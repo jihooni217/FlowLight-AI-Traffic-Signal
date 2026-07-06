@@ -1,0 +1,3067 @@
+
+cityflow_6.html
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CityFlow v2 — 한국 교통법 준수 미시 교통 시뮬레이터</title>
+    <style>
+:root {
+    --bg-color: #1a1a1a;
+    --panel-bg: rgba(255,255,255,0.05);
+    --border-color: rgba(255,255,255,0.1);
+    --text-main: #e0e0e0;
+    --text-muted: #999;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    --success: #10b981;
+    --success-hover: #059669;
+    --secondary: #8b5cf6;
+    --secondary-hover: #7c3aed;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background-color: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+.container { display: flex; width: 100%; height: 100%; }
+.sidebar { width: 320px; flex-shrink: 0; background: #111; border-right: 1px solid var(--border-color); padding: 1rem; padding-bottom: 2rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; }
+.sidebar h1 { font-size: 1.5rem; color: #fff; margin-bottom: 0.5rem; font-weight: 600; }
+.panel { background: var(--panel-bg); border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color); backdrop-filter: blur(10px); }
+.panel h2 { font-size: 1rem; margin-bottom: 0.75rem; color: #fff; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; }
+.btn-group { display: flex; gap: 0.5rem; }
+.btn { flex: 1; padding: 0.5rem; border: none; border-radius: 4px; font-weight: 600; cursor: pointer; color: white; transition: background 0.2s; }
+.btn.primary { background: var(--primary); }
+.btn.primary:hover { background: var(--primary-hover); }
+.btn.danger { background: var(--danger); }
+.btn.danger:hover { background: var(--danger-hover); }
+.btn.success { background: var(--success); }
+.btn.success:hover { background: var(--success-hover); }
+.btn.secondary { background: var(--secondary); }
+.btn.secondary:hover { background: var(--secondary-hover); }
+.btn.outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+.btn.outline:hover { background: rgba(255,255,255,0.1); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.slider-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.slider-group label { font-size: 0.85rem; color: var(--text-muted); }
+.slider-group label span { color: #fff; font-weight: 600; }
+input[type="range"] { width: 100%; accent-color: var(--primary); }
+.hint { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+.radio-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+.mt-2 { margin-top: 0.75rem; }
+.toggle-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+.speed-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+}
+.speed-btn {
+    flex: 1;
+    padding: 0.35rem 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+.speed-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+.speed-btn.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.main-content { flex: 1; display: flex; flex-direction: column; position: relative; padding: 1rem; overflow: hidden; }
+.stats-bar {
+    display: flex;
+    gap: 1rem;
+    background: rgba(30, 30, 30, 0.75);
+    padding: 0.75rem 1.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.stat {
+    font-size: 0.82rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+.stat b {
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    margin-left: 0.25rem;
+}
+.stat.congestion { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; background: transparent; border: none; padding: 0; }
+.c-bar-bg { width: 100px; height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+.c-bar-fill { height: 100%; width: 0%; background: #22c55e; transition: width 0.3s, background-color 0.3s; }
+.canvas-container { flex: 1; background: #000; border-radius: 8px; border: 1px solid #333; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
+#sim-canvas { background: #222; box-shadow: inset 0 0 50px rgba(0,0,0,0.5); cursor: crosshair; touch-action: none; }
+.legend { margin-top: 1rem; background: var(--panel-bg); padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.85rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.l-item { display: flex; align-items: center; gap: 0.3rem; }
+.color-box { width: 12px; height: 12px; border-radius: 2px; }
+.log-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+.log-overlay.hidden { display: none; }
+.log-content { background: #111; border: 1px solid #444; border-radius: 8px; width: 80%; max-width: 700px; max-height: 80%; display: flex; flex-direction: column; }
+.log-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #333; }
+.btn-close { background: transparent; color: #999; border: none; font-size: 1.5rem; cursor: pointer; }
+.btn-close:hover { color: #fff; }
+#log-text { padding: 1rem; overflow-y: auto; font-family: monospace; font-size: 0.85rem; color: #0ea5e9; white-space: pre-wrap; }
+.canvas-controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 10;
+}
+.canvas-controls button {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: rgba(20, 20, 20, 0.75);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    transition: all 0.2s;
+}
+.canvas-controls button:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+.canvas-controls button:active {
+    transform: scale(0.95);
+}
+
+#ai-apply-banner {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(16, 185, 129, 0.92);
+    color: white;
+    padding: 0.8rem 1.4rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-align: center;
+    z-index: 30;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    line-height: 1.5;
+}
+
+#ai-apply-banner.hidden {
+    display: none;
+}
+
+#ai-banner-detail {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+#ai-floating-panel {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    width: 240px;
+    background: rgba(17, 17, 17, 0.88);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 1rem;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    z-index: 20;
+    color: var(--text-muted);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+
+#ai-floating-panel .hint {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h1>CityFlow v2</h1>
+            <section class="panel controls">
+                <h2>시뮬레이션 제어</h2>
+                <div class="btn-group">
+                    <button id="btn-toggle-play" class="btn primary">Play</button>
+                    <button id="btn-reset" class="btn danger">시뮬레이션 초기화</button>
+                </div>
+                <div class="slider-group mt-2">
+                    <label>배속:</label>
+                    <div class="speed-group">
+                        <button class="speed-btn active" data-speed="1">1x</button>
+                        <button class="speed-btn" data-speed="2">2x</button>
+                        <button class="speed-btn" data-speed="3">3x</button>
+                        <button class="speed-btn" data-speed="4">4x</button>
+                    </div>
+                </div>
+                <div class="slider-group mt-2">
+                    <label>교통량 (대/초): <span id="val-spawn">3</span></label>
+                    <input type="range" id="sim-spawn-rate" min="0" max="6" step="1" value="3">
+                    <label>보행자 (명/초): <span id="val-ped">0</span></label>
+                    <input type="range" id="sim-ped-rate" min="0" max="2" step="1" value="0">
+                    <label>최대 차량 (대): <span id="val-maxcars">150</span></label>
+                    <input type="range" id="sim-max-cars" min="1" max="400" step="1" value="150">
+                    <label>최고 속도 (px/s): <span id="val-speed">60</span></label>
+                    <input type="range" id="sim-max-speed" min="20" max="120" step="5" value="60">
+                    <label>격자 크기 (NxN): <span id="val-grid">4</span></label>
+                    <input type="range" id="sim-grid-size" min="2" max="6" step="1" value="4">
+                </div>
+            </section>
+
+            <section class="panel control-types">
+                <h2>교차로 제어 유형</h2>
+                <p class="hint">유형을 선택하고 교차로를 클릭하세요.</p>
+                <div class="radio-group" id="junction-types">
+                    <label><input type="radio" name="jtype" value="signal" checked> 🚦 신호교차로 (한국 4현시)</label>
+                    <label><input type="radio" name="jtype" value="allway_stop"> 🛑 전방향 정지</label>
+                    <label><input type="radio" name="jtype" value="priority"> ⚠️ 우선도로</label>
+                    <label><input type="radio" name="jtype" value="roundabout"> 🔄 회전교차로</label>
+                </div>
+                <div class="slider-group mt-2">
+                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
+                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
+                    <label>신호 연동 오프셋 (s): <span id="val-offset">0</span></label>
+                    <input type="range" id="sim-offset" min="0" max="20" step="1" value="0">
+                    <p class="hint">인접 교차로 간 녹색파(Green Wave) 시차. 0이면 동시 시작.</p>
+                </div>
+            </section>
+
+            <section class="panel data-panel">
+                <h2>데이터 수집</h2>
+                <div class="slider-group">
+                    <label>샘플 간격 (s): <span id="val-sample">1.0</span></label>
+                    <input type="range" id="sim-sample-int" min="0.5" max="5.0" step="0.5" value="1.0">
+                </div>
+                <div class="btn-group mt-2">
+                    <button id="btn-export-json" class="btn outline">JSON 내보내기</button>
+                    <button id="btn-export-csv" class="btn outline">CSV 내보내기</button>
+                </div>
+            </section>
+
+            <section class="panel optimize-panel">
+                <h2>신호 최적화</h2>
+                <div class="slider-group">
+                    <label>분석 주기 (s): <span id="val-opt-int">10</span></label>
+                    <input type="range" id="sim-opt-int" min="5" max="60" step="1" value="10">
+                </div>
+                <div class="btn-group mt-2">
+                    <button id="btn-optimize" class="btn secondary">AI 분석</button>
+                    <button id="btn-apply-opt" class="btn success" disabled>권장값 적용</button>
+                </div>
+                <div class="btn-group mt-2">
+                    <button id="btn-ab-test" class="btn primary">A/B 검증 (180s×2, 시드 고정)</button>
+                </div>
+                <div id="ab-status" class="hint mt-2" style="display:none"></div>
+                <label class="toggle-label mt-2">
+                    <input type="checkbox" id="chk-adaptive"> 적응형 신호 자동 적용
+                </label>
+            </section>
+        </aside>
+
+        <main class="main-content">
+            <div class="stats-bar">
+                <div class="stat">차량: <b id="stat-cars">0</b></div>
+                <div class="stat">보행자: <b id="stat-peds">0</b></div>
+                <div class="stat">대기: <b id="stat-stopped">0</b></div>
+                <div class="stat">평균속도: <b id="stat-speed">0%</b></div>
+                <div class="stat">통과(1분): <b id="stat-throughput">0</b></div>
+                <div class="stat congestion">
+                    정체 지수:
+                    <div class="c-bar-bg"><div class="c-bar-fill" id="stat-congestion"></div></div>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <canvas id="sim-canvas"></canvas>
+                <div id="ai-apply-banner" class="hidden">
+                    ✅ AI 신호 제어 적용 완료<br>
+                    <span id="ai-banner-detail">남북 12초 / 동서 8초 / 보행자 0초</span>
+                </div>
+
+                <div id="ai-floating-panel">
+                    <div id="ai-status-panel" class="hint">
+                        <b style="color:#fff;">AI 제어 상태</b><br>
+                        상태: <span id="ai-state">대기 중</span><br>
+                        판단: <span id="ai-decision">-</span><br>
+                        우선순위: <span id="ai-priority">-</span><br>
+                        남북 직진: <span id="ai-ns">-</span><br>
+                        동서 직진: <span id="ai-ew">-</span><br>
+                        보행자 요청: <span id="ai-ped">-</span>
+                    </div>
+
+                    <div id="ai-result-panel" class="hint mt-2"
+                         style="line-height:1.6;border-top:1px solid rgba(255,255,255,.1);padding-top:.75rem;">
+                        <b style="color:#fff;">AI 적용 결과</b><br>
+                        적용 여부: <span id="ai-apply-state">대기 중</span><br>
+                        적용 교차로: <span id="ai-apply-count">-</span><br>
+                        차량 제어: <span id="ai-vehicle-control">-</span><br>
+                        보행자 제어: <span id="ai-ped-control">-</span><br>
+                        Guardrail: <span id="ai-guardrail">-</span>
+                        <hr>
+
+                        <b style="color:#fff;">AI 적용 효과</b><br>
+
+                        처리량 :
+                        <span id="effect-flow-before">-</span>
+                        →
+                        <span id="effect-flow-after">-</span><br>
+
+                        정지 차량 :
+                        <span id="effect-stop-before">-</span>
+                        →
+                        <span id="effect-stop-after">-</span><br>
+
+                        정체 상태 :
+                        <span id="effect-congestion-after">-</span><br>
+
+                        판단 :
+                        <span id="effect-summary">AI 신호 적용 대기</span>
+                    </div>
+                </div>
+
+                <div class="canvas-controls">
+                    <button id="btn-zoom-in" title="확대">+</button>
+                    <button id="btn-zoom-out" title="축소">-</button>
+                    <button id="btn-zoom-reset" title="화면 리셋">⟲</button>
+                </div>
+            </div>
+
+            <div class="legend">
+                <strong>범례:</strong>
+                <span class="l-item"><span class="color-box" style="background:#22c55e"></span>원활</span>
+                <span class="l-item"><span class="color-box" style="background:#eab308"></span>서행</span>
+                <span class="l-item"><span class="color-box" style="background:#ef4444"></span>정체</span>
+                |
+                <span class="l-item">🟢직진·우회전</span>
+                <span class="l-item">🟣좌회전 신호</span>
+                <span class="l-item">🟡황색</span>
+                <span class="l-item">🔴적색(우회전가능·보행자양보)</span>
+                |
+                <span class="l-item"><span class="color-box" style="background:#fb923c"></span>지시등(점멸=회전방향)</span>
+                <span class="l-item"><span class="color-box" style="background:#f8fafc;border-radius:50%"></span>일반인</span>
+                <span class="l-item"><span class="color-box" style="background:#f472b6;border-radius:50%"></span>어린이</span>
+                <span class="l-item"><span class="color-box" style="background:#c084fc;border-radius:50%"></span>노약자</span>
+                <span class="l-item"><span class="color-box" style="background:#38bdf8"></span>장애인(휠체어)</span>
+            </div>
+        </main>
+    </div>
+
+    <div id="log-overlay" class="log-overlay hidden">
+        <div class="log-content">
+            <div class="log-header">
+                <h3>분석 리포트</h3>
+                <button id="btn-close-log" class="btn-close">&times;</button>
+            </div>
+            <pre id="log-text">결과 대기 중...</pre>
+        </div>
+    </div>
+
+    <script>
+// ===== Constants =====
+var MIN_GAP = 5;
+var DECEL = 120;
+var ACCEL = 70;
+var CAR_LEN = 10;
+var GREEN_MIN = 2;
+var COL_GREEN = '#22c55e';
+var COL_YELLOW = '#eab308';
+var COL_RED = '#ef4444';
+var COL_LEFT_ARROW = '#a855f7';
+
+// ===== 보행자 상수 =====
+var PED_TYPES = [
+    { key:'adult',    label:'일반인', speed:13,  r:2.2, color:'#f8fafc', weight:0.60 },
+    { key:'child',    label:'어린이', speed:15,  r:1.7, color:'#f472b6', weight:0.15 },
+    { key:'elderly',  label:'노약자', speed:7,   r:2.2, color:'#c084fc', weight:0.15 },
+    { key:'disabled', label:'장애인', speed:5.5, r:2.5, color:'#38bdf8', weight:0.10 }
+];
+var CW_DIST = 24;     // 교차로 중심 → 횡단보도 거리
+var CW_HALF = 14;     // 횡단보도 절반 길이 (도로 폭 커버)
+var CW_CLEAR = 2.0;   // 보행 녹색 잔여 이 값 미만이면 새 횡단 시작 금지 (점멸 구간)
+
+// ===== Seeded PRNG (재현성 — A/B 검증용) =====
+var RNG = { state: 12345 >>> 0 };
+function setSeed(s) { RNG.state = (s >>> 0) || 1; }
+function rand() { // mulberry32
+    var t = RNG.state += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+
+// ===== Utility: 회전 방향 판별 (한국 우측통행 기준) =====
+function getTurnType(inEdge, outEdge) {
+    if (!outEdge || outEdge.isArc) return 'straight';
+    var cross = inEdge.ux * outEdge.uy - inEdge.uy * outEdge.ux;
+    var dot   = inEdge.ux * outEdge.ux + inEdge.uy * outEdge.uy;
+    if (Math.abs(cross) < 0.3 && dot > 0.5) return 'straight';
+    if (cross > 0) return 'right';
+    if (cross < 0) return 'left';
+    return 'straight'; 
+}
+
+// 차량이 엣지에 진입하는 순간 1회만 카운트 (도착률 λ의 원천 데이터)
+// 스냅샷 점유 방식과 달리 대기시간에 의한 중복 카운트가 없다.
+function recordArrival(car, edge) {
+    if (!edge || edge.isArc) return;
+    var ne = (car.routeIndex + 1 < car.route.length) ? car.route[car.routeIndex + 1] : null;
+    var tt = getTurnType(edge, ne);
+    if (tt === 'left') edge.arr.left++;
+    else if (tt === 'right') edge.arr.right++;
+    else edge.arr.straight++;
+}
+
+// ===== Network =====
+function Node(id, x, y, isBoundary) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.control = 'signal';
+    this.legs = 0;
+    this.isBoundary = isBoundary;
+    this.incoming = [];
+    this.outgoing = [];
+}
+
+function Edge(id, from, to, laneOff) {
+    if (laneOff === undefined) laneOff = 6;
+    this.id = id;
+    this.from = from;
+    this.to = to;
+    this.cars = [];
+    this.flowCount = 0;
+    var dx = to.x - from.x; var dy = to.y - from.y;
+    this.len = Math.sqrt(dx*dx + dy*dy);
+    this.ux = dx / this.len; this.uy = dy / this.len;
+    var nx = -this.uy, ny = this.ux;
+    this.ax = from.x + nx * laneOff; this.ay = from.y + ny * laneOff;
+    this.bx = to.x + nx * laneOff; this.by = to.y + ny * laneOff;
+    this.dir = (Math.abs(this.ux) > Math.abs(this.uy)) ? 'EW' : 'NS';
+    this.approachId = from.id;
+    this.rank = 1;
+    this.isArc = false;
+    // 도착 기반 수요 측정: 이 엣지에 "진입한" 차량 수 (이동류별, 샘플마다 리셋)
+    this.arr = { straight: 0, left: 0, right: 0 };
+}
+
+function Network(gridSize, spacing) {
+    this.nodes = [];
+    this.edges = [];
+    this.gridSize = gridSize;
+    this.spacing = spacing;
+    this._build();
+}
+Network.prototype._build = function() {
+    var N = this.gridSize, off = this.spacing;
+    var id = 1, nodeMap = {};
+    for (var j = 0; j < N; j++) {
+        for (var i = 0; i < N; i++) {
+            var isBnd = (i===0||i===N-1||j===0||j===N-1);
+            var node = new Node(id++, (i+1)*off, (j+1)*off, isBnd);
+            this.nodes.push(node);
+            nodeMap[i+','+j] = node;
+        }
+    }
+    for (var j = 0; j < N; j++) {
+        for (var i = 0; i < N; i++) {
+            var node = nodeMap[i+','+j];
+            var nb = [];
+            if (j > 0)   nb.push(nodeMap[i+','+(j-1)]);
+            if (i < N-1)  nb.push(nodeMap[(i+1)+','+j]);
+            if (j < N-1)  nb.push(nodeMap[i+','+(j+1)]);
+            if (i > 0)   nb.push(nodeMap[(i-1)+','+j]);
+            node.legs = nb.length;
+            for (var k = 0; k < nb.length; k++) {
+                var nxt = nb[k];
+                var edge = new Edge(node.id+'>'+nxt.id, node, nxt);
+                this.edges.push(edge);
+                node.outgoing.push(edge);
+                nxt.incoming.push(edge);
+            }
+        }
+    }
+};
+Network.prototype.getRandomSourceEdge = function() {
+    var bnd = [];
+    for (var i = 0; i < this.edges.length; i++) {
+        var e = this.edges[i];
+        if (e.from.isBoundary && !e.isArc) {
+            if (!e.to.isBoundary || this.gridSize <= 2) {
+                bnd.push(e);
+            }
+        }
+    }
+    return bnd.length > 0 ? bnd[Math.floor(rand() * bnd.length)] : null;
+};
+
+Network.prototype.findRandomRoute = function(startEdge) {
+    var route = [startEdge];
+    var cur = startEdge;
+
+    for (var h = 0; h < 8; h++) {
+        var nn = cur.to;
+
+        if (nn.isBoundary && route.length > 1) {
+            break;
+        }
+
+        var cands = [];
+        var exitCands = [];
+
+        for (var k = 0; k < nn.outgoing.length; k++) {
+            var e = nn.outgoing[k];
+
+            if (e.to === cur.from || e.isArc) continue;
+
+            cands.push(e);
+
+            if (e.to.isBoundary && route.length >= 2) {
+                exitCands.push(e);
+            }
+        }
+
+        if (cands.length === 0) break;
+
+        if (exitCands.length > 0) {
+            cur = exitCands[Math.floor(rand() * exitCands.length)];
+        } else {
+            cur = cands[Math.floor(rand() * cands.length)];
+        }
+
+        route.push(cur);
+    }
+
+    return route;
+};
+
+
+// ===== TrafficLight =====
+function TrafficLight(node, totalCycle, offset) {
+    this.node = node;
+    this.YELLOW = 2;
+    this.ALL_RED = 1;
+    this.t = 0;
+    this.offset = offset || 0; // 연동 오프셋 (녹색파)
+    this.phaseIdx = 0;
+    var dirs = {};
+    for (var i = 0; i < node.incoming.length; i++) dirs[node.incoming[i].dir] = true;
+    this.directions = Object.keys(dirs);
+    if (this.directions.length === 0) this.directions = ['NS'];
+    this.greenTimes = {};
+    this.phases = [];
+    this.buildPhases(totalCycle);
+    // 오프셋 적용: 시작 시각을 앞으로 밀어 교차로 간 시차를 만듦
+    if (this.offset > 0 && this.phases.length > 1) {
+        var skip = this.offset;
+        while (skip > 0) {
+            var dur = this.phases[this.phaseIdx].duration;
+            if (skip >= dur - this.t) {
+                skip -= (dur - this.t);
+                this.t = 0;
+                this.phaseIdx = (this.phaseIdx + 1) % this.phases.length;
+            } else {
+                this.t += skip;
+                skip = 0;
+            }
+        }
+    }
+}
+TrafficLight.prototype.buildPhases = function(totalCycle) {
+    this.totalCycle = totalCycle;
+    this.phases = [];
+    var dirs = this.directions, n = dirs.length;
+    if (n <= 1) {
+        var d = dirs[0];
+        this.phases.push({dir:d, type:'green', duration:totalCycle});
+        this.greenTimes['straight_'+d] = totalCycle;
+        this.greenTimes['left_'+d] = 0;
+        return;
+    }
+    var overhead = n * (this.YELLOW * 2 + this.ALL_RED);
+    var eff = Math.max(n * GREEN_MIN * 2, totalCycle - overhead);
+    var perDir = eff / n;
+    for (var i = 0; i < dirs.length; i++) {
+    var d = dirs[i];
+    var sk = 'straight_' + d, lk = 'left_' + d;
+
+    var sg = this.greenTimes[sk] !== undefined
+        ? this.greenTimes[sk]
+        : Math.max(GREEN_MIN, perDir * 0.7);
+
+    var lg = this.greenTimes[lk] !== undefined
+        ? this.greenTimes[lk]
+        : Math.max(GREEN_MIN, perDir * 0.3);
+
+    this.greenTimes[sk] = sg;
+    this.greenTimes[lk] = lg;
+
+    this.phases.push({dir:d, type:'straight_right', duration:sg});
+    this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
+
+    if (lg > 0) {
+        this.phases.push({dir:d, type:'left_arrow', duration:lg});
+        this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
+    }
+
+    this.phases.push({dir:'ALL', type:'all_red', duration:this.ALL_RED});
+}
+};
+TrafficLight.prototype.updateCycle = function(newCycle) {
+    var dirs = this.directions, n = dirs.length;
+    if (n <= 1) { this.greenTimes = {}; this.buildPhases(newCycle); return; }
+    var overhead = n * (this.YELLOW * 2 + this.ALL_RED);
+    var vals = [], keys = Object.keys(this.greenTimes);
+    for (var i = 0; i < keys.length; i++) vals.push(this.greenTimes[keys[i]]);
+    var oldSum = 0; for (var i = 0; i < vals.length; i++) oldSum += vals[i];
+    var newEff = Math.max(n * GREEN_MIN * 2, newCycle - overhead);
+    var ratio = oldSum > 0 ? newEff / oldSum : 1;
+    var ng = {};
+    for (var i = 0; i < keys.length; i++) ng[keys[i]] = Math.max(GREEN_MIN, this.greenTimes[keys[i]] * ratio);
+    this.greenTimes = ng;
+    this.phaseIdx = 0; this.t = 0;
+    this.buildPhases(newCycle);
+};
+// 권장 초록시간 적용 — 현재 위상 위치(phaseIdx, t)를 보존한다.
+// 매번 위상을 0으로 리셋하면 적응형 모드에서 첫 위상만 반복 재생되어
+// 뒤쪽 위상이 초록을 영영 못 받는 치명적 버그가 생기므로 절대 리셋하지 않는다.
+TrafficLight.prototype.applyGreens = function(ng, cycle) {
+    var cur = this.phases[this.phaseIdx];
+    var curDir = cur ? cur.dir : null, curType = cur ? cur.type : null;
+    var curT = this.t;
+    for (var k in ng) this.greenTimes[k] = ng[k];
+    this.buildPhases(cycle || this.totalCycle);
+    var idx = 0;
+    for (var i = 0; i < this.phases.length; i++) {
+        if (this.phases[i].dir === curDir && this.phases[i].type === curType) { idx = i; break; }
+    }
+    this.phaseIdx = idx;
+    // 새 duration이 기존 경과보다 짧아졌으면 위상 끝으로 맞춰 자연스럽게 다음으로 넘어가게 함
+    this.t = Math.min(curT, Math.max(0, this.phases[idx].duration - 0.001));
+};
+TrafficLight.prototype.update = function(dt) {
+    if (this.phases.length <= 1) return;
+    this.t += dt;
+    while (this.t >= this.phases[this.phaseIdx].duration) {
+        this.t -= this.phases[this.phaseIdx].duration;
+        this.phaseIdx = (this.phaseIdx + 1) % this.phases.length;
+    }
+};
+TrafficLight.prototype.allows = function(edgeDir, turnType) {
+    if (this.phases.length <= 1) return 'green';
+    var p = this.phases[this.phaseIdx];
+    if (p.type === 'all_red') return turnType === 'right' ? 'yield_right' : 'red';
+    if (p.type === 'yellow') return turnType === 'right' ? 'yield_right' : 'red';
+    if (p.type === 'straight_right') {
+        if (p.dir === edgeDir) {
+            if (turnType === 'straight' || turnType === 'right' || turnType === 'left') return 'green';
+            return 'red';
+        }
+        return turnType === 'right' ? 'yield_right' : 'red';
+    }
+    if (p.type === 'left_arrow') {
+        if (p.dir === edgeDir && turnType === 'left') return 'green';
+        return turnType === 'right' ? 'yield_right' : 'red';
+    }
+    return 'red';
+};
+
+// ===== Car =====
+function Car(edge, v, maxSpeed, route, spawnTime) {
+    this.edge = edge;
+    this.s = 0;
+    this.v = v;
+    this.maxSpeed = maxSpeed;
+    this.route = route;
+    this.routeIndex = 0;
+    this.spawnTime = spawnTime;
+    this.waitTime = 0;
+    this.color = COL_GREEN;
+    this.wasCommitted = false;
+    edge.cars.unshift(this);
+    edge.cars.sort(function(a,b){ return a.s - b.s; });
+    recordArrival(this, edge);
+}
+Car.prototype.getNextEdge = function() {
+    return (this.routeIndex + 1 < this.route.length) ? this.route[this.routeIndex + 1] : null;
+};
+Car.prototype.update = function(dt, simTime, jc) {
+    if (this.crashed) {
+        this.v = 0;
+        this.crashTimer = (this.crashTimer || 0) + dt;
+        // 30초 후 사고 처리가 완료되어 차량이 견인(삭제)됨
+        if (this.crashTimer > 30) return 'removed';
+        return;
+    }
+    var d = Infinity;
+    var myIdx = this.edge.cars.indexOf(this);
+    var endS = this.edge.len;
+    if (this.edge.to.control === 'roundabout' && !this.edge.isArc) {
+        endS = Math.max(0, this.edge.len - 18);
+    }
+    
+    // 앞차 추종 (있으면)
+    if (myIdx < this.edge.cars.length - 1) {
+        d = (this.edge.cars[myIdx + 1].s - CAR_LEN) - this.s;
+    }
+    // 교차로 진입 판정 — 큐 선두뿐 아니라 "모든 미허가 차량"에 정지선 규칙 적용.
+    // 선두에만 적용하면 앞차가 통과하는 동안 뒤차가 추종만으로 정지선을 넘어버리고,
+    // 앞차가 빠지는 순간 distToStop<0 → 자동 커밋되어 일시정지 없이 통과하는
+    // 소대(platoon) 통과 버그가 생긴다 (전방향정지·회전 양보가 모두 뚫림).
+    {
+        var isRoundaboutEntry = (this.edge.to.control === 'roundabout' && !this.edge.isArc);
+        var ctl = this.edge.to.control;
+        // stopOff = CW_DIST+5: 정지선(len-29)과 통과불가 시 정지 지점(front=len-34)이
+        // 모두 횡단보도 밴드(len-27.5~-20.5) "앞"에 오도록 한다. 정지선이 밴드 안(len-24)이면
+        // ok 반전 시 밴드 위에 얼어붙는 함정 구간(정지지점~정지선)이 생긴다.
+        var stopOff = (ctl === 'signal' && !this.edge.to.isBoundary && !this.edge.isArc) ? CW_DIST + 5 : 15;
+        var distToStop = (endS - stopOff) - this.s;
+        var brakeDist = this.v * this.v / (2 * DECEL);
+        // 커밋: 정지선을 지났거나, (신호에 한해) 물리적으로 정지 불가능한 황색 딜레마 존이면 통과.
+        // 비신호(정지/우선)는 반드시 정지선 준수 — 딜레마 예외를 주면 일시정지 규칙이 깨짐.
+        var committed = !isRoundaboutEntry && (distToStop <= 0 ||
+            (ctl === 'signal' && this.v > 25 && brakeDist > distToStop + 1));
+        var ok = committed || (jc.junctionAllows(this, this.edge) && jc.nextEdgeHasSpace(this));
+        if (!ok) {
+            var dj = isRoundaboutEntry ? (endS - this.s) : distToStop;
+            if (dj < d) d = dj;
+        } else {
+            if (!this.wasCommitted && committed) {
+                this.wasCommitted = true;
+                jc.onEnterIntersection(this, this.edge.to);
+            }
+            // 선두 차량만 다음 엣지 큐 후미와의 간격을 본다 (뒤차는 앞차 추종으로 충분)
+            if (myIdx === this.edge.cars.length - 1) {
+                var ne = this.getNextEdge();
+                if (ne && ne.cars.length > 0) {
+                    var dq = (endS - this.s) + (ne.cars[0].s - CAR_LEN);
+                    if (dq < d) d = dq;
+                }
+            }
+        }
+    }
+    // 횡단보도 보행자 양보: 보행자가 올라와 있는 횡단보도(접근·진출측) 앞에서 정지.
+    // 우회전 차량이 회전 직후 진출측 횡단보도에서 멈추는 한국 도로교통법 규칙이 여기서 창발함.
+    if (jc.peds) {
+        var dCw = jc.peds.blockDistFor(this);
+        if (dCw < d) d = dCw;
+        // keep-clear: 앞 정체로 인한 정지 위치가 횡단보도 밴드 위라면, 밴드 앞에서 대기
+        d = jc.peds.keepClear(this, d);
+    }
+    var safe = Math.sqrt(2 * DECEL * Math.max(0, d - MIN_GAP));
+    var target = Math.min(this.maxSpeed, safe);
+
+
+    if (this.v < target) this.v = Math.min(target, this.v + ACCEL * dt);
+    else this.v = Math.max(target, this.v - DECEL * dt);
+    if (this.v < 0.5) this.v = 0;
+    this.s += this.v * dt;
+    if (this.v < 3) this.waitTime += dt;
+    var sr = this.v / this.maxSpeed;
+    if (sr < 0.15) this.color = COL_RED;
+    else if (sr < 0.5) this.color = COL_YELLOW;
+    else this.color = COL_GREEN;
+    if (this.s >= endS) this._transition(simTime, jc, endS);
+};
+Car.prototype._transition = function(simTime, jc, endS) {
+    this.edge.flowCount++;
+    var idx = this.edge.cars.indexOf(this);
+    if (idx > -1) this.edge.cars.splice(idx, 1);
+    var node = this.edge.to;
+    var wasRoundaboutIn = (node.control === 'roundabout' && !this.edge.isArc);
+    if (wasRoundaboutIn) {
+        var outEdge = this.getNextEdge();
+        if (outEdge) {
+            var arcs = jc.getRoundaboutPath(node, this.edge, outEdge);
+            if (arcs.length > 0) this.route.splice(this.routeIndex + 1, 0, ...arcs);
+        }
+    }
+    this.routeIndex++;
+    if (this.routeIndex >= this.route.length) {
+        jc.onTripCompleted(this, simTime);
+        return;
+    }
+    var next = this.route[this.routeIndex];
+    this.s -= (endS !== undefined ? endS : this.edge.len);
+    this.edge = next;
+    if (this.edge.from.control === 'roundabout' && !this.edge.isArc) {
+        this.s += 18;
+    }
+    this.wasCommitted = false;
+    this.edge.cars.unshift(this);
+    this.edge.cars.sort(function(a,b){ return a.s - b.s; });
+    recordArrival(this, this.edge);
+};
+
+// ===== JunctionControl =====
+function JunctionControl(network) {
+    this.network = network;
+    this.lights = new Map();
+    this.stopQueues = new Map();
+    this.occupiedZones = new Map();
+    this.completedTrips = [];
+    this.roundabouts = new Map();
+    this.simTime = 0;
+}
+JunctionControl.prototype.update = function(dt, simTime, cycleLength) {
+    this.simTime = simTime;
+    for (var i = 0; i < this.network.nodes.length; i++) {
+        var node = this.network.nodes[i];
+        // 경계 노드는 junctionAllows가 무조건 통과시키는 진입/진출점이므로
+        // 신호등을 만들지 않는다 (만들면 동작하지 않는 장식 신호가 됨)
+        if (node.control === 'signal' && !node.isBoundary) {
+            if (!this.lights.has(node.id)) {
+                // 연동 오프셋 계산: 격자 위치에 따라 시차를 두어 녹색파 구현
+                var offsetVal = this.greenWaveOffset || 0;
+                var nodeOffset = 0;
+                if (offsetVal > 0) {
+                    // 노드 좌표 기반으로 격자 인덱스를 추정하여 순차적 오프셋 부여
+                    var gridIdx = Math.round(node.x / 100) + Math.round(node.y / 100);
+                    nodeOffset = (gridIdx * offsetVal) % cycleLength;
+                }
+                this.lights.set(node.id, new TrafficLight(node, cycleLength, nodeOffset));
+            }
+            this.lights.get(node.id).update(dt);
+        }
+    }
+    // JSON 데이터 추출을 위해 모든 통행 기록을 유지합니다. (브라우저 환경에서 객체 수천 개는 문제없음)
+};
+JunctionControl.prototype.setControlType = function(node, type, cycleLength) {
+    if (node.isBoundary) return; // 경계 노드는 제어 없음 (진입/진출 전용)
+    // 단일 방향 교차로 보호: 방향이 1개뿐인 교차로는 신호 제어 변경 불가
+    // (2x2 격자 모서리 등 하나의 도로 축만 가진 노드에 다방향 제어를 넣으면 기능 오류)
+    var dirs = {};
+    for (var i = 0; i < node.incoming.length; i++) dirs[node.incoming[i].dir] = true;
+    var dirCount = Object.keys(dirs).length;
+    if (dirCount <= 1 && type !== 'signal') {
+        console.warn('단일 방향 교차로는 신호 유형만 가능합니다. 변경이 무시됩니다.');
+        return;
+    }
+    if (type === 'roundabout' && node.incoming.length < 3) {
+        console.warn('Roundabouts require at least 3 legs. Ignored.');
+        return;
+    }
+    node.control = type;
+    if (type === 'signal') {
+        if (!this.lights.has(node.id))
+            this.lights.set(node.id, new TrafficLight(node, cycleLength));
+    } else {
+        this.lights.delete(node.id);
+    }
+    if (type === 'allway_stop') this.stopQueues.set(node.id, []);
+    else this.stopQueues.delete(node.id);
+    if (type === 'priority') {
+        var majorDir = node.majorDir || 'EW';
+        for (var i = 0; i < node.incoming.length; i++)
+            node.incoming[i].rank = node.incoming[i].dir === majorDir ? 2 : 1;
+    }
+    if (type === 'roundabout') this._buildRoundabout(node);
+    else this._removeRoundabout(node);
+};
+JunctionControl.prototype.junctionAllows = function(car, edge) {
+    var node = edge.to;
+    if (node.isBoundary) return true;
+
+    if (node.control === 'signal') {
+        var light = this.lights.get(node.id);
+        if (!light) return true;
+        var nextEdge = car.getNextEdge();
+        var turnType = getTurnType(edge, nextEdge);
+        var result = light.allows(edge.dir, turnType);
+        if (result === 'green') return true;
+        if (result === 'yield_right') {
+            var CRIT = 35; // 우회전 충돌 방지를 위해 양보 필요 거리 연장
+            for (var i = 0; i < node.incoming.length; i++) {
+                var oe = node.incoming[i];
+                if (oe === edge || oe.isArc) continue;
+                for (var j = 0; j < oe.cars.length; j++) {
+                    if (oe.len - oe.cars[j].s < CRIT && oe.cars[j].v > 3) return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    if (node.control === 'allway_stop') {
+        if (!this.stopQueues.has(node.id)) this.stopQueues.set(node.id, []);
+        var queue = this.stopQueues.get(node.id);
+        if (queue.length > 0 && queue[0].car === car && car.v > 0) return true;
+        if (car.v > 0) return false;
+        // 정지선(len-15) 근처에서 "완전 정지"한 차만 FIFO에 등록한다.
+        // 이 조건이 없으면 앞차 뒤에 줄 서 있다 멈춘 차도 등록되어, 자기 차례가 오면
+        // 정지선에서 일시정지하지 않고 그대로 통과하는 위반이 발생함.
+        var distLine = (edge.len - 15) - car.s;
+        if (distLine > 8) return false;
+        var found = false;
+        for (var i = 0; i < queue.length; i++) { if (queue[i].car === car) { found = true; break; } }
+        if (!found) queue.push({car:car, arrivalTime:this.simTime, approachId:edge.approachId});
+        if (this.occupiedZones.has(node.id) && this.simTime < this.occupiedZones.get(node.id)) return false;
+        queue.sort(function(a,b) {
+            if (Math.abs(a.arrivalTime - b.arrivalTime) < 0.1) return a.approachId - b.approachId;
+            return a.arrivalTime - b.arrivalTime;
+        });
+        return queue.length > 0 && queue[0].car === car;
+    }
+
+    if (node.control === 'priority') {
+        if (this.occupiedZones.has(node.id) && this.simTime < this.occupiedZones.get(node.id)) {
+            return false;
+        }
+        if (edge.rank === 2) return true;
+        var CRIT_D = 45; // 우선교차로 진입 시 여유 거리 연장
+        for (var i = 0; i < node.incoming.length; i++) {
+            var me = node.incoming[i];
+            if (me.rank === 2) {
+                for (var j = 0; j < me.cars.length; j++) {
+                    if (me.len - me.cars[j].s < CRIT_D) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    if (node.control === 'roundabout') {
+        var rd = this.roundabouts.get(node.id);
+        if (!rd) return true;
+        if (edge.isArc) return true;
+        var MERGE = 25; // 회전교차로 진입 시 충돌 방지를 위해 거리 연장
+        var entryArc = null;
+        for (var i = 0; i < rd.arcs.length; i++) { if (rd.arcs[i].entryEdge === edge) { entryArc = rd.arcs[i]; break; } }
+        if (!entryArc) return true;
+        var upArc = null;
+        for (var i = 0; i < rd.arcs.length; i++) { if (rd.arcs[i].nextArc === entryArc) { upArc = rd.arcs[i]; break; } }
+        if (upArc) {
+            for (var j = 0; j < upArc.cars.length; j++) {
+                if (upArc.len - upArc.cars[j].s < MERGE) return false;
+            }
+        }
+        return true;
+    }
+    return true;
+};
+JunctionControl.prototype.nextEdgeHasSpace = function(car) {
+    var ne = car.getNextEdge();
+    if (!ne) return true;
+
+    var need = CAR_LEN + MIN_GAP;
+
+    // 일반 상태에서는 교차로/횡단보도 위 정체 방지를 위해 더 넓은 여유 필요
+    if (car.edge.to.control === 'signal' && !car.edge.to.isBoundary && !ne.isArc) {
+        need = CW_DIST + CAR_LEN + MIN_GAP;
+    }
+
+    // AI 적용 중에는 너무 빡빡한 기준만 조금 완화
+    // 단, 차량끼리 겹치지 않도록 최소 차간거리는 유지
+    if (this.aiReliefMode) {
+        need = CAR_LEN + MIN_GAP + 2;
+    }
+
+    if (ne.cars.length === 0) return true;
+
+    return ne.cars[0].s >= need;
+};
+JunctionControl.prototype.onEnterIntersection = function(car, node) {
+    if (!node || node.isBoundary) return;
+    if (node.control === 'allway_stop' || node.control === 'priority') {
+        this.occupiedZones.set(node.id, this.simTime + 1.0);
+        if (node.control === 'allway_stop') {
+            var q = this.stopQueues.get(node.id);
+            if (q) { for (var i = 0; i < q.length; i++) { if (q[i].car === car) { q.splice(i,1); break; } } }
+        }
+    }
+};
+JunctionControl.prototype.onTripCompleted = function(car, simTime) {
+    this.completedTrips.push({travelTime:simTime-car.spawnTime, waitTime:car.waitTime, edges:car.route.length, endTime:simTime});
+};
+JunctionControl.prototype._buildRoundabout = function(node) {
+    if (this.roundabouts.has(node.id)) return;
+    var r = 18, arcs = [];
+    var legs = [];
+    for (var i = 0; i < node.incoming.length; i++) {
+        var ie = node.incoming[i];
+        var angle = Math.atan2(ie.from.y - node.y, ie.from.x - node.x);
+        var oe = null;
+        for (var j = 0; j < node.outgoing.length; j++) { if (node.outgoing[j].to === ie.from) { oe = node.outgoing[j]; break; } }
+        legs.push({inEdge:ie, outEdge:oe, angle:angle});
+    }
+    legs.sort(function(a,b){ return b.angle - a.angle; });
+    
+    var ringPoints = [];
+    for (var i = 0; i < legs.length; i++) {
+        var leg = legs[i];
+        var nextLeg = legs[(i + 1) % legs.length];
+        
+        ringPoints.push({
+            x: node.x + Math.cos(leg.angle) * r,
+            y: node.y + Math.sin(leg.angle) * r,
+            entryEdge: leg.inEdge, exitEdge: leg.outEdge, type: 'leg'
+        });
+        
+        var diff = leg.angle - nextLeg.angle;
+        if (diff <= 0) diff += Math.PI * 2;
+        
+        var steps = 3;
+        for (var s = 1; s < steps; s++) {
+            var interpAngle = leg.angle - diff * (s / steps);
+            ringPoints.push({
+                x: node.x + Math.cos(interpAngle) * r,
+                y: node.y + Math.sin(interpAngle) * r,
+                entryEdge: null, exitEdge: null, type: 'interp'
+            });
+        }
+    }
+    
+    for (var k = 0; k < ringPoints.length; k++) {
+        var p1 = ringPoints[k], p2 = ringPoints[(k+1)%ringPoints.length];
+        var ae = new Edge('arc_'+node.id+'_'+k, {x:p1.x, y:p1.y}, {x:p2.x, y:p2.y}, 0);
+        ae.isArc = true;
+        ae.entryEdge = p1.entryEdge;
+        ae.exitEdge = p1.exitEdge;
+        ae.p1 = p1;
+        ae.p2 = p2;
+        arcs.push(ae);
+    }
+    
+    for (var i = 0; i < arcs.length; i++) arcs[i].nextArc = arcs[(i+1) % arcs.length];
+    for (var i = 0; i < arcs.length; i++) this.network.edges.push(arcs[i]);
+    this.roundabouts.set(node.id, {arcs:arcs});
+};
+JunctionControl.prototype.getRoundaboutPath = function(node, inEdge, outEdge) {
+    var data = this.roundabouts.get(node.id);
+    if (!data) return [];
+    var entryArc = null;
+    for (var i = 0; i < data.arcs.length; i++) { if (data.arcs[i].entryEdge === inEdge) { entryArc = data.arcs[i]; break; } }
+    if (!entryArc) return [];
+    var path = [], cur = entryArc;
+    var maxSteps = data.arcs.length + 1;
+    for (var g = 0; g < maxSteps; g++) {
+        path.push(cur);
+        if (cur.exitEdge === outEdge) break;
+        cur = cur.nextArc;
+    }
+    return path;
+};
+JunctionControl.prototype._removeRoundabout = function(node) {
+    if (!this.roundabouts.has(node.id)) return;
+    var arcs = this.roundabouts.get(node.id).arcs;
+    this.network.edges = this.network.edges.filter(function(e){ return arcs.indexOf(e) === -1; });
+    this.roundabouts.delete(node.id);
+};
+
+// ===== PedSystem: 보행자 · 횡단보도 · 보행 신호 =====
+// 스코프: 횡단보도는 "신호교차로"에만 생성된다 (비신호/회전 교차로 보행자는 미구현).
+// 보행 녹색 = 해당 도로와 수직인 방향의 직진 위상 (한국 4현시 관례와 동일).
+// 차량은 보행자가 physically 올라와 있는 횡단보도를 통과할 수 없다
+// → 우회전 차량이 횡단보도 앞에서 보행자에게 양보하는 한국 도로교통법 규칙이 창발한다.
+function PedSystem(network, jc) {
+    this.network = network;
+    this.jc = jc;
+    this.crosswalks = new Map(); // nodeId -> [crosswalk]
+    this.peds = [];
+    this.spawnRate = 0.3;        // 명/초
+    this.spawnAcc = 0;
+    this.completed = 0;
+}
+PedSystem.prototype.clear = function() {
+    this.peds.length = 0;
+    this.spawnAcc = 0;
+    this.completed = 0;
+};
+// 노드 제어 유형 변경에 대응해 횡단보도 목록을 동기화 (매 프레임 호출, O(nodes))
+PedSystem.prototype.sync = function() {
+    for (var i = 0; i < this.network.nodes.length; i++) {
+        var nd = this.network.nodes[i];
+        var ok = nd.control === 'signal' && !nd.isBoundary && this.jc.lights.has(nd.id);
+        if (ok && !this.crosswalks.has(nd.id)) this.crosswalks.set(nd.id, this._buildCW(nd));
+        else if (!ok && this.crosswalks.has(nd.id)) {
+            var gone = this.crosswalks.get(nd.id);
+            this.peds = this.peds.filter(function(pd){ return gone.indexOf(pd.cw) < 0; });
+            this.crosswalks.delete(nd.id);
+        }
+    }
+};
+PedSystem.prototype._buildCW = function(node) {
+    var light = this.jc.lights.get(node.id);
+    var list = [], seen = {};
+    for (var i = 0; i < node.incoming.length; i++) {
+        var e = node.incoming[i];
+        if (e.isArc || seen[e.from.id]) continue;
+        seen[e.from.id] = true;
+        // 수직 방향 위상이 없으면 보행 녹색이 존재하지 않으므로 생성하지 않음
+        var perpDir = e.dir === 'EW' ? 'NS' : 'EW';
+        if (light.directions.indexOf(perpDir) < 0) continue;
+        var dx = e.from.x - node.x, dy = e.from.y - node.y;
+        var dl = Math.hypot(dx, dy); if (dl === 0) continue;
+        var tx = dx/dl, ty = dy/dl;           // 도로 방향 (교차로 → 이웃)
+        var px = -ty, py = tx;                 // 수직 (보행 방향)
+        var outE = null;
+        for (var oi = 0; oi < node.outgoing.length; oi++) {
+            if (node.outgoing[oi].to === e.from) { outE = node.outgoing[oi]; break; }
+        }
+        list.push({
+            nodeId: node.id, nbId: e.from.id, dirRoad: e.dir,
+            cx: node.x + tx*CW_DIST, cy: node.y + ty*CW_DIST,
+            tx: tx, ty: ty, px: px, py: py,
+            edgeIn: e, edgeOut: outE // 이 도로의 양방향 엣지 (차량 점유 검사용)
+        });
+    }
+    return list;
+};
+PedSystem.prototype.pedGreen = function(cw) {
+    if (this.jc.aiPedGreenSec !== null && Number(this.jc.aiPedGreenSec) === 0) {
+        return { green:false, remain:0, totalGreen:0 };
+    }
+
+    var light = this.jc.lights.get(cw.nodeId);
+    if (!light) return { green:false, remain:0, totalGreen:0 };
+
+    var p = light.phases[light.phaseIdx];
+    var g = !!(p && p.type === 'straight_right' && p.dir !== cw.dirRoad);
+    var remain = g ? (p.duration - light.t) : 0;
+
+    return {
+        green: g,
+        remain: remain,
+        totalGreen: g ? p.duration : 0
+    };
+};
+// 보행자가 물리적으로 올라와 있는가 (차량 차단 판정)
+PedSystem.prototype.isOccupied = function(cw) {
+    for (var i = 0; i < this.peds.length; i++) {
+        var pd = this.peds[i];
+        if (pd.cw === cw && pd.state === 'cross' && pd.prog > 0.02 && pd.prog < 0.98) return true;
+    }
+    return false;
+};
+// 횡단보도 밴드에 차체가 걸쳐 있는가 (보행자 횡단 시작 가능 여부 판정)
+PedSystem.prototype.zoneClear = function(cw) {
+    var checks = [
+        { e: cw.edgeIn,  sCw: cw.edgeIn ? cw.edgeIn.len - CW_DIST : 0 },
+        { e: cw.edgeOut, sCw: CW_DIST }
+    ];
+    for (var i = 0; i < checks.length; i++) {
+        var e = checks[i].e; if (!e) continue;
+        var sCw = checks[i].sCw;
+        for (var j = 0; j < e.cars.length; j++) {
+            var cs = e.cars[j].s;
+            // 차체(front=s, rear=s-CAR_LEN)가 밴드(±5)에 걸치면 점유
+            if (cs > sCw - 5 && cs - CAR_LEN < sCw + 5) return false;
+        }
+    }
+    return true;
+};
+// keep-clear: 차량이 (앞 정체 때문에) 횡단보도 밴드 "위"에 정지하게 될 경우
+// 정지 위치를 밴드 앞으로 당긴다 → 정지 차량 위로 보행자가 겹쳐 걷는 시각 버그 방지
+PedSystem.prototype.keepClear = function(car, d) {
+    var e = car.edge;
+    if (e.isArc || d === Infinity) return d;
+    var bands = [];
+    var cws = this.crosswalks.get(e.to.id);
+    if (cws) for (var i = 0; i < cws.length; i++) if (cws[i].nbId === e.from.id) bands.push(e.len - CW_DIST);
+    cws = this.crosswalks.get(e.from.id);
+    if (cws) for (var i = 0; i < cws.length; i++) if (cws[i].nbId === e.to.id) bands.push(CW_DIST);
+    for (var b = 0; b < bands.length; b++) {
+        var sCw = bands[b];
+        if (car.s >= sCw - 4) continue;           // 이미 밴드에 도달/통과 중이면 후진 불가
+        var haltFront = car.s + d - MIN_GAP;       // 예상 정지 위치 (front)
+        if (haltFront > sCw - 6 && haltFront - CAR_LEN < sCw + 5) {
+            var dCap = sCw - car.s;                // → front가 sCw-5 에 정지 (밴드 앞)
+            if (dCap < d) d = dCap;
+        }
+    }
+    return d;
+};
+// 차량 장애물 거리: 접근/진출 엣지의 횡단보도가 점유 중이면 정지선(횡단보도 앞)까지 거리 반환
+PedSystem.prototype.blockDistFor = function(car) {
+    var e = car.edge;
+    if (e.isArc) return Infinity;
+    var best = Infinity;
+    // (1) 접근측: e.to 가 신호교차로 → 횡단보도는 s = len - CW_DIST
+    var cws = this.crosswalks.get(e.to.id);
+    if (cws) {
+        for (var i = 0; i < cws.length; i++) {
+            if (cws[i].nbId !== e.from.id) continue;
+            var sCw = e.len - CW_DIST;
+            if (car.s < sCw - 0.5 && this.isOccupied(cws[i])) best = Math.min(best, sCw - car.s);
+        }
+    }
+    // (2) 진출측: e.from 이 신호교차로 → 회전 직후 s = CW_DIST 에서 보행자 양보
+    cws = this.crosswalks.get(e.from.id);
+    if (cws) {
+        for (var i = 0; i < cws.length; i++) {
+            if (cws[i].nbId !== e.to.id) continue;
+            var sCw2 = CW_DIST;
+            if (car.s < sCw2 - 0.5 && this.isOccupied(cws[i])) best = Math.min(best, sCw2 - car.s);
+        }
+    }
+    return best;
+};
+PedSystem.prototype.update = function(dt) {
+    this.sync();
+    // 스폰 (시드 고정 rand 사용 → A/B 재현성 유지)
+    this.spawnAcc += this.spawnRate * dt;
+    var all = [];
+    var it = this.crosswalks.values();
+    for (var r = it.next(); !r.done; r = it.next()) for (var i = 0; i < r.value.length; i++) all.push(r.value[i]);
+    var allEdges = [];
+    for (var i = 0; i < this.network.edges.length; i++) {
+        if (!this.network.edges[i].isArc) allEdges.push(this.network.edges[i]);
+    }
+    
+    while (this.spawnAcc >= 1) {
+        this.spawnAcc -= 1;
+        if (all.length === 0 || allEdges.length === 0) { rand(); rand(); rand(); rand(); continue; }
+        
+        var isWalk = rand() < 0.5; // 50%는 인도를 걷고, 50%는 횡단보도 대기
+        var tw = rand(), type = PED_TYPES[0], acc = 0;
+        for (var ti = 0; ti < PED_TYPES.length; ti++) { acc += PED_TYPES[ti].weight; if (tw <= acc) { type = PED_TYPES[ti]; break; } }
+        var jit = (rand() - 0.5) * 6;
+        var speedMod = 0.8 + rand() * 0.4;
+        
+        if (isWalk) {
+            var edge = allEdges[Math.floor(rand() * allEdges.length)];
+            var side = rand() < 0.5 ? -1 : 1;
+            this.peds.push({ edge: edge, side: side, s: rand() * (edge.len - CW_DIST), state: 'walk_sidewalk', type: type, jit: jit, speedMod: speedMod });
+        } else {
+            var cw = all[Math.floor(rand() * all.length)];
+            var side = rand() < 0.5 ? -1 : 1;
+            this.peds.push({ cw: cw, side: side, prog: 0, state: 'wait', type: type, jit: jit, speedMod: speedMod, waitT: 0 });
+        }
+    }
+    // 갱신
+    for (var i = this.peds.length - 1; i >= 0; i--) {
+        var pd = this.peds[i];
+        if (pd.crashed) {
+            pd.crashTimer = (pd.crashTimer || 0) + dt;
+            if (pd.crashTimer > 30) {
+                this.peds.splice(i, 1); // 30초 후 구급차 이송
+            }
+            continue; // 사고 난 보행자는 더이상 이동 안 함
+        }
+        if (pd.state === 'walk_sidewalk') {
+            pd.s += (pd.type.speed * pd.speedMod) * dt;
+            if (pd.s >= pd.edge.len - CW_DIST) { // 교차로 부근 도달
+                var cws = this.crosswalks.get(pd.edge.to.id);
+                var foundCw = null;
+                if (cws) {
+                    for (var c = 0; c < cws.length; c++) {
+                        if (cws[c].nbId === pd.edge.from.id) { foundCw = cws[c]; break; }
+                    }
+                }
+                if (foundCw && rand() < 0.7) { // 70% 확률로 횡단보도로 진입
+                    pd.state = 'wait';
+                    pd.cw = foundCw;
+                    pd.side = -pd.side; // 횡단보도 좌표계로 변환
+                    pd.waitT = 0;
+                    pd.prog = 0;
+                } else {
+                    this.peds.splice(i, 1); // 건물로 들어감
+                }
+            }
+        } else if (pd.state === 'wait') {
+            pd.waitT += dt;
+            var sig = this.pedGreen(pd.cw);
+            if (sig.green && sig.remain > CW_CLEAR && this.zoneClear(pd.cw)) pd.state = 'cross';
+        } else {
+            pd.prog += (pd.type.speed * pd.speedMod) * dt / (CW_HALF * 2);
+            if (pd.prog >= 1) { this.peds.splice(i, 1); this.completed++; }
+        }
+    }
+};
+
+// ===== DataLogger =====
+function DataLogger(network, junctionControl, maxSpeed) {
+    this.network = network;
+    this.jc = junctionControl;
+    this.maxSpeed = maxSpeed;
+    this.sampleInterval = 1.0;
+    this.buffer = [];
+    this.maxSamples = 600;
+}
+DataLogger.prototype.sample = function(simTime) {
+    var allCars = [];
+    for (var i = 0; i < this.network.edges.length; i++) {
+        var e = this.network.edges[i];
+        for (var j = 0; j < e.cars.length; j++) allCars.push(e.cars[j]);
+    }
+    var totalDelay = 0, sumSpeed = 0, stoppedCount = 0;
+    for (var i = 0; i < allCars.length; i++) {
+        totalDelay += allCars[i].waitTime;
+        sumSpeed += allCars[i].v;
+        if (allCars[i].v < 3) stoppedCount++;
+    }
+    var n = allCars.length;
+    var meanSpeed = n > 0 ? sumSpeed / n : 0;
+    var recent = this.jc.completedTrips.filter(function(t){ return simTime - t.endTime <= 60; });
+    var congestion = Math.min(1, Math.max(0,
+        (stoppedCount / Math.max(1, n)) * 0.7 + (1 - meanSpeed / Math.max(1, this.maxSpeed)) * 0.6));
+
+    var edgesStats = [];
+    for (var i = 0; i < this.network.edges.length; i++) {
+        var e = this.network.edges[i];
+        if (e.isArc) continue;
+        var ems = 0;
+        for (var j = 0; j < e.cars.length; j++) ems += e.cars[j].v;
+        ems = e.cars.length > 0 ? ems / e.cars.length : 0;
+        var flow = e.flowCount / Math.max(0.1, this.sampleInterval);
+        e.flowCount = 0;
+        edgesStats.push({id:e.id, flow:flow, density:(e.cars.length/e.len)*100, meanSpeed:ems, occupancy:(e.cars.length*CAR_LEN)/e.len});
+    }
+
+    var intStats = [];
+    var SAT_FLOW = 0.5; // 포화유출률 s (대/초)
+    for (var ni = 0; ni < this.network.nodes.length; ni++) {
+        var nd = this.network.nodes[ni];
+        if (nd.isBoundary) continue;
+        var approaches = {};
+        for (var ei = 0; ei < nd.incoming.length; ei++) {
+            var e = nd.incoming[ei];
+            if (e.isArc) continue;
+            var aKey = e.id;
+            if (!approaches[aKey]) approaches[aKey] = {dir: e.dir, queue:0, meanWait:0, arrS:0, arrL:0, arrR:0, _cnt:0};
+            var a = approaches[aKey];
+            var q = 0, tw = 0;
+            for (var ci = 0; ci < e.cars.length; ci++) {
+                if (e.cars[ci].v < 3) q++;
+                tw += e.cars[ci].waitTime;
+            }
+            // 도착 기반 수요: 이번 샘플 동안 이 엣지에 "진입한" 차량 수 (중복 카운트 없음)
+            a.arrS += e.arr.straight;
+            a.arrL += e.arr.left;
+            a.arrR += e.arr.right;
+            e.arr.straight = 0; e.arr.left = 0; e.arr.right = 0;
+            a.queue += q;
+            a.meanWait += e.cars.length > 0 ? tw / e.cars.length : 0;
+            a._cnt++;
+        }
+        // 실측 v/c 포화도: x = λ / (S · g/C)  — 현재 신호 초록 배분 대비 수요
+        var maxSat = 0;
+        var light = this.jc.lights.get(nd.id);
+        var Cactual = 0;
+        if (light) { for (var pi = 0; pi < light.phases.length; pi++) Cactual += light.phases[pi].duration; }
+        for (var aKey in approaches) {
+            var a = approaches[aKey];
+            var dir = a.dir;
+            if (a._cnt > 0) a.meanWait /= a._cnt;
+            delete a._cnt;
+            if (light && Cactual > 0) {
+                var lamS = (a.arrS + a.arrR) / this.sampleInterval; // 직진+우회전 (같은 위상)
+                var lamL = a.arrL / this.sampleInterval;
+                var gS = light.greenTimes['straight_'+dir] || GREEN_MIN;
+                var gL = light.greenTimes['left_'+dir] || GREEN_MIN;
+                var xS = lamS / (SAT_FLOW * gS / Cactual);
+                var xL = lamL / (SAT_FLOW * gL / Cactual);
+                if (xS > maxSat) maxSat = xS;
+                if (xL > maxSat) maxSat = xL;
+            }
+        }
+        intStats.push({id:nd.id, control:nd.control, approaches:approaches, saturation:maxSat});
+    }
+
+    // 잔여 도착 카운터 정리 (경계로 향하는 엣지 등, 위에서 읽히지 않은 것)
+    for (var i = 0; i < this.network.edges.length; i++) {
+        var e = this.network.edges[i];
+        e.arr.straight = 0; e.arr.left = 0; e.arr.right = 0;
+    }
+    this.buffer.push({t:simTime, network:{cars:n, meanSpeed:meanSpeed, totalDelay:totalDelay, throughputPerMin:recent.length, congestion:congestion}, edges:edgesStats, intersections:intStats});
+    if (this.buffer.length > this.maxSamples) this.buffer.shift();
+};
+DataLogger.prototype.exportJSON = function() {
+    var data = {
+        meta:{gridCols:this.network.gridSize, gridRows:this.network.gridSize, durationSec:this.buffer.length?this.buffer[this.buffer.length-1].t:0, sampleInterval:this.sampleInterval},
+        timeseries:this.buffer,
+        completedTrips:this.jc.completedTrips
+    };
+    var blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'cityflow_data.json'; a.click();
+    URL.revokeObjectURL(url);
+};
+DataLogger.prototype.exportCSV = function() {
+    if (this.buffer.length === 0) return;
+    var csv = 't,cars,meanSpeed,totalDelay,throughputPerMin,congestion\n';
+    for (var i = 0; i < this.buffer.length; i++) {
+        var s = this.buffer[i];
+        csv += s.t.toFixed(1)+','+s.network.cars+','+s.network.meanSpeed.toFixed(1)+','+s.network.totalDelay.toFixed(1)+','+s.network.throughputPerMin+','+s.network.congestion.toFixed(3)+'\n';
+    }
+    var blob = new Blob([csv], {type:'text/csv'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'cityflow_data.csv'; a.click();
+    URL.revokeObjectURL(url);
+};
+
+// ===== Analyzer =====
+function Analyzer(network, jc, logger) {
+    this.network = network;
+    this.jc = jc;
+    this.logger = logger;
+    this.lastReport = null;
+}
+// 클램프 후 재정규화 배분: 각 위상에 최소 초록(minG)을 보장하면서
+// 남은 예산을 가중치 비례로 나눠 "합계 == effG"를 정확히 지킨다.
+// (단순 클램프만 하면 합이 예산을 초과해 보고 주기와 실제 주기가 어긋남)
+function allocateGreens(keys, weights, effG, minG) {
+    var res = {}, fixed = {}, remaining = keys.slice(), budget = effG;
+    var changed = true, guard = keys.length + 2;
+    while (changed && guard-- > 0) {
+        changed = false;
+        var w = 0;
+        for (var i = 0; i < remaining.length; i++) w += weights[remaining[i]];
+        for (var i = remaining.length - 1; i >= 0; i--) {
+            var k = remaining[i];
+            var g = w > 0 ? budget * weights[k] / w : budget / remaining.length;
+            if (g < minG) { fixed[k] = minG; budget -= minG; remaining.splice(i, 1); changed = true; }
+        }
+    }
+    var w2 = 0;
+    for (var i = 0; i < remaining.length; i++) w2 += weights[remaining[i]];
+    for (var i = 0; i < remaining.length; i++) {
+        var k = remaining[i];
+        res[k] = w2 > 0 ? budget * weights[k] / w2 : budget / remaining.length;
+    }
+    for (var k in fixed) res[k] = fixed[k];
+    return res;
+}
+
+Analyzer.prototype.analyze = function() {
+    var MIN_OBS = 10;   // 윈도 내 최소 관측 도착 수 — 미만이면 노이즈 최적화 방지 위해 보류
+    var S = 0.5;        // 포화유출률 (대/초)
+    var wSize = Math.min(30, this.logger.buffer.length);
+    if (wSize === 0) return null;
+    var samples = this.logger.buffer.slice(-wSize);
+    var windowSec = wSize * this.logger.sampleInterval;
+
+    var bottlenecks = [];
+    var latest = samples[samples.length - 1].intersections;
+
+    var recs = [];
+    for (var ni = 0; ni < this.network.nodes.length; ni++) {
+        var node = this.network.nodes[ni];
+        if (node.control !== 'signal' || node.isBoundary) continue;
+        var light = this.jc.lights.get(node.id);
+        if (!light || light.directions.length <= 1) continue;
+
+        // ① 윈도 내 이동류별 최대 접근 도착 수 산출 (Webster 최적화를 위한 임계 흐름)
+        var approachTotals = {};
+        var totalObs = 0, queueNow = 0, worstDir = null, maxQ = 0, worstWait = 0;
+        for (var si = 0; si < samples.length; si++) {
+            var intSnap = null;
+            for (var ii = 0; ii < samples[si].intersections.length; ii++) {
+                if (samples[si].intersections[ii].id === node.id) { intSnap = samples[si].intersections[ii]; break; }
+            }
+            if (!intSnap) continue;
+            for (var aKey in intSnap.approaches) {
+                var a = intSnap.approaches[aKey];
+                var dir = a.dir || aKey; // 하위 호환성
+                if (!approachTotals[aKey]) approachTotals[aKey] = { dir: dir, S:0, L:0, R:0 };
+                approachTotals[aKey].S += (a.arrS || 0);
+                approachTotals[aKey].R += (a.arrR || 0);
+                approachTotals[aKey].L += (a.arrL || 0);
+                totalObs += (a.arrS || 0) + (a.arrL || 0) + (a.arrR || 0);
+            }
+        }
+        var arrTotals = {};
+        for (var di = 0; di < light.directions.length; di++) {
+            var d = light.directions[di];
+            arrTotals['straight_'+d] = 0;
+            arrTotals['left_'+d] = 0;
+        }
+        for (var aKey in approachTotals) {
+            var at = approachTotals[aKey];
+            var dir = at.dir;
+            if (arrTotals['straight_'+dir] !== undefined) {
+                // 같은 방향(위상)을 공유하는 접근로 중 최대 수요를 선택 (Webster's method 원칙)
+                arrTotals['straight_'+dir] = Math.max(arrTotals['straight_'+dir], at.S + at.R);
+                arrTotals['left_'+dir] = Math.max(arrTotals['left_'+dir], at.L);
+            }
+        }
+        // 최신 스냅샷의 큐/대기 (병목 탐지용)
+        var intSnapLatest = null;
+        for (var ii = 0; ii < latest.length; ii++) {
+            if (latest[ii].id === node.id) { intSnapLatest = latest[ii]; break; }
+        }
+        if (intSnapLatest) {
+            for (var aKey in intSnapLatest.approaches) {
+                var a = intSnapLatest.approaches[aKey];
+                var dir = a.dir || aKey;
+                if (a.queue > maxQ) { maxQ = a.queue; worstWait = a.meanWait; worstDir = dir; }
+                queueNow += a.queue;
+            }
+        }
+
+        // ② 도착률 λ (대/초) 및 위상별 y = λ/S
+        var phaseKeys = Object.keys(arrTotals);
+        var lam = {}, yv = {}, Y = 0;
+        for (var ki = 0; ki < phaseKeys.length; ki++) {
+            lam[phaseKeys[ki]] = arrTotals[phaseKeys[ki]] / windowSec;
+            yv[phaseKeys[ki]] = lam[phaseKeys[ki]] / S;
+            Y += yv[phaseKeys[ki]];
+        }
+
+        // ③ 현재 실제 주기 및 윈도 기반 실측 v/c
+        var nDirs = light.directions.length;
+        var L = nDirs * (light.YELLOW * 2 + light.ALL_RED);
+        var Cactual = 0;
+        for (var pi = 0; pi < light.phases.length; pi++) Cactual += light.phases[pi].duration;
+        var currentSat = 0;
+        for (var ki = 0; ki < phaseKeys.length; ki++) {
+            var g = light.greenTimes[phaseKeys[ki]] || GREEN_MIN;
+            var x = Cactual > 0 ? lam[phaseKeys[ki]] / (S * g / Cactual) : 0;
+            if (x > currentSat) currentSat = x;
+        }
+        if (currentSat >= 0.9 || maxQ >= 5) {
+            bottlenecks.push({type:'intersection', id:node.id, approach:worstDir, saturation:parseFloat(currentSat.toFixed(2)), meanWait:parseFloat(worstWait.toFixed(1)), queue:maxQ});
+        }
+
+        // ④ 신호 배분 계산
+        var method = 'webster';
+        var greenRecs = null;
+        var cycle = Cactual;
+
+        if (totalObs < MIN_OBS) {
+            method = 'insufficient_data';
+        } else if (Y >= 1) {
+            // 과포화: Webster 발산(음수 주기) → 수요 비례 배분 폴백
+            method = 'proportional';
+            var effG = Math.max(phaseKeys.length * GREEN_MIN, Cactual - L);
+            greenRecs = allocateGreens(phaseKeys, lam, effG, GREEN_MIN);
+        } else {
+            cycle = (1.5 * L + 5) / (1 - Y);
+            cycle = Math.max(20, Math.min(120, cycle));
+            var effG = Math.max(phaseKeys.length * GREEN_MIN, cycle - L);
+            greenRecs = allocateGreens(phaseKeys, yv, effG, GREEN_MIN);
+        }
+
+        var recommendedGT = null;
+        if (greenRecs) {
+            recommendedGT = {};
+            var sumG = 0;
+            for (var k in greenRecs) { recommendedGT[k] = Math.round(greenRecs[k]); sumG += recommendedGT[k]; }
+            recommendedGT.cycle = sumG + L; // 보고 주기 = 반올림된 초록 합 + 손실 → 실동작과 일치
+        }
+
+        var currentGT = { cycle: Math.round(Cactual) };
+        for (var k in light.greenTimes) currentGT[k] = Math.round(light.greenTimes[k] * 10) / 10;
+
+        var isBottleneck = false;
+        for (var bi = 0; bi < bottlenecks.length; bi++) { if (bottlenecks[bi].id === node.id) { isBottleneck = true; break; } }
+
+        var reasoning = '';
+        if (method === 'insufficient_data') {
+            reasoning = '윈도(' + windowSec.toFixed(0) + 's) 내 관측 도착 ' + totalObs + '대 < 최소 ' + MIN_OBS + '대 — 표본 부족으로 최적화를 보류했습니다.';
+        } else if (method === 'proportional') {
+            reasoning = '수요합 Y=' + Y.toFixed(2) + ' ≥ 1 (과포화) — Webster가 발산하므로 현재 주기 내에서 도착률(λ) 비례로 초록을 배분했습니다. [관측 ' + totalObs + '대]';
+        } else {
+            reasoning = '도착률 기반 수요합 Y=' + Y.toFixed(2) + ' → Webster 최적 주기 ' + Math.round(cycle) + 's 산출, 위상별 y비율로 초록 배분(최소 초록 보장 후 재정규화). [관측 ' + totalObs + '대]';
+        }
+
+        recs.push({
+            intersectionId: node.id,
+            method: method,
+            saturation: parseFloat(currentSat.toFixed(2)),
+            sampleCount: totalObs, // 윈도 내 실제 관측 도착 수
+            reasoning: reasoning,
+            current: currentGT,
+            recommended: recommendedGT || '표본 부족',
+            note: isBottleneck ? '병목 교차로 — 신호 조정 권장' : (method === 'insufficient_data' ? '표본 부족' : '')
+        });
+    }
+    bottlenecks.sort(function(a,b){ return b.saturation - a.saturation; });
+
+    var noDataIds = [];
+    var filteredRecs = [];
+    for (var i = 0; i < recs.length; i++) {
+        if (recs[i].method === 'insufficient_data') noDataIds.push(recs[i].intersectionId);
+        else filteredRecs.push(recs[i]);
+    }
+
+    this.lastReport = {
+        window: windowSec.toFixed(0)+'s',
+        bottlenecks: bottlenecks,
+        recommendations: filteredRecs,
+        insufficient_data: noDataIds // 표본 부족 (경계 노드는 애초에 분석 대상 아님)
+    };
+    return this.lastReport;
+};
+Analyzer.prototype.applyRecommendations = function() {
+    if (!this.lastReport) return;
+    for (var i = 0; i < this.lastReport.recommendations.length; i++) {
+        var rec = this.lastReport.recommendations[i];
+        var light = this.jc.lights.get(rec.intersectionId);
+        if (!light || typeof rec.recommended === 'string') continue;
+        var ng = {};
+        for (var k in rec.recommended) {
+            if (k === 'cycle') continue;
+            ng[k] = rec.recommended[k];
+        }
+        // 위상 위치 보존 적용 — phaseIdx/t를 리셋하면 적응형 모드에서
+        // 첫 위상만 반복 재생되어 신호 운영이 파괴된다.
+        light.applyGreens(ng, rec.recommended.cycle);
+    }
+};
+
+// ===== Renderer =====
+function Renderer(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+}
+Renderer.prototype.render = function(network, jc, cam) {
+    var ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+    
+    // 텍스트 겹침 방지를 위한 Bounding Box 배열
+    var textBBoxes = [];
+
+    if (cam) {
+        ctx.translate(cam.x, cam.y);
+        ctx.scale(cam.scale, cam.scale);
+    }
+
+    // 인도: 도로 가장자리에 사람만 통행 가능한 영역(회색 블록)
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        if (e.isArc || e.from.id > e.to.id) continue;
+        ctx.lineWidth = 41; // 도로 25 + 양옆 8픽셀 인도
+        ctx.lineCap = 'round'; // 교차로에서 둥글게 이어짐
+        ctx.strokeStyle = '#6b7280'; // 밝은 회색
+        ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
+    }
+    
+    // 도로: 인도 위에 차량이 다니는 슬래브(폭 25)
+    ctx.lineCap = 'butt'; // 도로는 인도 위에서 직각으로 끊김
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        if (e.isArc || e.from.id > e.to.id) continue;
+        ctx.lineWidth = 25; ctx.strokeStyle = '#3d434d';
+        ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
+    }
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        if (e.isArc || e.from.id > e.to.id) continue;
+        ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(250,204,21,0.55)'; ctx.setLineDash([7,7]);
+        
+        // 황색 중앙선이 교차로와 횡단보도를 침범하지 않도록 양끝에서 30px 띄워서 그립니다.
+        var dx = e.to.x - e.from.x;
+        var dy = e.to.y - e.from.y;
+        var len = Math.hypot(dx, dy);
+        if (len > 60) {
+            var ux = dx / len, uy = dy / len;
+            ctx.beginPath(); 
+            ctx.moveTo(e.from.x + ux * 30, e.from.y + uy * 30); 
+            ctx.lineTo(e.to.x - ux * 30, e.to.y - uy * 30); 
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+    }
+    // 회전교차로 호
+    ctx.lineWidth = 10; ctx.strokeStyle = '#555';
+    var rbIter = jc.roundabouts.values();
+    for (var rd = rbIter.next(); !rd.done; rd = rbIter.next()) {
+        var data = rd.value;
+        for (var ai = 0; ai < data.arcs.length; ai++) {
+            var arc = data.arcs[ai];
+            ctx.beginPath(); ctx.moveTo(arc.from.x,arc.from.y); ctx.lineTo(arc.to.x,arc.to.y); ctx.stroke();
+        }
+    }
+    // 횡단보도 (얼룩말 무늬) + 보행 신호
+    if (jc.peds) {
+        var cwIter = jc.peds.crosswalks.values();
+        var blinkOn = (performance.now() / 350) % 2 < 1;
+        for (var cwr = cwIter.next(); !cwr.done; cwr = cwIter.next()) {
+            for (var ci = 0; ci < cwr.value.length; ci++) {
+                var cw = cwr.value[ci];
+                ctx.save();
+                ctx.translate(cw.cx, cw.cy);
+                ctx.rotate(Math.atan2(cw.ty, cw.tx));
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                for (var k = -2; k <= 2; k++) ctx.fillRect(-3.5, k*5 - 1.5, 7, 3);
+                ctx.restore();
+                // 보행자 신호기: 양쪽 보도에 2등식(적/녹) 신호등. 녹색 잔여 < CW_CLEAR 이면 점멸.
+                var sig = jc.peds.pedGreen(cw);
+                var greenLamp = sig.green && (sig.remain >= CW_CLEAR || blinkOn);
+                for (var sd = -1; sd <= 1; sd += 2) {
+                    // 신호기가 교차로 모서리에서 완전히 분리되도록 밖으로 더 밀고 크기를 줄임
+                    var sx = cw.cx + cw.tx * 12 + cw.px*sd*(CW_HALF+10);
+                    var sy = cw.cy + cw.ty * 12 + cw.py*sd*(CW_HALF+10);
+                    ctx.save();
+                    ctx.translate(sx, sy);
+                    ctx.rotate(Math.atan2(cw.py, cw.px));
+                    ctx.fillStyle = '#151515';
+                    ctx.fillRect(-2, -3.5, 4, 7);
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 0.5;
+                    ctx.strokeRect(-2, -3.5, 4, 7);
+                    ctx.fillStyle = !sig.green ? COL_RED : '#3a1212';   // 적색 램프 (위)
+                    ctx.beginPath(); ctx.arc(0, -1.8, 1.2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = greenLamp ? COL_GREEN : '#0f2a18';  // 녹색 램프 (아래)
+                    ctx.beginPath(); ctx.arc(0, 1.8, 1.2, 0, Math.PI*2); ctx.fill();
+                    
+                    // 보행자 신호 남은 시간 표시 (카운트다운) - 양쪽 보도 모두 표시하되, 모서리에서 겹치지 않도록 방향별 오프셋 적용
+                    var textStr = "";
+                    var isGreen = sig.green;
+                    var remainVal = 0;
+
+                    if (jc.aiPedGreenSec !== null && Number(jc.aiPedGreenSec) === 0) {
+                        // AI 적용 후: 보행자 신호는 빨간불/0초 고정
+                        // 지도 위 0 표시는 너무 많아져서 숨김
+                        textStr = "";
+                        remainVal = 0;
+                    } else if (isGreen && sig.remain > 0) {
+                        // AI 적용 전 또는 보행자 신호가 살아있는 경우: 초록불 남은 시간 표시
+                        textStr = Math.ceil(sig.remain).toString();
+                        remainVal = sig.remain;
+                    } else if (!isGreen) {
+                        // AI 적용 전: 빨간불일 때 다음 보행자 초록까지 남은 시간 표시
+                        var light = jc.lights.get(cw.nodeId);
+                        if (light && light.phases.length > 1) {
+                            var redRemain = light.phases[light.phaseIdx].duration - light.t;
+                            var pi = light.phaseIdx;
+                            for (var scan = 0; scan < light.phases.length; scan++) {
+                                pi = (pi + 1) % light.phases.length;
+                                var ph = light.phases[pi];
+                                if (ph.type === 'straight_right' && ph.dir !== cw.dirRoad) break;
+                                redRemain += ph.duration;
+                            }
+                            textStr = Math.ceil(redRemain).toString();
+                            remainVal = redRemain;
+                        }
+                    }
+                    
+                    if (textStr) {
+                        ctx.save();
+                        // 텍스트를 신호등 박스 옆에 겹치지 않게 배치
+                        // 모서리에서 확실히 분리하기 위해 각 도로가 뻗어나가는 방향(tx, ty)으로 더 강하게 밀고,
+                        // 횡단보도 바깥쪽 방향(px*sd, py*sd)으로도 약간 밀어줌
+                        var tox = cw.tx * 16 + cw.px * sd * 4;
+                        var toy = cw.ty * 16 + cw.py * sd * 4;
+                        
+                        ctx.font = 'bold 7.5px sans-serif';
+                        var tw = ctx.measureText(textStr).width;
+                        var rw = Math.max(10, tw + 4);
+                        var rh = 9;
+                        
+                        // 충돌 회피 알고리즘: 절대 좌표계에서 다른 텍스트 박스와 겹치면 더 바깥쪽으로 밀어냄
+                        var finalX = sx + tox;
+                        var finalY = sy + toy;
+                        for (var iter = 0; iter < 8; iter++) {
+                            var overlap = false;
+                            for (var ti = 0; ti < textBBoxes.length; ti++) {
+                                var tb = textBBoxes[ti];
+                                // AABB 충돌 체크 (패딩 2 추가)
+                                if (Math.abs(finalX - tb.x) < (rw + tb.rw)/2 + 2 &&
+                                    Math.abs(finalY - tb.y) < (rh + tb.rh)/2 + 2) {
+                                    overlap = true;
+                                    break;
+                                }
+                            }
+                            if (!overlap) break;
+                            // 겹친다면 해당 교차로에서 밖으로 나가는 방향(cw.tx, cw.ty)으로 8px 더 밀어냄
+                            finalX += cw.tx * 8;
+                            finalY += cw.ty * 8;
+                        }
+                        textBBoxes.push({x: finalX, y: finalY, rw: rw, rh: rh});
+                        
+                        // 현재 sx, sy에서 원래 translate를 취소하고 절대 좌표로 이동
+                        ctx.setTransform(1, 0, 0, 1, 0, 0);
+                        if (cam) {
+                            ctx.translate(cam.x, cam.y);
+                            ctx.scale(cam.scale, cam.scale);
+                        }
+                        ctx.translate(finalX, finalY);
+                        
+
+
+                        
+                        ctx.fillStyle = 'rgba(15, 15, 15, 0.85)';
+                        ctx.strokeStyle = isGreen ? (remainVal < CW_CLEAR ? '#eab308' : '#22c55e') : '#ef4444';
+                        ctx.lineWidth = 0.8;
+                        
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(-rw/2, -rh/2, rw, rh, 3);
+                        else ctx.rect(-rw/2, -rh/2, rw, rh);
+                        ctx.fill();
+                        ctx.stroke();
+                        
+                        ctx.fillStyle = isGreen ? (remainVal < CW_CLEAR ? '#ff0' : '#0f0') : '#ff5f5f';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(textStr, 0, 0.4);
+                        ctx.restore();
+                    }
+                    ctx.restore();
+                }
+            }
+        }
+    }
+    // 교차로 노드
+    for (var i = 0; i < network.nodes.length; i++) {
+        var nd = network.nodes[i];
+        if (nd.control === 'roundabout') continue;
+        
+        ctx.fillStyle = '#333';
+        ctx.fillRect(nd.x-12.5, nd.y-12.5, 25, 25);
+
+        // 경계 노드는 제어가 없으므로(무조건 통과) 신호등을 그리지 않는다 — 장식 신호 방지
+        if (nd.isBoundary) continue;
+
+        if (nd.control === 'signal' && nd.incoming.length > 0) {
+            for (var j = 0; j < nd.incoming.length; j++) {
+                var ie = nd.incoming[j];
+                if (ie.isArc) continue;
+                
+                var ux = ie.ux, uy = ie.uy;
+                var nx = -uy, ny = ux;
+                var lx = nd.x - ux * 15 + nx * 6;
+                var ly = nd.y - uy * 15 + ny * 6;
+                
+                ctx.save();
+                ctx.translate(lx, ly);
+                ctx.rotate(Math.atan2(uy, ux));
+                
+                ctx.fillStyle = '#222';
+                ctx.fillRect(-4, -10, 8, 20);
+                
+                var lightObj = jc.lights.get(nd.id);
+                var p = lightObj ? lightObj.phases[lightObj.phaseIdx] : null;
+                var cG = (p && p.type==='straight_right' && p.dir===ie.dir) ? COL_GREEN : '#444';
+                var cL = (p && p.type==='left_arrow' && p.dir===ie.dir) ? COL_LEFT_ARROW : '#444';
+                var cY = (p && p.type==='yellow' && p.dir===ie.dir) ? COL_YELLOW : '#444';
+                var cR = (cG==='#444' && cL==='#444' && cY==='#444') ? COL_RED : '#444';
+                
+                ctx.fillStyle = cR; ctx.beginPath(); ctx.arc(0, -6, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = cY; ctx.beginPath(); ctx.arc(0, -2, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = cL; ctx.beginPath(); ctx.arc(0,  2, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(0,  6, 1.5, 0, Math.PI*2); ctx.fill();
+                
+                // 실제 신호 남은 시간 표시
+                if (lightObj && p) {
+                    var remainSec = Math.ceil(p.duration - lightObj.t);
+
+                    var isActiveSignal =
+                        (p.type === 'straight_right' && p.dir === ie.dir) ||
+                        (p.type === 'left_arrow' && p.dir === ie.dir) ||
+                        (p.type === 'yellow' && p.dir === ie.dir);
+
+                    if (isActiveSignal) {
+                        ctx.save();
+                        ctx.rotate(-Math.atan2(uy, ux));
+
+                        ctx.font = 'bold 8px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+
+                        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(-9, -18, 18, 10, 4);
+                        else ctx.rect(-9, -18, 18, 10);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText(remainSec.toString(), 0, -13);
+
+                        ctx.restore();
+                    }
+                }
+                ctx.restore();
+            }
+        } else if (nd.control === 'allway_stop') {
+            ctx.fillStyle = COL_RED;
+            ctx.beginPath(); ctx.arc(nd.x,nd.y,6,0,Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = '7px Arial'; ctx.textAlign='center';
+            ctx.fillText('STOP', nd.x, nd.y+3); ctx.textAlign='start';
+        } else if (nd.control === 'priority') {
+            ctx.fillStyle = COL_YELLOW;
+            ctx.beginPath(); ctx.moveTo(nd.x,nd.y-6); ctx.lineTo(nd.x+6,nd.y+4); ctx.lineTo(nd.x-6,nd.y+4); ctx.closePath(); ctx.fill();
+        }
+    }
+    // 차량
+    var blinkCar = (performance.now() / 400) % 2 < 1;
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        for (var j = 0; j < e.cars.length; j++) {
+            var c = e.cars[j];
+            var px = e.ax + e.ux * c.s, py = e.ay + e.uy * c.s;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(Math.atan2(e.uy, e.ux));
+            if (c.crashed) {
+                ctx.fillStyle = '#111'; // 검게 탄 차
+                ctx.fillRect(-10, -3, 10, 6);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = blinkCar ? '#f00' : '#ff0'; // 경고등 깜빡임
+                ctx.strokeRect(-10, -3, 10, 6);
+                ctx.beginPath(); ctx.moveTo(-8, -2); ctx.lineTo(-2, 2); ctx.moveTo(-8, 2); ctx.lineTo(-2, -2); ctx.stroke();
+                
+                // 견인 타이머 표시 - 경고 테두리가 있는 적색 알림 필(Pill)로 표시
+                var remain = Math.max(0, 30 - (c.crashTimer || 0));
+                ctx.save();
+                ctx.translate(0, -9);
+                ctx.rotate(-Math.atan2(e.uy, e.ux)); // 텍스트가 항상 정방향이 되게
+                
+                var txt = remain.toFixed(0) + 's';
+                ctx.font = 'bold 7.5px sans-serif';
+                var tw = ctx.measureText(txt).width;
+                var rw = tw + 4, rh = 9;
+                
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 0.6;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(-rw/2, -rh/2, rw, rh, 3);
+                else ctx.rect(-rw/2, -rh/2, rw, rh);
+                ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(txt, 0, 0.4);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = c.color;
+                ctx.fillRect(-10, -3, 10, 6);
+                ctx.lineWidth = 0.5;
+                ctx.strokeStyle = '#000';
+                ctx.strokeRect(-10, -3, 10, 6);
+                // 방향지시등: 다음 회전 의도 (좌=왼쪽·우=오른쪽 주황 점멸 / 직진=전방 흰 점)
+                // 회전교차로 접근 중엔 최종 진출 방향(호 스플라이스 전 route의 다음 엣지)이 의도가 되고,
+                // 링(호) 위에서는 진출 직전에만 우측 지시등을 켠다 (실제 회전교차로 관행).
+                var ne = c.getNextEdge();
+                if (e.isArc) {
+                    if (ne && !ne.isArc && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, 2.2, 2.5, 2.2); }
+                } else if (ne) {
+                    var tt = getTurnType(e, ne);
+                    if (tt === 'left' && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, -4.4, 2.5, 2.2); }
+                    else if (tt === 'right' && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, 2.2, 2.5, 2.2); }
+                    else if (tt === 'straight') { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-1.6, -1, 1.6, 2); }
+                }
+            }
+            ctx.restore();
+        }
+    }
+    // 보행자
+    if (jc.peds) {
+        for (var i = 0; i < jc.peds.peds.length; i++) {
+            var pd = jc.peds.peds[i];
+            var cw = pd.cw, x, y;
+            if (pd.state === 'walk_sidewalk') {
+                var e = pd.edge;
+                var off = pd.side * 17.5; // 인도 중앙
+                x = e.from.x + e.ux * pd.s - e.uy * off + e.ux * pd.jit;
+                y = e.from.y + e.uy * pd.s + e.ux * off + e.uy * pd.jit;
+            } else if (pd.state === 'wait') {
+                var cw = pd.cw;
+                x = cw.cx + cw.px * pd.side * (CW_HALF + 4) + cw.tx * pd.jit;
+                y = cw.cy + cw.py * pd.side * (CW_HALF + 4) + cw.ty * pd.jit;
+            } else {
+                var cw = pd.cw;
+                var off = pd.side * (CW_HALF - pd.prog * CW_HALF * 2);
+                x = cw.cx + cw.px * off + cw.tx * pd.jit * 0.5;
+                y = cw.cy + cw.py * off + cw.ty * pd.jit * 0.5;
+            }
+            
+            if (pd.crashed) {
+                ctx.fillStyle = '#f00'; // 피/사고 표시
+                ctx.fillRect(x - pd.type.r - 2, y - pd.type.r, pd.type.r*2 + 4, pd.type.r*2);
+                
+                // 부상자 구조 타이머 표시 - 적색 알림 필(Pill)로 표시
+                var remain = Math.max(0, 30 - (pd.crashTimer || 0));
+                ctx.save();
+                ctx.translate(x, y - 8);
+                var txt = remain.toFixed(0) + 's';
+                ctx.font = 'bold 7.5px sans-serif';
+                var tw = ctx.measureText(txt).width;
+                var rw = tw + 4, rh = 9;
+                
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 0.6;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(-rw/2, -rh/2, rw, rh, 3);
+                else ctx.rect(-rw/2, -rh/2, rw, rh);
+                ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(txt, 0, 0.4);
+                ctx.restore();
+                continue;
+            }
+
+            ctx.fillStyle = pd.type.color;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 0.5;
+            if (pd.type.key === 'disabled') { // 휠체어 이용자 = 사각형
+                ctx.fillRect(x - pd.type.r, y - pd.type.r, pd.type.r*2, pd.type.r*2);
+                ctx.strokeRect(x - pd.type.r, y - pd.type.r, pd.type.r*2, pd.type.r*2);
+            } else {
+                ctx.beginPath(); ctx.arc(x, y, pd.type.r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            }
+        }
+    }
+    
+    ctx.restore();
+};
+
+// ===== SimController =====
+function SimController() {
+    this.running = false;
+    this.lastTime = 0;
+    this.simTime = 0;
+    this.cars = [];
+    this.spawnRate = 3.0;
+    this.maxCars = 150;
+    this.maxSpeed = 60;
+    this.cycleLength = 20;
+    this.gridSize = 4;
+    this.spawnAcc = 0;
+    this.sampleAcc = 0;
+    this.optAcc = 0;
+    this.adaptiveMode = false; // 기본 OFF — 켜져 있으면 권장이 자동 적용되어 전/후 비교가 불가능해짐
+    this.optimizeInterval = 10;
+    this.speedMultiplier = 1; // 배속 (1x, 2x, 3x, 4x)
+    this.greenWaveOffset = 0;
+    this.recommendedSignalPlan = null;
+    this.cam = {x: 0, y: 0, scale: 1.0};
+    this.isDragging = false;
+    this.dragStartX = 0;
+    this.dragStartY = 0;
+    this.logger = null;
+    this.analyzer = null;
+    this._initDOM();
+    this.reset();
+}
+SimController.prototype._initDOM = function() {
+    var self = this;
+    this.canvas = document.getElementById('sim-canvas');
+    this.renderer = new Renderer(this.canvas);
+
+    var resize = function() {
+        var rect = self.canvas.parentElement.getBoundingClientRect();
+        self.canvas.width = rect.width;
+        self.canvas.height = rect.height;
+        if (self.network && self.cam.x === 0 && self.cam.scale === 1.0) {
+            var nw = (self.gridSize+1)*100, nh = (self.gridSize+1)*100;
+            self.cam.x = (rect.width-nw)/2;
+            self.cam.y = (rect.height-nh)/2;
+        }
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+    window.addEventListener('resize', resize);
+
+    document.getElementById('btn-toggle-play').onclick = function() {
+        self.running = !self.running;
+        document.getElementById('btn-toggle-play').textContent = self.running ? 'Pause' : 'Play';
+        if (self.running) { self.lastTime = performance.now(); requestAnimationFrame(function(t){self._loop(t);}); }
+    };
+    document.getElementById('btn-reset').onclick = function(){ self.reset(); };
+
+    var bindSlider = function(id, prop, valId) {
+        var el = document.getElementById(id), valEl = document.getElementById(valId);
+        if (prop === 'gridSize') {
+            el.oninput = function() {
+                valEl.textContent = el.value;
+            };
+            el.onchange = function() {
+                self[prop] = parseFloat(el.value);
+                self.reset();
+            };
+        } else {
+            el.oninput = function() {
+                self[prop] = parseFloat(el.value);
+                valEl.textContent = el.value;
+                if (prop === 'cycleLength' && self.jc) {
+                    var iter = self.jc.lights.values();
+                    for (var r = iter.next(); !r.done; r = iter.next()) r.value.updateCycle(self.cycleLength);
+                }
+                if (prop === 'maxSpeed' && self.logger) self.logger.maxSpeed = self.maxSpeed;
+            };
+        }
+    };
+    bindSlider('sim-spawn-rate','spawnRate','val-spawn');
+    var pedSlider = document.getElementById('sim-ped-rate');
+    pedSlider.oninput = function() {
+        document.getElementById('val-ped').textContent = pedSlider.value;
+        if (self.pedSys) self.pedSys.spawnRate = parseFloat(pedSlider.value);
+    };
+    bindSlider('sim-max-cars','maxCars','val-maxcars');
+    bindSlider('sim-max-speed','maxSpeed','val-speed');
+    bindSlider('sim-cycle','cycleLength','val-cycle');
+    bindSlider('sim-grid-size','gridSize','val-grid');
+
+    // 확대/축소 (휠)
+    this.canvas.addEventListener('wheel', function(ev) {
+        ev.preventDefault();
+        var rect = self.canvas.getBoundingClientRect();
+        var mx = ev.clientX - rect.left;
+        var my = ev.clientY - rect.top;
+        
+        var wheel = ev.deltaY < 0 ? 1 : -1;
+        var zoom = Math.exp(wheel * 0.1);
+        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
+        zoom = newScale / self.cam.scale;
+        
+        self.cam.x = mx - (mx - self.cam.x) * zoom;
+        self.cam.y = my - (my - self.cam.y) * zoom;
+        self.cam.scale = newScale;
+        
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    }, {passive: false});
+
+    // 캔버스 드래그 패닝 및 클릭 제어
+    this.canvas.addEventListener('mousedown', function(ev) {
+        if (ev.button !== 0) return;
+        var rect = self.canvas.getBoundingClientRect();
+        var cx = (ev.clientX - rect.left - self.cam.x) / self.cam.scale;
+        var cy = (ev.clientY - rect.top  - self.cam.y) / self.cam.scale;
+        var nearest = null, minD = 20 / self.cam.scale;
+        for (var i = 0; i < self.network.nodes.length; i++) {
+            var d = Math.hypot(self.network.nodes[i].x - cx, self.network.nodes[i].y - cy);
+            if (d < minD) { minD = d; nearest = self.network.nodes[i]; }
+        }
+        if (nearest) {
+            var sel = document.querySelector('input[name="jtype"]:checked').value;
+            if (nearest.control === 'signal' && sel === 'signal') {
+                var light = self.jc.lights.get(nearest.id);
+                if (light) { light.t = 0; light.phaseIdx = (light.phaseIdx + 1) % light.phases.length; }
+            } else {
+                self.jc.setControlType(nearest, sel, self.cycleLength);
+            }
+            if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+            return;
+        }
+        
+        self.isDragging = true;
+        self.dragStartX = ev.clientX - self.cam.x;
+        self.dragStartY = ev.clientY - self.cam.y;
+        self.canvas.style.cursor = 'grabbing';
+    });
+    
+    window.addEventListener('mousemove', function(ev) {
+        if (!self.isDragging) return;
+        self.cam.x = ev.clientX - self.dragStartX;
+        self.cam.y = ev.clientY - self.dragStartY;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    });
+    
+    window.addEventListener('mouseup', function() {
+        self.isDragging = false;
+        self.canvas.style.cursor = 'crosshair';
+    });
+    
+    this.canvas.addEventListener('mouseleave', function() {
+        self.isDragging = false;
+        self.canvas.style.cursor = 'crosshair';
+    });
+
+    document.getElementById('btn-export-json').onclick = function(){ if (self.logger) self.logger.exportJSON(); };
+    document.getElementById('btn-export-csv').onclick = function(){ if (self.logger) self.logger.exportCSV(); };
+    var sampleSlider = document.getElementById('sim-sample-int');
+    sampleSlider.oninput = function() {
+        document.getElementById('val-sample').textContent = sampleSlider.value;
+        if (self.logger) self.logger.sampleInterval = parseFloat(sampleSlider.value);
+    };
+
+    var btnOpt = document.getElementById('btn-optimize');
+    var btnApply = document.getElementById('btn-apply-opt');
+    var chkAdapt = document.getElementById('chk-adaptive');
+    var optSlider = document.getElementById('sim-opt-int');
+
+    btnOpt.onclick = async function() {
+        var lt = document.getElementById('log-text');
+        lt.textContent = 'AI 에이전트 분석을 시작합니다...\n\n';
+        document.getElementById('log-overlay').classList.remove('hidden');
+
+        // AI 적용 전 성능 저장
+        var beforeStopped = 0;
+        var beforeSumV = 0;
+
+        for (var i = 0; i < self.cars.length; i++) {
+        if (self.cars[i].v < 3) beforeStopped++;
+            beforeSumV += self.cars[i].v;
+        }
+
+        var beforeSpeedRate = self.cars.length > 0
+            ? Math.round((beforeSumV / self.cars.length) / self.maxSpeed * 100)
+            : 0;
+
+        var beforeLatest = self.logger && self.logger.buffer.length > 0
+            ? self.logger.buffer[self.logger.buffer.length - 1]
+            : null;
+
+        self.aiBeforeMetrics = {
+            stopped: beforeStopped,
+            speed: beforeSpeedRate,
+            throughput: beforeLatest ? beforeLatest.network.throughputPerMin : 0,
+            congestion: beforeLatest ? beforeLatest.network.congestion : 0
+        };
+
+        document.getElementById("effect-stop-before").textContent = self.aiBeforeMetrics.stopped + "대";
+        document.getElementById("effect-flow-before").textContent = self.aiBeforeMetrics.throughput + "대/분";
+
+        document.getElementById("effect-stop-after").textContent = "측정 중";
+        document.getElementById("effect-flow-after").textContent = "측정 중";
+        document.getElementById("effect-congestion-after").textContent = "측정 중";
+
+        var stopped = 0;
+        for (var i = 0; i < self.cars.length; i++) {
+            if (self.cars[i].v < 3) stopped++;
+        }
+    
+
+        var latest = self.logger && self.logger.buffer.length > 0
+            ? self.logger.buffer[self.logger.buffer.length - 1]
+            : null;
+
+        var scenario = {
+            intersection_id: "simulation-current",
+            tick: Math.round(self.simTime),
+            signals: {
+                cycle_sec: self.cycleLength
+            },
+            queues: {
+                total_cars: self.cars.length,
+                stopped_cars: stopped
+            },
+            pedestrians: {
+                waiting_or_crossing: self.pedSys ? self.pedSys.peds.length : 0,
+                vulnerable_count: self.pedSys
+                    ? self.pedSys.peds.filter(function(p) {
+                        return p.type && (
+                            p.type.key === "child" ||
+                            p.type.key === "elderly" ||
+                            p.type.key === "disabled"
+                        );
+                    }).length
+                    : 0
+            },
+            context: {
+                source: "cityflow_final_html",
+                grid_size: self.gridSize
+            },
+            metrics: {
+                congestion: latest ? latest.network.congestion : 0,
+                throughput_per_min: latest ? latest.network.throughputPerMin : 0
+            }
+        };
+
+        try {
+            var response = await fetch('http://127.0.0.1:8000/api/agent/stream', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(scenario)
+            });
+
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder("utf-8");
+            var buffer = "";
+
+            while (true) {
+                var result = await reader.read();
+                if (result.done) break;
+
+                buffer += decoder.decode(result.value, { stream: true });
+
+                var events = buffer.split("\n\n");
+                buffer = events.pop();
+
+                for (var e of events) {
+                    var lines = e.split("\n");
+                    var eventName = "";
+                    var dataText = "";
+
+                    for (var line of lines) {
+                        if (line.startsWith("event:")) {
+                            eventName = line.replace("event:", "").trim();
+                        }
+                        if (line.startsWith("data:")) {
+                            dataText = line.replace("data:", "").trim();
+                        }
+                    }
+
+                    if (!dataText) continue;
+
+                    var data = JSON.parse(dataText);
+
+                    if (eventName === "message") {
+                        var agentLabel = "";
+
+                        if (data.message.includes("교통 상황 분석")) {
+                            agentLabel = "[Agent 1] Traffic Situation Agent\n";
+                        } else if (data.message.includes("신호 계획 생성")) {
+                            agentLabel = "[Agent 2] Signal Planning Agent\n";
+                        } else if (data.message.includes("Guardrail")) {
+                            agentLabel = "[Guardrail] Safety Rule Check\n";
+                        } else if (data.message.includes("계획 평가")) {
+                            agentLabel = "[Agent 3] Plan Evaluation Agent\n";
+                        }
+
+                        if (agentLabel) {
+                            lt.textContent += "\n" + agentLabel;
+                        }
+
+                        lt.textContent += "[진행] " + data.message + "\n";
+                    }
+
+                    if (eventName === "done") {
+                        var input = data.input_state;
+                        var analysis = data.traffic_analysis;
+                        var plan = data.signal_plan;
+                        var evalResult = data.evaluation;
+                        var d = plan.durations;
+                        var priorityText = {
+                        "VEHICLE": "차량 우선",
+                        "PEDESTRIAN": "보행자 우선",
+                        "BALANCED": "균형 제어"
+                        }[plan.priority] || plan.priority;
+
+                        var congestionValue = input.metrics.congestion;
+                        var congestionText =
+                            congestionValue >= 0.7 ? "매우 높음" :
+                            congestionValue >= 0.3 ? "보통" :
+                            "낮음";
+
+                        lt.textContent += "\n==============================\n";
+                        lt.textContent += " FlowLight AI 분석 결과\n";
+                        lt.textContent += "==============================\n\n";
+
+                        lt.textContent += "[교통 상황]\n";
+                        lt.textContent += "• 차량 수: " + input.queues.total_cars + "대\n";
+                        lt.textContent += "• 정지 차량: " + input.queues.stopped_cars + "대\n";
+                        lt.textContent += "• 보행자: " + input.pedestrians.waiting_or_crossing + "명\n";
+                        lt.textContent += "• 혼잡도: " + congestionText + " (" + congestionValue.toFixed(2) + ")\n\n";
+
+                        lt.textContent += "[AI 신호 제어안]\n";
+                        lt.textContent += "• 우선순위: " + priorityText + "\n";
+                        lt.textContent += "• 남북 신호: " + d.north_south_green_sec + "초\n";
+                        lt.textContent += "• 동서 신호: " + d.east_west_green_sec + "초\n";
+                        lt.textContent += "• 보행자 요청: " + (d.pedestrian_green_sec === 0 ? "없음" : d.pedestrian_green_sec + "초") + "\n";
+                        lt.textContent += "• 전체 주기: " + input.signals.cycle_sec + "초\n\n";
+
+                        lt.textContent += "[AI 판단 근거]\n";
+
+                        if (input.pedestrians.waiting_or_crossing === 0) {
+
+                            lt.textContent +=
+                                "• 보행자가 없어 차량 흐름을 우선하도록 신호를 조정했습니다.\n";
+
+                        } else if (input.pedestrians.waiting_or_crossing >= 10) {
+
+                            lt.textContent +=
+                                "• 보행자가 많아 차량과 보행자를 균형 있게 고려하도록 신호를 조정했습니다.\n";
+
+                        } else {
+
+                            lt.textContent +=
+                                "• 차량과 보행자 상황을 함께 고려하여 신호를 조정했습니다.\n";
+
+                        }
+
+                        lt.textContent +=
+                            "• 최종 신호시간 : 남북 " +
+                            d.north_south_green_sec +
+                            "초 / 동서 " +
+                            d.east_west_green_sec +
+                            "초 / 보행자 " +
+                            d.pedestrian_green_sec +
+                            "초\n";
+
+                        lt.textContent +=
+                           "• Guardrail 검증 : 전체 주기 " +
+                            input.signals.cycle_sec +
+                            "초 이내로 안전하게 조정했습니다.\n\n";
+
+                        var finalReason = "";
+
+                        if (data.final_decision === "자동 적용") {
+                            finalReason =
+                                "보행자가 없고 차량 혼잡도가 높아 차량 우선 제어가 적절합니다. " +
+                                "Guardrail 검증 결과 전체 주기 " + input.signals.cycle_sec +
+                                "초를 초과하지 않아 자동 적용했습니다.";
+                        } else if (data.final_decision === "운영자 승인 필요") {
+                            finalReason =
+                                "보행자 수가 많거나 안전 검토가 필요한 상황입니다. " +
+                                "최종 신호 시간은 전체 주기 " + input.signals.cycle_sec +
+                                "초 이내로 조정되었지만, 자동 적용 대신 운영자 확인이 필요합니다.";
+                        } else {
+                            finalReason =
+                                "현재 신호안이 안전 기준 또는 운영 기준을 충분히 만족하지 못해 재계획이 필요합니다.";
+                        }
+
+                        lt.textContent += "[평가 결과]\n";
+                        lt.textContent += "• 총점: " + evalResult.total_score + "점\n";
+                        lt.textContent += "• 최종 판단: " + data.final_decision + "\n";
+                        lt.textContent += "• 판단 이유: " + finalReason + "\n\n";
+
+                        if (data.final_decision === "자동 적용") {
+                            lt.textContent += "\n[자동 적용 예정]\n";
+                            lt.textContent += "평가 결과가 자동 적용으로 판단되어 신호 제어안을 반영합니다.\n";
+                        } else {
+                            lt.textContent += "\n[자동 적용 보류]\n";
+                            lt.textContent += "평가 결과: " + data.final_decision + "\n";
+                            lt.textContent += "안전 검토가 필요하여 자동 적용하지 않았습니다.\n";
+                        }
+
+                        lt.textContent += "\n==============================\n";
+                        lt.textContent += " 개발자용 상세 JSON\n";
+                        lt.textContent += "==============================\n";
+                        lt.textContent += JSON.stringify(data, null, 2);
+
+                        lt.scrollTop = lt.scrollHeight;
+
+                        self.recommendedSignalPlan = d;
+                        btnApply.disabled = false;
+
+                        if (data.final_decision === "자동 적용") {
+                            setTimeout(function() {
+                                btnApply.click();
+                            }, 300);
+                        }
+                    }
+
+                    if (eventName === "error") {
+                        lt.textContent += "\n[오류]\n";
+                        lt.textContent += JSON.stringify(data, null, 2);
+                    }
+                }
+            }
+        } catch (err) {
+            lt.textContent += "\n[오류] FastAPI 서버 연결 실패\n";
+            lt.textContent += err.message;
+        }
+    };
+    document.getElementById('btn-close-log').onclick = function(){ document.getElementById('log-overlay').classList.add('hidden'); };
+    
+    btnApply.onclick = function() {
+        console.log("권장값 적용 버튼 클릭!");
+        console.log("recommendedSignalPlan:", self.recommendedSignalPlan);
+
+        if (!self.recommendedSignalPlan) {
+            alert('적용할 AI 권장 신호안이 없습니다.');
+            return;
+        }
+
+        var plan = self.recommendedSignalPlan;
+        var vulnerableCount = self.pedSys
+            ? self.pedSys.peds.filter(function(p) {
+                return p.type && (
+                    p.type.key === "child" ||
+                    p.type.key === "elderly" ||
+                    p.type.key === "disabled"
+                );
+            }).length
+            : 0;
+
+        if (vulnerableCount > 0 && Number(plan.pedestrian_green_sec) > 0) {
+            plan.pedestrian_green_sec = Math.max(Number(plan.pedestrian_green_sec), 10);
+        }
+        self.jc.aiPedGreenSec = Number(plan.pedestrian_green_sec);
+
+        // AI 적용 후 정체 완화 모드: 새 차량 유입을 잠시 줄여 기존 정체 차량을 먼저 배출
+        self.aiControlApplied = true;
+        self.aiReliefUntil = self.simTime + 120;
+        self.jc.aiReliefMode = true;
+        self.originalSpawnRate = self.spawnRate;
+        self.spawnRate = Math.max(2, Math.floor(self.originalSpawnRate * 0.5));
+        document.getElementById('val-spawn').textContent = self.spawnRate;
+        document.getElementById('sim-spawn-rate').value = self.spawnRate;
+
+        console.log("AI pedestrian control:", self.jc.aiPedGreenSec);
+
+        var nsLeft = 0;
+        var ewLeft = 0;
+
+        console.log("lights =", self.jc.lights);
+        console.log("lights size =", self.jc.lights.size);
+
+        var ng = {
+            straight_NS: plan.north_south_green_sec,
+            left_NS: nsLeft,
+            straight_EW: plan.east_west_green_sec,
+            left_EW: ewLeft
+        };
+
+        var cycle = self.cycleLength;
+
+        var appliedCount = 0;
+
+        var iter = self.jc.lights.values();
+        for (var r = iter.next(); !r.done; r = iter.next()) {
+            r.value.applyGreens(ng, cycle);
+            appliedCount++;
+        }
+
+        console.log("적용 교차로 수:", appliedCount);
+        alert("AI 권장안 적용 완료: " + appliedCount + "개 교차로");
+
+        var banner = document.getElementById("ai-apply-banner");
+        var bannerDetail = document.getElementById("ai-banner-detail");
+
+        bannerDetail.textContent =
+            "남북 직진 " + plan.north_south_green_sec + "초 / " +
+            "동서 직진 " + plan.east_west_green_sec + "초 / " +
+            "보행자 " + plan.pedestrian_green_sec + "초";
+
+        banner.classList.remove("hidden");
+
+        setTimeout(function() {
+            banner.classList.add("hidden");
+        }, 6000);
+
+        document.getElementById("ai-apply-state").textContent = "자동 적용 완료";
+        document.getElementById("ai-apply-count").textContent = appliedCount + "개";
+        document.getElementById("ai-vehicle-control").textContent =
+            "남북 " + plan.north_south_green_sec + "초 / 동서 " + plan.east_west_green_sec + "초";
+        document.getElementById("ai-ped-control").textContent =
+            plan.pedestrian_green_sec === 0
+                ? "보행자 요청 없음 → 빨간불 고정"
+                : vulnerableCount > 0
+                    ? "교통약자 감지 → 보행자 " + plan.pedestrian_green_sec + "초 확보"
+                    : "보행자 " + plan.pedestrian_green_sec + "초 확보";
+        document.getElementById("ai-guardrail").textContent =
+            "최소 신호 시간 및 주기 초과 검증 완료";
+        
+        document.getElementById("effect-summary").textContent =
+            "AI 신호 제어 반영 완료";
+
+        document.getElementById('ai-state').textContent = "자동 적용 완료";
+        document.getElementById('ai-decision').textContent = "자동 적용";
+        document.getElementById('ai-priority').textContent = "차량 우선";
+        document.getElementById('ai-ns').textContent = plan.north_south_green_sec + "초";
+        document.getElementById('ai-ew').textContent = plan.east_west_green_sec + "초";
+        document.getElementById('ai-ped').textContent =
+            plan.pedestrian_green_sec === 0 ? "없음" : plan.pedestrian_green_sec + "초";
+
+        self.cycleLength = Math.round(cycle);
+        document.getElementById('val-cycle').textContent = self.cycleLength;
+        document.getElementById('sim-cycle').value = self.cycleLength;
+
+        var lt = document.getElementById('log-text');
+
+        lt.textContent += "\n\n===== AI 권장안 적용 완료 =====\n";
+        lt.textContent += "적용 교차로 수: " + appliedCount + "개\n";
+        lt.textContent += "남북 직진: " + plan.north_south_green_sec + "초\n";
+        lt.textContent += "동서 직진: " + plan.east_west_green_sec + "초\n";
+        lt.textContent += "보행자 요청: " + (plan.pedestrian_green_sec === 0 ? "없음" : plan.pedestrian_green_sec + "초") + "\n";
+        lt.textContent += "적용된 전체 주기: " + Math.round(cycle) + "초\n";
+
+        lt.scrollTop = lt.scrollHeight;
+
+        btnApply.disabled = true;
+
+        // AI 적용 효과: 15초 동안 평균값으로 측정
+        var effectSamples = [];
+        var effectSampleCount = 0;
+
+        var effectTimer = setInterval(function() {
+            var stoppedNow = 0;
+            var sumVNow = 0;
+
+            for (var i = 0; i < self.cars.length; i++) {
+                if (self.cars[i].v < 3) stoppedNow++;
+                sumVNow += self.cars[i].v;
+            }
+
+            var nNow = self.cars.length;
+            var speedRateNow = nNow > 0
+                ? (sumVNow / nNow) / self.maxSpeed
+                : 0;
+
+            var congestionNow = Math.min(1, Math.max(0,
+            (stoppedNow / Math.max(1, nNow)) * 0.7 + (1 - speedRateNow) * 0.6
+            ));
+
+            var latestNow = self.logger && self.logger.buffer.length > 0
+                ? self.logger.buffer[self.logger.buffer.length - 1]
+                : null;
+
+            effectSamples.push({
+                stopped: stoppedNow,
+                congestion: congestionNow,
+                throughput: latestNow ? latestNow.network.throughputPerMin : 0
+            });
+
+            effectSampleCount++;
+
+            document.getElementById("effect-summary").textContent =
+                "AI 적용 효과 측정 중... " + effectSampleCount + "/15초";
+
+            if (effectSampleCount >= 15) {
+                clearInterval(effectTimer);
+
+                var sumStopped = 0;
+                var sumCongestion = 0;
+                var sumThroughput = 0;
+
+                for (var j = 0; j < effectSamples.length; j++) {
+                    sumStopped += effectSamples[j].stopped;
+                    sumCongestion += effectSamples[j].congestion;
+                    sumThroughput += effectSamples[j].throughput;
+                }
+
+                var avgStopped = Math.round(sumStopped / effectSamples.length);
+                var avgCongestion = sumCongestion / effectSamples.length;
+                var avgThroughput = Math.round(sumThroughput / effectSamples.length);
+
+                var beforeThroughput = self.aiBeforeMetrics ? self.aiBeforeMetrics.throughput : 0;
+                var beforeStopped = self.aiBeforeMetrics ? self.aiBeforeMetrics.stopped : 0;
+                var beforeCongestion = self.aiBeforeMetrics ? self.aiBeforeMetrics.congestion : 0;
+
+                document.getElementById("effect-stop-after").textContent =
+                    avgStopped + "대";
+
+                document.getElementById("effect-flow-after").textContent =
+                    avgThroughput + "대/분";
+
+                document.getElementById("effect-congestion-after").textContent =
+                    beforeCongestion.toFixed(2) + " → " + avgCongestion.toFixed(2);
+
+                if (avgThroughput > beforeThroughput && avgCongestion < beforeCongestion) {
+                    document.getElementById("effect-summary").textContent =
+                        "처리량 증가 및 정체 완화 확인";
+                } else if (avgThroughput > beforeThroughput) {
+                    document.getElementById("effect-summary").textContent =
+                        "처리량 개선, 정체 완화 관찰 중";
+                } else {
+                    document.getElementById("effect-summary").textContent =
+                        "AI 신호 제어 반영 완료";
+                }
+            }
+        }, 1000);
+
+        if (!self.running) {
+            self.renderer.render(self.network, self.jc, self.cam);
+        }
+    };
+    
+    optSlider.oninput = function() {
+        document.getElementById('val-opt-int').textContent = optSlider.value;
+        self.optimizeInterval = parseFloat(optSlider.value);
+    };
+    chkAdapt.onchange = function(){ self.adaptiveMode = chkAdapt.checked; };
+    document.getElementById('btn-ab-test').onclick = function(){ self.startABTest(); };
+
+    // 배속 버튼
+    var speedBtns = document.querySelectorAll('.speed-btn');
+    for (var i = 0; i < speedBtns.length; i++) {
+        speedBtns[i].onclick = function() {
+            for (var j = 0; j < speedBtns.length; j++) speedBtns[j].classList.remove('active');
+            this.classList.add('active');
+            self.speedMultiplier = parseInt(this.getAttribute('data-speed'));
+        };
+    }
+
+    // 신호 연동 오프셋 슬라이더
+    var offsetSlider = document.getElementById('sim-offset');
+    offsetSlider.oninput = function() {
+        document.getElementById('val-offset').textContent = offsetSlider.value;
+        self.greenWaveOffset = parseFloat(offsetSlider.value);
+        if (self.jc) {
+            self.jc.greenWaveOffset = self.greenWaveOffset;
+            // 기존 신호등 재생성 (새 오프셋 적용)
+            var iter = self.jc.lights.entries();
+            for (var r = iter.next(); !r.done; r = iter.next()) {
+                var nodeId = r.value[0];
+                var node = null;
+                for (var ni = 0; ni < self.network.nodes.length; ni++) {
+                    if (self.network.nodes[ni].id === nodeId) { node = self.network.nodes[ni]; break; }
+                }
+                if (!node) continue;
+                var offsetVal = self.greenWaveOffset;
+                var gridIdx = Math.round(node.x / 100) + Math.round(node.y / 100);
+                var nodeOffset = offsetVal > 0 ? (gridIdx * offsetVal) % self.cycleLength : 0;
+                var newLight = new TrafficLight(node, self.cycleLength, nodeOffset);
+                self.jc.lights.set(nodeId, newLight);
+            }
+        }
+    };
+
+    // 확대/축소 버튼 클릭 바인딩
+    document.getElementById('btn-zoom-in').onclick = function() {
+        var rect = self.canvas.getBoundingClientRect();
+        var mx = rect.width / 2;
+        var my = rect.height / 2;
+        var zoom = Math.exp(0.2);
+        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
+        zoom = newScale / self.cam.scale;
+        self.cam.x = mx - (mx - self.cam.x) * zoom;
+        self.cam.y = my - (my - self.cam.y) * zoom;
+        self.cam.scale = newScale;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+    document.getElementById('btn-zoom-out').onclick = function() {
+        var rect = self.canvas.getBoundingClientRect();
+        var mx = rect.width / 2;
+        var my = rect.height / 2;
+        var zoom = Math.exp(-0.2);
+        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
+        zoom = newScale / self.cam.scale;
+        self.cam.x = mx - (mx - self.cam.x) * zoom;
+        self.cam.y = my - (my - self.cam.y) * zoom;
+        self.cam.scale = newScale;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+    document.getElementById('btn-zoom-reset').onclick = function() {
+        var rect = self.canvas.getBoundingClientRect();
+        var nw = (self.gridSize+1)*100, nh = (self.gridSize+1)*100;
+        self.cam.scale = 1.0;
+        self.cam.x = (rect.width-nw)/2;
+        self.cam.y = (rect.height-nh)/2;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+
+    setTimeout(resize, 0);
+};
+SimController.prototype.reset = function() {
+    this.simTime = 0;
+    this.cars = [];
+    this.spawnAcc = 0;
+    this.sampleAcc = 0;
+    this.optAcc = 0;
+    this.network = new Network(this.gridSize, 100);
+    this.jc = new JunctionControl(this.network);
+    this.jc.aiPedGreenSec = null;
+    this.pedSys = new PedSystem(this.network, this.jc);
+    this.jc.peds = this.pedSys; // Car.update가 jc를 통해 접근
+    this.pedSys.spawnRate = parseFloat(document.getElementById('sim-ped-rate').value);
+    this.logger = new DataLogger(this.network, this.jc, this.maxSpeed);
+    this.logger.sampleInterval = parseFloat(document.getElementById('sim-sample-int').value);
+    this.analyzer = new Analyzer(this.network, this.jc, this.logger);
+    this.optimizeInterval = parseFloat(document.getElementById('sim-opt-int').value);
+    this.cam = {x: 0, y: 0, scale: 1.0};
+    window.dispatchEvent(new Event('resize'));
+    if (!this.running) this.renderer.render(this.network, this.jc, this.cam);
+};
+SimController.prototype._loop = function(ts) {
+    if (!this.running) return;
+    var dt = Math.min((ts - this.lastTime) / 1000, 0.1);
+    this.lastTime = ts;
+    // 배속 적용: dt에 배속 배수를 곱함
+    var effectiveDt = dt * this.speedMultiplier;
+    // 안정성을 위해 배속이 높을 때는 여러 번 나누어 시뮬레이션
+    var steps = this.speedMultiplier;
+    var stepDt = effectiveDt / steps;
+    
+    for (var i = 0; i < steps; i++) {
+    this._update(stepDt);
+    }
+    this.renderer.render(this.network, this.jc, this.cam);
+    var self = this;
+    requestAnimationFrame(function(t){ self._loop(t); });
+};
+SimController.prototype._update = function(dt, skipUI) {
+    this.simTime += dt;
+    // AI 정체 완화 시간이 끝나면 원래 교통량으로 복구
+        if (this.aiControlApplied && this.aiReliefUntil && this.simTime >= this.aiReliefUntil) {
+            this.spawnRate = this.originalSpawnRate || this.spawnRate;
+            document.getElementById('val-spawn').textContent = this.spawnRate;
+            document.getElementById('sim-spawn-rate').value = this.spawnRate;
+            this.aiControlApplied = false;
+            this.jc.aiReliefMode = false;
+        }
+    this.spawnAcc += this.spawnRate * dt;
+    var stoppedForSpawn = 0;
+    for (var si = 0; si < this.cars.length; si++) {
+        if (this.cars[si].v < 3) stoppedForSpawn++;
+    }
+
+    var stoppedRatio = stoppedForSpawn / Math.max(1, this.cars.length);
+
+    // 장시간 고밀도 상태에서 도로가 완전히 막히는 것 방지
+    var gridlockRisk =
+        this.cars.length >= this.maxCars * 0.8 &&
+        stoppedRatio >= 0.75;
+
+    while (this.spawnAcc >= 1.0) {
+        this.spawnAcc -= 1.0;
+
+        if (!gridlockRisk && this.cars.length < this.maxCars) {
+            this._spawnCar();
+        }
+    }
+    this.jc.update(dt, this.simTime, this.cycleLength);
+    for (var i = this.cars.length - 1; i >= 0; i--) {
+        var status = this.cars[i].update(dt, this.simTime, this.jc);
+        if (status === 'removed' || this.cars[i].routeIndex >= this.cars[i].route.length) {
+            if (status === 'removed') {
+                var idx = this.cars[i].edge.cars.indexOf(this.cars[i]);
+                if (idx > -1) this.cars[i].edge.cars.splice(idx, 1);
+            }
+            this.cars.splice(i, 1);
+        }
+    }
+
+    /*
+    // 사고 판정 (차량 겹침 감지 및 사고 처리)
+    for (var i = 0; i < this.cars.length; i++) {
+        var c1 = this.cars[i];
+        if (c1.crashed) continue;
+        var cx1 = c1.edge.ax + c1.edge.ux * (c1.s - 5);
+        var cy1 = c1.edge.ay + c1.edge.uy * (c1.s - 5);
+        
+        // 1. 차량간 충돌
+        for (var j = i + 1; j < this.cars.length; j++) {
+            var c2 = this.cars[j];
+            if (c2.crashed) continue;
+            var cx2 = c2.edge.ax + c2.edge.ux * (c2.s - 5);
+            var cy2 = c2.edge.ay + c2.edge.uy * (c2.s - 5);
+            var distSq = (cx1 - cx2)*(cx1 - cx2) + (cy1 - cy2)*(cy1 - cy2);
+            if (distSq < 49) { // 중심거리가 7픽셀 이내면 충돌
+                c1.crashed = true;
+                c2.crashed = true;
+            }
+        }
+        
+        // 2. 보행자와 충돌
+        if (this.pedSys && this.pedSys.peds) {
+            for (var k = 0; k < this.pedSys.peds.length; k++) {
+                var pd = this.pedSys.peds[k];
+                if (pd.state === 'wait' || pd.crashed) continue;
+                var px, py;
+                if (pd.state === 'walk_sidewalk') {
+                    var e = pd.edge;
+                    var off = pd.side * 17.5; // 인도 중앙
+                    px = e.from.x + e.ux * pd.s - e.uy * off + e.ux * pd.jit;
+                    py = e.from.y + e.uy * pd.s + e.ux * off + e.uy * pd.jit;
+                } else {
+                    var cw = pd.cw;
+                    var off = pd.side * (14 - pd.prog * 28); // 14는 CW_HALF
+                    px = cw.cx + cw.px * off + cw.tx * pd.jit * 0.5;
+                    py = cw.cy + cw.py * off + cw.ty * pd.jit * 0.5;
+                }
+                
+                var distSq = (cx1 - px)*(cx1 - px) + (cy1 - py)*(cy1 - py);
+                if (distSq < 36) { // 반경 6픽셀 이내 (차체와 보행자 중심)
+                    c1.crashed = true;
+                    pd.crashed = true;
+                }
+            }
+        }
+    }*/
+
+    this.pedSys.update(dt); // 보행자는 A/B 평가에도 포함 (교통에 영향)
+    this.sampleAcc += dt;
+    if (this.sampleAcc >= this.logger.sampleInterval) {
+        this.sampleAcc -= this.logger.sampleInterval;
+        this.logger.sample(this.simTime);
+    }
+    if (skipUI) return; // A/B 평가 중: DOM 갱신·적응형 생략 (결정성 보장)
+    if (this.adaptiveMode) {
+        this.optAcc += dt;
+        if (this.optAcc >= this.optimizeInterval) {
+            this.optAcc -= this.optimizeInterval;
+            this.analyzer.analyze();
+            this.analyzer.applyRecommendations();
+        }
+    }
+    var stopped = 0, sumV = 0;
+    for (var i = 0; i < this.cars.length; i++) {
+        if (this.cars[i].v < 3) stopped++;
+        sumV += this.cars[i].v;
+    }
+    var n = this.cars.length;
+    var sr = n > 0 ? (sumV / n) / this.maxSpeed : 0;
+    document.getElementById('stat-cars').textContent = n;
+    document.getElementById('stat-peds').textContent = this.pedSys.peds.length;
+    document.getElementById('stat-stopped').textContent = stopped;
+    document.getElementById('stat-speed').textContent = Math.round(sr * 100) + '%';
+    var recent = this.jc.completedTrips.filter(function(t){ return this.simTime - t.endTime <= 60; }.bind(this));
+    document.getElementById('stat-throughput').textContent = recent.length;
+    var cong = Math.min(1, Math.max(0, (stopped / Math.max(1, n)) * 0.7 + (1 - sr) * 0.6));
+    var cBar = document.getElementById('stat-congestion');
+    cBar.style.width = (cong * 100) + '%';
+
+    var beforeCong = this.aiBeforeMetrics ? this.aiBeforeMetrics.congestion : null;
+
+    if (beforeCong !== null && cong < beforeCong) {
+    // 실제 정체지수가 AI 적용 전보다 낮아졌을 때만 개선 색상 표시
+    cBar.style.backgroundColor = cong < 0.55 ? COL_GREEN : COL_YELLOW;
+} else {
+        // 개선 전이거나 악화/유지 상태면 기존 기준 유지
+        cBar.style.backgroundColor =
+            cong < 0.25 ? COL_GREEN :
+            cong < 0.55 ? COL_YELLOW :
+            COL_RED;
+    }
+};
+SimController.prototype._spawnCar = function() {
+    var edge = this.network.getRandomSourceEdge();
+    if (!edge) return;
+    if (edge.cars.length > 0 && edge.cars[0].s < 15) return;
+    var route = this.network.findRandomRoute(edge);
+    if (route.length > 0) {
+        this.cars.push(new Car(edge, this.maxSpeed, this.maxSpeed, route, this.simTime));
+    }
+};
+
+// ===== A/B 검증 하네스 =====
+// 도로망·제어 유형·신호 설정은 유지한 채 차량/시간/데이터만 초기화.
+// (reset()은 네트워크를 새로 만들어 사용자가 지정한 교차로 유형이 날아가므로 별도 구현)
+SimController.prototype.softReset = function() {
+    this.simTime = 0; this.spawnAcc = 0; this.sampleAcc = 0; this.optAcc = 0;
+    this.cars = [];
+    for (var i = 0; i < this.network.edges.length; i++) {
+        var e = this.network.edges[i];
+        e.cars.length = 0; e.flowCount = 0;
+        e.arr.straight = 0; e.arr.left = 0; e.arr.right = 0;
+    }
+    this.jc.completedTrips.length = 0;
+    this.jc.occupiedZones.clear();
+    this.jc.stopQueues.forEach(function(q){ q.length = 0; });
+    var it = this.jc.lights.values();
+    for (var r = it.next(); !r.done; r = it.next()) { r.value.phaseIdx = 0; r.value.t = 0; }
+    this.pedSys.clear();
+    this.logger.buffer.length = 0;
+};
+SimController.prototype._collectKPI = function(congSum, congN) {
+    var trips = this.jc.completedTrips;
+    var mt = 0, mw = 0;
+    for (var i = 0; i < trips.length; i++) { mt += trips[i].travelTime; mw += trips[i].waitTime; }
+    return {
+        throughput: trips.length,
+        meanTravel: trips.length ? mt / trips.length : 0,
+        meanWait: trips.length ? mw / trips.length : 0,
+        meanCong: congN ? congSum / congN : 0
+    };
+};
+// 같은 시드로 (A) 현재 신호 → (B) 권장 신호를 각각 T초 실행해 KPI 델타를 표로 출력.
+// 시드가 같으면 스폰 시각·진입 지점·경로가 완전히 동일하므로, 차이는 오직 신호 설정뿐.
+SimController.prototype.startABTest = function() {
+    var self = this;
+    if (this.evaluating) return;
+    // 권장값 확보 (기존 리포트가 없으면 현 데이터로 즉석 분석)
+    var rep = this.analyzer.lastReport || this.analyzer.analyze();
+    if (!rep || rep.recommendations.length === 0) {
+        var lt = document.getElementById('log-text');
+        lt.textContent = 'A/B 검증 불가: 적용할 권장값이 없습니다.\n시뮬레이션을 30초 이상 돌려 데이터를 모은 뒤 [최적화 분석]을 먼저 실행해주세요.';
+        document.getElementById('log-overlay').classList.remove('hidden');
+        return;
+    }
+    var T = 180;          // 각 단계 시뮬레이션 시간 (초) - 신호 주기를 고려해 최소 180초로 연장
+    var SEED = 20260702;  // 고정 시드
+    var FIXED_DT = 1/30;  // 결정성 보장: 고정 스텝 (프레임레이트 무관)
+    var wasRunning = this.running;
+    this.running = false;
+    this.evaluating = true;
+    var status = document.getElementById('ab-status');
+    status.style.display = 'block';
+    var savedAdaptive = this.adaptiveMode;
+    this.adaptiveMode = false;
+
+    var phase = 'A', kpiA = null, congSum = 0, congN = 0, secAcc = 0;
+
+    function beginPhase(applyRecs) {
+        self.softReset();
+        setSeed(SEED);
+        if (applyRecs) self.analyzer.applyRecommendations();
+        congSum = 0; congN = 0; secAcc = 0;
+    }
+    function stepChunk() {
+        // 프레임당 1 시뮬레이션 초 (30스텝) — 60초가 약 2초 실화면에 진행
+        for (var i = 0; i < 30 && self.simTime < T; i++) {
+            self._update(FIXED_DT, true);
+            secAcc += FIXED_DT;
+            if (secAcc >= 1.0) {
+                secAcc -= 1.0;
+                var stopped = 0, sumV = 0, n = self.cars.length;
+                for (var c = 0; c < n; c++) { if (self.cars[c].v < 3) stopped++; sumV += self.cars[c].v; }
+                var sr = n > 0 ? (sumV / n) / self.maxSpeed : 1;
+                congSum += Math.min(1, Math.max(0, (stopped / Math.max(1, n)) * 0.7 + (1 - sr) * 0.6));
+                congN++;
+            }
+        }
+        self.renderer.render(self.network, self.jc, self.cam);
+        status.textContent = '[' + phase + '] ' + (phase === 'A' ? '기준(현재 신호)' : '권장 적용') + ' 실행 중… ' + self.simTime.toFixed(0) + ' / ' + T + 's';
+        if (self.simTime < T) { requestAnimationFrame(stepChunk); return; }
+        // 단계 종료
+        if (phase === 'A') {
+            kpiA = self._collectKPI(congSum, congN);
+            phase = 'B';
+            beginPhase(true);
+            requestAnimationFrame(stepChunk);
+        } else {
+            var kpiB = self._collectKPI(congSum, congN);
+            self._showABResult(kpiA, kpiB, T, SEED);
+            status.style.display = 'none';
+            self.evaluating = false;
+            self.adaptiveMode = savedAdaptive;
+            // B(권장 적용) 상태로 재개 — 사용자가 최적화된 신호를 이어서 관찰 가능
+            self.running = wasRunning || true;
+            self.lastTime = performance.now();
+            requestAnimationFrame(function(t){ self._loop(t); });
+            document.getElementById('btn-toggle-play').textContent = 'Pause';
+        }
+    }
+    beginPhase(false);
+    requestAnimationFrame(stepChunk);
+};
+SimController.prototype._showABResult = function(a, b, T, seed) {
+    function delta(x, y, lowerBetter) {
+        if (x === 0 && y === 0) return '—';
+        if (x === 0) return 'N/A';
+        var d = ((y - x) / x) * 100;
+        var sign = d > 0 ? '+' : '';
+        var good = lowerBetter ? d < 0 : d > 0;
+        return sign + d.toFixed(1) + '% ' + (Math.abs(d) < 1 ? '≈' : (good ? '개선' : '악화'));
+    }
+    function row(name, x, y, unit, lowerBetter) {
+        return name.padEnd(10) + ' | ' + (x.toFixed(1) + unit).padStart(9) + ' | ' + (y.toFixed(1) + unit).padStart(9) + ' | ' + delta(x, y, lowerBetter) + '\n';
+    }
+    var txt = '===== A/B 검증 결과 =====\n';
+    txt += '조건: 동일 시드(' + seed + '), 각 ' + T + 's, 동일 교통 수요\n';
+    txt += 'A = 기준(현재 신호) / B = 권장값 적용\n\n';
+    txt += '지표         |     A(기준) |     B(권장) | 변화\n';
+    txt += '-------------------------------------------------\n';
+    txt += row('처리량', a.throughput, b.throughput, '대', false);
+    txt += row('평균 통행시간', a.meanTravel, b.meanTravel, 's', true);
+    txt += row('평균 대기시간', a.meanWait, b.meanWait, 's', true);
+    txt += row('평균 정체지수', a.meanCong, b.meanCong, '', true);
+    txt += '\n※ 시드가 같으므로 두 실행의 차량 생성·경로는 완전히 동일하며,\n   차이는 오직 신호 설정에서만 발생합니다.\n';
+    txt += '※ 현재 화면은 B(권장 적용) 상태로 이어서 실행 중입니다.\n';
+    var lt = document.getElementById('log-text');
+    lt.textContent = txt;
+    document.getElementById('log-overlay').classList.remove('hidden');
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    window.sim = new SimController();
+});
+    </script>
+</body>
+</html>

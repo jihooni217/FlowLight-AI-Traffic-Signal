@@ -1,5 +1,5 @@
 
-cityflow_5.html
+cityflow_6.html
 
 <!DOCTYPE html>
 <html lang="ko">
@@ -53,11 +53,64 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
 .mt-2 { margin-top: 0.75rem; }
 .toggle-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+.speed-group {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+}
+.speed-btn {
+    flex: 1;
+    padding: 0.35rem 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+.speed-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+}
+.speed-btn.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
 .main-content { flex: 1; display: flex; flex-direction: column; position: relative; padding: 1rem; overflow: hidden; }
-.stats-bar { display: flex; gap: 1.5rem; background: var(--panel-bg); padding: 0.75rem 1.5rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1rem; align-items: center; flex-wrap: wrap; }
-.stat { font-size: 0.9rem; }
-.stat b { color: #fff; font-variant-numeric: tabular-nums; }
-.stat.congestion { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+.stats-bar {
+    display: flex;
+    gap: 1rem;
+    background: rgba(30, 30, 30, 0.75);
+    padding: 0.75rem 1.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.stat {
+    font-size: 0.82rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+.stat b {
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+    margin-left: 0.25rem;
+}
+.stat.congestion { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; background: transparent; border: none; padding: 0; }
 .c-bar-bg { width: 100px; height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
 .c-bar-fill { height: 100%; width: 0%; background: #22c55e; transition: width 0.3s, background-color 0.3s; }
 .canvas-container { flex: 1; background: #000; border-radius: 8px; border: 1px solid #333; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
@@ -72,6 +125,39 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .btn-close { background: transparent; color: #999; border: none; font-size: 1.5rem; cursor: pointer; }
 .btn-close:hover { color: #fff; }
 #log-text { padding: 1rem; overflow-y: auto; font-family: monospace; font-size: 0.85rem; color: #0ea5e9; white-space: pre-wrap; }
+.canvas-controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 10;
+}
+.canvas-controls button {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: rgba(20, 20, 20, 0.75);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    transition: all 0.2s;
+}
+.canvas-controls button:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+.canvas-controls button:active {
+    transform: scale(0.95);
+}
     </style>
 </head>
 <body>
@@ -83,6 +169,15 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                 <div class="btn-group">
                     <button id="btn-toggle-play" class="btn primary">Play</button>
                     <button id="btn-reset" class="btn danger">Reset</button>
+                </div>
+                <div class="slider-group mt-2">
+                    <label>배속:</label>
+                    <div class="speed-group">
+                        <button class="speed-btn active" data-speed="1">1x</button>
+                        <button class="speed-btn" data-speed="2">2x</button>
+                        <button class="speed-btn" data-speed="3">3x</button>
+                        <button class="speed-btn" data-speed="4">4x</button>
+                    </div>
                 </div>
                 <div class="slider-group mt-2">
                     <label>교통량 (대/초): <span id="val-spawn">3.0</span></label>
@@ -108,8 +203,11 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                     <label><input type="radio" name="jtype" value="roundabout"> 🔄 회전교차로</label>
                 </div>
                 <div class="slider-group mt-2">
-                    <label>신호 주기 (s): <span id="val-cycle">40</span></label>
-                    <input type="range" id="sim-cycle" min="20" max="120" step="5" value="40">
+                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
+                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
+                    <label>신호 연동 오프셋 (s): <span id="val-offset">0</span></label>
+                    <input type="range" id="sim-offset" min="0" max="20" step="1" value="0">
+                    <p class="hint">인접 교차로 간 녹색파(Green Wave) 시차. 0이면 동시 시작.</p>
                 </div>
             </section>
 
@@ -132,7 +230,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                     <input type="range" id="sim-opt-int" min="5" max="60" step="1" value="10">
                 </div>
                 <div class="btn-group mt-2">
-                    <button id="btn-optimize" class="btn secondary">AI 분석</button>
+                    <button id="btn-optimize" class="btn secondary">최적화 분석</button>
                     <button id="btn-apply-opt" class="btn success" disabled>권장값 적용</button>
                 </div>
                 <div class="btn-group mt-2">
@@ -160,6 +258,11 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 
             <div class="canvas-container">
                 <canvas id="sim-canvas"></canvas>
+                <div class="canvas-controls">
+                    <button id="btn-zoom-in" title="확대">+</button>
+                    <button id="btn-zoom-out" title="축소">-</button>
+                    <button id="btn-zoom-reset" title="화면 리셋">⟲</button>
+                </div>
             </div>
 
             <div class="legend">
@@ -346,11 +449,12 @@ Network.prototype.findRandomRoute = function(startEdge) {
 };
 
 // ===== TrafficLight =====
-function TrafficLight(node, totalCycle) {
+function TrafficLight(node, totalCycle, offset) {
     this.node = node;
     this.YELLOW = 2;
     this.ALL_RED = 1;
     this.t = 0;
+    this.offset = offset || 0; // 연동 오프셋 (녹색파)
     this.phaseIdx = 0;
     var dirs = {};
     for (var i = 0; i < node.incoming.length; i++) dirs[node.incoming[i].dir] = true;
@@ -359,6 +463,21 @@ function TrafficLight(node, totalCycle) {
     this.greenTimes = {};
     this.phases = [];
     this.buildPhases(totalCycle);
+    // 오프셋 적용: 시작 시각을 앞으로 밀어 교차로 간 시차를 만듦
+    if (this.offset > 0 && this.phases.length > 1) {
+        var skip = this.offset;
+        while (skip > 0) {
+            var dur = this.phases[this.phaseIdx].duration;
+            if (skip >= dur - this.t) {
+                skip -= (dur - this.t);
+                this.t = 0;
+                this.phaseIdx = (this.phaseIdx + 1) % this.phases.length;
+            } else {
+                this.t += skip;
+                skip = 0;
+            }
+        }
+    }
 }
 TrafficLight.prototype.buildPhases = function(totalCycle) {
     this.totalCycle = totalCycle;
@@ -467,6 +586,13 @@ Car.prototype.getNextEdge = function() {
     return (this.routeIndex + 1 < this.route.length) ? this.route[this.routeIndex + 1] : null;
 };
 Car.prototype.update = function(dt, simTime, jc) {
+    if (this.crashed) {
+        this.v = 0;
+        this.crashTimer = (this.crashTimer || 0) + dt;
+        // 30초 후 사고 처리가 완료되어 차량이 견인(삭제)됨
+        if (this.crashTimer > 30) return 'removed';
+        return;
+    }
     var d = Infinity;
     var myIdx = this.edge.cars.indexOf(this);
     var endS = this.edge.len;
@@ -474,22 +600,43 @@ Car.prototype.update = function(dt, simTime, jc) {
         endS = Math.max(0, this.edge.len - 18);
     }
     
+    // 앞차 추종 (있으면)
     if (myIdx < this.edge.cars.length - 1) {
         d = (this.edge.cars[myIdx + 1].s - CAR_LEN) - this.s;
-    } else {
+    }
+    // 교차로 진입 판정 — 큐 선두뿐 아니라 "모든 미허가 차량"에 정지선 규칙 적용.
+    // 선두에만 적용하면 앞차가 통과하는 동안 뒤차가 추종만으로 정지선을 넘어버리고,
+    // 앞차가 빠지는 순간 distToStop<0 → 자동 커밋되어 일시정지 없이 통과하는
+    // 소대(platoon) 통과 버그가 생긴다 (전방향정지·회전 양보가 모두 뚫림).
+    {
         var isRoundaboutEntry = (this.edge.to.control === 'roundabout' && !this.edge.isArc);
-        var committed = !isRoundaboutEntry && (this.s >= endS - 15);
+        var ctl = this.edge.to.control;
+        // stopOff = CW_DIST+5: 정지선(len-29)과 통과불가 시 정지 지점(front=len-34)이
+        // 모두 횡단보도 밴드(len-27.5~-20.5) "앞"에 오도록 한다. 정지선이 밴드 안(len-24)이면
+        // ok 반전 시 밴드 위에 얼어붙는 함정 구간(정지지점~정지선)이 생긴다.
+        var stopOff = (ctl === 'signal' && !this.edge.to.isBoundary && !this.edge.isArc) ? CW_DIST + 5 : 15;
+        var distToStop = (endS - stopOff) - this.s;
+        var brakeDist = this.v * this.v / (2 * DECEL);
+        // 커밋: 정지선을 지났거나, (신호에 한해) 물리적으로 정지 불가능한 황색 딜레마 존이면 통과.
+        // 비신호(정지/우선)는 반드시 정지선 준수 — 딜레마 예외를 주면 일시정지 규칙이 깨짐.
+        var committed = !isRoundaboutEntry && (distToStop <= 0 ||
+            (ctl === 'signal' && this.v > 25 && brakeDist > distToStop + 1));
         var ok = committed || (jc.junctionAllows(this, this.edge) && jc.nextEdgeHasSpace(this));
         if (!ok) {
-            d = isRoundaboutEntry ? (endS - this.s) : ((endS - 15) - this.s);
+            var dj = isRoundaboutEntry ? (endS - this.s) : distToStop;
+            if (dj < d) d = dj;
         } else {
             if (!this.wasCommitted && committed) {
                 this.wasCommitted = true;
                 jc.onEnterIntersection(this, this.edge.to);
             }
-            var ne = this.getNextEdge();
-            if (ne && ne.cars.length > 0) {
-                d = (endS - this.s) + (ne.cars[0].s - CAR_LEN);
+            // 선두 차량만 다음 엣지 큐 후미와의 간격을 본다 (뒤차는 앞차 추종으로 충분)
+            if (myIdx === this.edge.cars.length - 1) {
+                var ne = this.getNextEdge();
+                if (ne && ne.cars.length > 0) {
+                    var dq = (endS - this.s) + (ne.cars[0].s - CAR_LEN);
+                    if (dq < d) d = dq;
+                }
             }
         }
     }
@@ -498,6 +645,8 @@ Car.prototype.update = function(dt, simTime, jc) {
     if (jc.peds) {
         var dCw = jc.peds.blockDistFor(this);
         if (dCw < d) d = dCw;
+        // keep-clear: 앞 정체로 인한 정지 위치가 횡단보도 밴드 위라면, 밴드 앞에서 대기
+        d = jc.peds.keepClear(this, d);
     }
     var safe = Math.sqrt(2 * DECEL * Math.max(0, d - MIN_GAP));
     var target = Math.min(this.maxSpeed, safe);
@@ -559,8 +708,17 @@ JunctionControl.prototype.update = function(dt, simTime, cycleLength) {
         // 경계 노드는 junctionAllows가 무조건 통과시키는 진입/진출점이므로
         // 신호등을 만들지 않는다 (만들면 동작하지 않는 장식 신호가 됨)
         if (node.control === 'signal' && !node.isBoundary) {
-            if (!this.lights.has(node.id))
-                this.lights.set(node.id, new TrafficLight(node, cycleLength));
+            if (!this.lights.has(node.id)) {
+                // 연동 오프셋 계산: 격자 위치에 따라 시차를 두어 녹색파 구현
+                var offsetVal = this.greenWaveOffset || 0;
+                var nodeOffset = 0;
+                if (offsetVal > 0) {
+                    // 노드 좌표 기반으로 격자 인덱스를 추정하여 순차적 오프셋 부여
+                    var gridIdx = Math.round(node.x / 100) + Math.round(node.y / 100);
+                    nodeOffset = (gridIdx * offsetVal) % cycleLength;
+                }
+                this.lights.set(node.id, new TrafficLight(node, cycleLength, nodeOffset));
+            }
             this.lights.get(node.id).update(dt);
         }
     }
@@ -568,6 +726,15 @@ JunctionControl.prototype.update = function(dt, simTime, cycleLength) {
 };
 JunctionControl.prototype.setControlType = function(node, type, cycleLength) {
     if (node.isBoundary) return; // 경계 노드는 제어 없음 (진입/진출 전용)
+    // 단일 방향 교차로 보호: 방향이 1개뿐인 교차로는 신호 제어 변경 불가
+    // (2x2 격자 모서리 등 하나의 도로 축만 가진 노드에 다방향 제어를 넣으면 기능 오류)
+    var dirs = {};
+    for (var i = 0; i < node.incoming.length; i++) dirs[node.incoming[i].dir] = true;
+    var dirCount = Object.keys(dirs).length;
+    if (dirCount <= 1 && type !== 'signal') {
+        console.warn('단일 방향 교차로는 신호 유형만 가능합니다. 변경이 무시됩니다.');
+        return;
+    }
     if (type === 'roundabout' && node.incoming.length < 3) {
         console.warn('Roundabouts require at least 3 legs. Ignored.');
         return;
@@ -601,7 +768,7 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
         var result = light.allows(edge.dir, turnType);
         if (result === 'green') return true;
         if (result === 'yield_right') {
-            var CRIT = 25;
+            var CRIT = 35; // 우회전 충돌 방지를 위해 양보 필요 거리 연장
             for (var i = 0; i < node.incoming.length; i++) {
                 var oe = node.incoming[i];
                 if (oe === edge || oe.isArc) continue;
@@ -619,6 +786,11 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
         var queue = this.stopQueues.get(node.id);
         if (queue.length > 0 && queue[0].car === car && car.v > 0) return true;
         if (car.v > 0) return false;
+        // 정지선(len-15) 근처에서 "완전 정지"한 차만 FIFO에 등록한다.
+        // 이 조건이 없으면 앞차 뒤에 줄 서 있다 멈춘 차도 등록되어, 자기 차례가 오면
+        // 정지선에서 일시정지하지 않고 그대로 통과하는 위반이 발생함.
+        var distLine = (edge.len - 15) - car.s;
+        if (distLine > 8) return false;
         var found = false;
         for (var i = 0; i < queue.length; i++) { if (queue[i].car === car) { found = true; break; } }
         if (!found) queue.push({car:car, arrivalTime:this.simTime, approachId:edge.approachId});
@@ -635,7 +807,7 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
             return false;
         }
         if (edge.rank === 2) return true;
-        var CRIT_D = 40;
+        var CRIT_D = 45; // 우선교차로 진입 시 여유 거리 연장
         for (var i = 0; i < node.incoming.length; i++) {
             var me = node.incoming[i];
             if (me.rank === 2) {
@@ -651,7 +823,7 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
         var rd = this.roundabouts.get(node.id);
         if (!rd) return true;
         if (edge.isArc) return true;
-        var MERGE = 15;
+        var MERGE = 25; // 회전교차로 진입 시 충돌 방지를 위해 거리 연장
         var entryArc = null;
         for (var i = 0; i < rd.arcs.length; i++) { if (rd.arcs[i].entryEdge === edge) { entryArc = rd.arcs[i]; break; } }
         if (!entryArc) return true;
@@ -669,7 +841,14 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
 JunctionControl.prototype.nextEdgeHasSpace = function(car) {
     var ne = car.getNextEdge();
     if (!ne) return true;
-    return !(ne.cars.length > 0 && ne.cars[0].s < CAR_LEN + MIN_GAP);
+    // 신호교차로 통과 시엔 진출 엣지에 "교차로 상자 + 진출측 횡단보도"를 완전히
+    // 지나 정지할 수 있는 여유(CW_DIST+차체+간격)가 있어야 정지선을 출발할 수 있다.
+    // 이 여유가 없으면 커밋 후 교차로/횡단보도 위에 갇히는(box blocking) 상황이 생김.
+    var need = CAR_LEN + MIN_GAP;
+    if (car.edge.to.control === 'signal' && !car.edge.to.isBoundary && !ne.isArc) {
+        need = CW_DIST + CAR_LEN + MIN_GAP;
+    }
+    return !(ne.cars.length > 0 && ne.cars[0].s < need);
 };
 JunctionControl.prototype.onEnterIntersection = function(car, node) {
     if (!node || node.isBoundary) return;
@@ -805,20 +984,30 @@ PedSystem.prototype._buildCW = function(node) {
         var dl = Math.hypot(dx, dy); if (dl === 0) continue;
         var tx = dx/dl, ty = dy/dl;           // 도로 방향 (교차로 → 이웃)
         var px = -ty, py = tx;                 // 수직 (보행 방향)
+        var outE = null;
+        for (var oi = 0; oi < node.outgoing.length; oi++) {
+            if (node.outgoing[oi].to === e.from) { outE = node.outgoing[oi]; break; }
+        }
         list.push({
             nodeId: node.id, nbId: e.from.id, dirRoad: e.dir,
             cx: node.x + tx*CW_DIST, cy: node.y + ty*CW_DIST,
-            tx: tx, ty: ty, px: px, py: py
+            tx: tx, ty: ty, px: px, py: py,
+            edgeIn: e, edgeOut: outE // 이 도로의 양방향 엣지 (차량 점유 검사용)
         });
     }
     return list;
 };
 PedSystem.prototype.pedGreen = function(cw) {
     var light = this.jc.lights.get(cw.nodeId);
-    if (!light) return { green:false, remain:0 };
+    if (!light) return { green:false, remain:0, totalGreen:0 };
     var p = light.phases[light.phaseIdx];
     var g = !!(p && p.type === 'straight_right' && p.dir !== cw.dirRoad);
-    return { green: g, remain: g ? (p.duration - light.t) : 0 };
+    // 전체 녹색 시간 계산 (카운트다운 표시용)
+    var totalGreen = 0;
+    if (g) {
+        totalGreen = p.duration;
+    }
+    return { green: g, remain: g ? (p.duration - light.t) : 0, totalGreen: totalGreen };
 };
 // 보행자가 물리적으로 올라와 있는가 (차량 차단 판정)
 PedSystem.prototype.isOccupied = function(cw) {
@@ -827,6 +1016,44 @@ PedSystem.prototype.isOccupied = function(cw) {
         if (pd.cw === cw && pd.state === 'cross' && pd.prog > 0.02 && pd.prog < 0.98) return true;
     }
     return false;
+};
+// 횡단보도 밴드에 차체가 걸쳐 있는가 (보행자 횡단 시작 가능 여부 판정)
+PedSystem.prototype.zoneClear = function(cw) {
+    var checks = [
+        { e: cw.edgeIn,  sCw: cw.edgeIn ? cw.edgeIn.len - CW_DIST : 0 },
+        { e: cw.edgeOut, sCw: CW_DIST }
+    ];
+    for (var i = 0; i < checks.length; i++) {
+        var e = checks[i].e; if (!e) continue;
+        var sCw = checks[i].sCw;
+        for (var j = 0; j < e.cars.length; j++) {
+            var cs = e.cars[j].s;
+            // 차체(front=s, rear=s-CAR_LEN)가 밴드(±5)에 걸치면 점유
+            if (cs > sCw - 5 && cs - CAR_LEN < sCw + 5) return false;
+        }
+    }
+    return true;
+};
+// keep-clear: 차량이 (앞 정체 때문에) 횡단보도 밴드 "위"에 정지하게 될 경우
+// 정지 위치를 밴드 앞으로 당긴다 → 정지 차량 위로 보행자가 겹쳐 걷는 시각 버그 방지
+PedSystem.prototype.keepClear = function(car, d) {
+    var e = car.edge;
+    if (e.isArc || d === Infinity) return d;
+    var bands = [];
+    var cws = this.crosswalks.get(e.to.id);
+    if (cws) for (var i = 0; i < cws.length; i++) if (cws[i].nbId === e.from.id) bands.push(e.len - CW_DIST);
+    cws = this.crosswalks.get(e.from.id);
+    if (cws) for (var i = 0; i < cws.length; i++) if (cws[i].nbId === e.to.id) bands.push(CW_DIST);
+    for (var b = 0; b < bands.length; b++) {
+        var sCw = bands[b];
+        if (car.s >= sCw - 4) continue;           // 이미 밴드에 도달/통과 중이면 후진 불가
+        var haltFront = car.s + d - MIN_GAP;       // 예상 정지 위치 (front)
+        if (haltFront > sCw - 6 && haltFront - CAR_LEN < sCw + 5) {
+            var dCap = sCw - car.s;                // → front가 sCw-5 에 정지 (밴드 앞)
+            if (dCap < d) d = dCap;
+        }
+    }
+    return d;
 };
 // 차량 장애물 거리: 접근/진출 엣지의 횡단보도가 점유 중이면 정지선(횡단보도 앞)까지 거리 반환
 PedSystem.prototype.blockDistFor = function(car) {
@@ -860,25 +1087,67 @@ PedSystem.prototype.update = function(dt) {
     var all = [];
     var it = this.crosswalks.values();
     for (var r = it.next(); !r.done; r = it.next()) for (var i = 0; i < r.value.length; i++) all.push(r.value[i]);
+    var allEdges = [];
+    for (var i = 0; i < this.network.edges.length; i++) {
+        if (!this.network.edges[i].isArc) allEdges.push(this.network.edges[i]);
+    }
+    
     while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
-        if (all.length === 0) { rand(); rand(); rand(); rand(); continue; } // rand 스트림 정렬 유지
-        var cw = all[Math.floor(rand() * all.length)];
-        var side = rand() < 0.5 ? -1 : 1;
+        if (all.length === 0 || allEdges.length === 0) { rand(); rand(); rand(); rand(); continue; }
+        
+        var isWalk = rand() < 0.5; // 50%는 인도를 걷고, 50%는 횡단보도 대기
         var tw = rand(), type = PED_TYPES[0], acc = 0;
         for (var ti = 0; ti < PED_TYPES.length; ti++) { acc += PED_TYPES[ti].weight; if (tw <= acc) { type = PED_TYPES[ti]; break; } }
-        var jit = (rand() - 0.5) * 6; // 도로축 방향 대기 위치 흐트러짐
-        this.peds.push({ cw: cw, side: side, prog: 0, state: 'wait', type: type, jit: jit, waitT: 0 });
+        var jit = (rand() - 0.5) * 6;
+        var speedMod = 0.8 + rand() * 0.4;
+        
+        if (isWalk) {
+            var edge = allEdges[Math.floor(rand() * allEdges.length)];
+            var side = rand() < 0.5 ? -1 : 1;
+            this.peds.push({ edge: edge, side: side, s: rand() * (edge.len - CW_DIST), state: 'walk_sidewalk', type: type, jit: jit, speedMod: speedMod });
+        } else {
+            var cw = all[Math.floor(rand() * all.length)];
+            var side = rand() < 0.5 ? -1 : 1;
+            this.peds.push({ cw: cw, side: side, prog: 0, state: 'wait', type: type, jit: jit, speedMod: speedMod, waitT: 0 });
+        }
     }
     // 갱신
     for (var i = this.peds.length - 1; i >= 0; i--) {
         var pd = this.peds[i];
-        if (pd.state === 'wait') {
+        if (pd.crashed) {
+            pd.crashTimer = (pd.crashTimer || 0) + dt;
+            if (pd.crashTimer > 30) {
+                this.peds.splice(i, 1); // 30초 후 구급차 이송
+            }
+            continue; // 사고 난 보행자는 더이상 이동 안 함
+        }
+        if (pd.state === 'walk_sidewalk') {
+            pd.s += (pd.type.speed * pd.speedMod) * dt;
+            if (pd.s >= pd.edge.len - CW_DIST) { // 교차로 부근 도달
+                var cws = this.crosswalks.get(pd.edge.to.id);
+                var foundCw = null;
+                if (cws) {
+                    for (var c = 0; c < cws.length; c++) {
+                        if (cws[c].nbId === pd.edge.from.id) { foundCw = cws[c]; break; }
+                    }
+                }
+                if (foundCw && rand() < 0.7) { // 70% 확률로 횡단보도로 진입
+                    pd.state = 'wait';
+                    pd.cw = foundCw;
+                    pd.side = -pd.side; // 횡단보도 좌표계로 변환
+                    pd.waitT = 0;
+                    pd.prog = 0;
+                } else {
+                    this.peds.splice(i, 1); // 건물로 들어감
+                }
+            }
+        } else if (pd.state === 'wait') {
             pd.waitT += dt;
             var sig = this.pedGreen(pd.cw);
-            if (sig.green && sig.remain > CW_CLEAR) pd.state = 'cross';
+            if (sig.green && sig.remain > CW_CLEAR && this.zoneClear(pd.cw)) pd.state = 'cross';
         } else {
-            pd.prog += pd.type.speed * dt / (CW_HALF * 2); // 녹색이 끝나도 건너던 보행자는 계속 (현실 동일)
+            pd.prog += (pd.type.speed * pd.speedMod) * dt / (CW_HALF * 2);
             if (pd.prog >= 1) { this.peds.splice(i, 1); this.completed++; }
         }
     }
@@ -1226,20 +1495,49 @@ Renderer.prototype.render = function(network, jc, cam) {
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
     
+    // 텍스트 겹침 방지를 위한 Bounding Box 배열
+    var textBBoxes = [];
+
     if (cam) {
         ctx.translate(cam.x, cam.y);
         ctx.scale(cam.scale, cam.scale);
     }
 
-    // 도로
-    ctx.lineWidth = 10; ctx.strokeStyle = '#444';
+    // 인도: 도로 가장자리에 사람만 통행 가능한 영역(회색 블록)
     for (var i = 0; i < network.edges.length; i++) {
         var e = network.edges[i];
-        if (e.isArc) continue;
-        ctx.beginPath(); ctx.moveTo(e.ax,e.ay); ctx.lineTo(e.bx,e.by); ctx.stroke();
-        ctx.lineWidth = 1; ctx.strokeStyle = '#666'; ctx.setLineDash([5,5]);
+        if (e.isArc || e.from.id > e.to.id) continue;
+        ctx.lineWidth = 41; // 도로 25 + 양옆 8픽셀 인도
+        ctx.lineCap = 'round'; // 교차로에서 둥글게 이어짐
+        ctx.strokeStyle = '#6b7280'; // 밝은 회색
         ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
-        ctx.setLineDash([]); ctx.lineWidth = 10; ctx.strokeStyle = '#444';
+    }
+    
+    // 도로: 인도 위에 차량이 다니는 슬래브(폭 25)
+    ctx.lineCap = 'butt'; // 도로는 인도 위에서 직각으로 끊김
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        if (e.isArc || e.from.id > e.to.id) continue;
+        ctx.lineWidth = 25; ctx.strokeStyle = '#3d434d';
+        ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
+    }
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        if (e.isArc || e.from.id > e.to.id) continue;
+        ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(250,204,21,0.55)'; ctx.setLineDash([7,7]);
+        
+        // 황색 중앙선이 교차로와 횡단보도를 침범하지 않도록 양끝에서 30px 띄워서 그립니다.
+        var dx = e.to.x - e.from.x;
+        var dy = e.to.y - e.from.y;
+        var len = Math.hypot(dx, dy);
+        if (len > 60) {
+            var ux = dx / len, uy = dy / len;
+            ctx.beginPath(); 
+            ctx.moveTo(e.from.x + ux * 30, e.from.y + uy * 30); 
+            ctx.lineTo(e.to.x - ux * 30, e.to.y - uy * 30); 
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
     }
     // 회전교차로 호
     ctx.lineWidth = 10; ctx.strokeStyle = '#555';
@@ -1264,14 +1562,111 @@ Renderer.prototype.render = function(network, jc, cam) {
                 ctx.fillStyle = 'rgba(255,255,255,0.4)';
                 for (var k = -2; k <= 2; k++) ctx.fillRect(-3.5, k*5 - 1.5, 7, 3);
                 ctx.restore();
-                // 보행 신호 (양쪽 보도에 점) — 녹색 잔여 짧으면 점멸
+                // 보행자 신호기: 양쪽 보도에 2등식(적/녹) 신호등. 녹색 잔여 < CW_CLEAR 이면 점멸.
                 var sig = jc.peds.pedGreen(cw);
-                var col = sig.green ? ((sig.remain < CW_CLEAR && !blinkOn) ? '#14532d' : COL_GREEN) : COL_RED;
-                ctx.fillStyle = col;
+                var greenLamp = sig.green && (sig.remain >= CW_CLEAR || blinkOn);
                 for (var sd = -1; sd <= 1; sd += 2) {
-                    ctx.beginPath();
-                    ctx.arc(cw.cx + cw.px*sd*(CW_HALF+5), cw.cy + cw.py*sd*(CW_HALF+5), 2, 0, Math.PI*2);
-                    ctx.fill();
+                    // 신호기가 교차로 모서리에서 완전히 분리되도록 밖으로 더 밀고 크기를 줄임
+                    var sx = cw.cx + cw.tx * 12 + cw.px*sd*(CW_HALF+10);
+                    var sy = cw.cy + cw.ty * 12 + cw.py*sd*(CW_HALF+10);
+                    ctx.save();
+                    ctx.translate(sx, sy);
+                    ctx.rotate(Math.atan2(cw.py, cw.px));
+                    ctx.fillStyle = '#151515';
+                    ctx.fillRect(-2, -3.5, 4, 7);
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 0.5;
+                    ctx.strokeRect(-2, -3.5, 4, 7);
+                    ctx.fillStyle = !sig.green ? COL_RED : '#3a1212';   // 적색 램프 (위)
+                    ctx.beginPath(); ctx.arc(0, -1.8, 1.2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = greenLamp ? COL_GREEN : '#0f2a18';  // 녹색 램프 (아래)
+                    ctx.beginPath(); ctx.arc(0, 1.8, 1.2, 0, Math.PI*2); ctx.fill();
+                    
+                    // 보행자 신호 남은 시간 표시 (카운트다운) - 양쪽 보도 모두 표시하되, 모서리에서 겹치지 않도록 방향별 오프셋 적용
+                    var textStr = "";
+                    var isGreen = sig.green;
+                    var remainVal = 0;
+                    
+                    if (isGreen && sig.remain > 0) {
+                        textStr = Math.ceil(sig.remain).toString();
+                        remainVal = sig.remain;
+                    } else if (!isGreen) {
+                        var light = jc.lights.get(cw.nodeId);
+                        if (light && light.phases.length > 1) {
+                            var redRemain = light.phases[light.phaseIdx].duration - light.t;
+                            var pi = light.phaseIdx;
+                            for (var scan = 0; scan < light.phases.length; scan++) {
+                                pi = (pi + 1) % light.phases.length;
+                                var ph = light.phases[pi];
+                                if (ph.type === 'straight_right' && ph.dir !== cw.dirRoad) break;
+                                redRemain += ph.duration;
+                            }
+                            textStr = Math.ceil(redRemain).toString();
+                            remainVal = redRemain;
+                        }
+                    }
+                    
+                    if (textStr) {
+                        ctx.save();
+                        // 텍스트를 신호등 박스 옆에 겹치지 않게 배치
+                        // 모서리에서 확실히 분리하기 위해 각 도로가 뻗어나가는 방향(tx, ty)으로 더 강하게 밀고,
+                        // 횡단보도 바깥쪽 방향(px*sd, py*sd)으로도 약간 밀어줌
+                        var tox = cw.tx * 16 + cw.px * sd * 4;
+                        var toy = cw.ty * 16 + cw.py * sd * 4;
+                        
+                        ctx.font = 'bold 7.5px sans-serif';
+                        var tw = ctx.measureText(textStr).width;
+                        var rw = Math.max(10, tw + 4);
+                        var rh = 9;
+                        
+                        // 충돌 회피 알고리즘: 절대 좌표계에서 다른 텍스트 박스와 겹치면 더 바깥쪽으로 밀어냄
+                        var finalX = sx + tox;
+                        var finalY = sy + toy;
+                        for (var iter = 0; iter < 8; iter++) {
+                            var overlap = false;
+                            for (var ti = 0; ti < textBBoxes.length; ti++) {
+                                var tb = textBBoxes[ti];
+                                // AABB 충돌 체크 (패딩 2 추가)
+                                if (Math.abs(finalX - tb.x) < (rw + tb.rw)/2 + 2 &&
+                                    Math.abs(finalY - tb.y) < (rh + tb.rh)/2 + 2) {
+                                    overlap = true;
+                                    break;
+                                }
+                            }
+                            if (!overlap) break;
+                            // 겹친다면 해당 교차로에서 밖으로 나가는 방향(cw.tx, cw.ty)으로 8px 더 밀어냄
+                            finalX += cw.tx * 8;
+                            finalY += cw.ty * 8;
+                        }
+                        textBBoxes.push({x: finalX, y: finalY, rw: rw, rh: rh});
+                        
+                        // 현재 sx, sy에서 원래 translate를 취소하고 절대 좌표로 이동
+                        ctx.setTransform(1, 0, 0, 1, 0, 0);
+                        if (cam) {
+                            ctx.translate(cam.x, cam.y);
+                            ctx.scale(cam.scale, cam.scale);
+                        }
+                        ctx.translate(finalX, finalY);
+                        
+
+
+                        
+                        ctx.fillStyle = 'rgba(15, 15, 15, 0.85)';
+                        ctx.strokeStyle = isGreen ? (remainVal < CW_CLEAR ? '#eab308' : '#22c55e') : '#ef4444';
+                        ctx.lineWidth = 0.8;
+                        
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(-rw/2, -rh/2, rw, rh, 3);
+                        else ctx.rect(-rw/2, -rh/2, rw, rh);
+                        ctx.fill();
+                        ctx.stroke();
+                        
+                        ctx.fillStyle = isGreen ? (remainVal < CW_CLEAR ? '#ff0' : '#0f0') : '#ff5f5f';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(textStr, 0, 0.4);
+                        ctx.restore();
+                    }
+                    ctx.restore();
                 }
             }
         }
@@ -1282,7 +1677,7 @@ Renderer.prototype.render = function(network, jc, cam) {
         if (nd.control === 'roundabout') continue;
         
         ctx.fillStyle = '#333';
-        ctx.fillRect(nd.x-10, nd.y-10, 20, 20);
+        ctx.fillRect(nd.x-12.5, nd.y-12.5, 25, 25);
 
         // 경계 노드는 제어가 없으므로(무조건 통과) 신호등을 그리지 않는다 — 장식 신호 방지
         if (nd.isBoundary) continue;
@@ -1338,18 +1733,56 @@ Renderer.prototype.render = function(network, jc, cam) {
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(Math.atan2(e.uy, e.ux));
-            ctx.fillStyle = c.color;
-            ctx.fillRect(-10, -3, 10, 6);
-            ctx.lineWidth = 0.5;
-            ctx.strokeStyle = '#000';
-            ctx.strokeRect(-10, -3, 10, 6);
-            // 방향지시등: 다음 회전 의도를 표시 (좌회전=왼쪽, 우회전=오른쪽 주황 점멸 / 직진=전방 흰 점)
-            var ne = c.getNextEdge();
-            if (ne && !e.isArc) {
-                var tt = getTurnType(e, ne);
-                if (tt === 'left' && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, -4.4, 2.5, 2.2); }
-                else if (tt === 'right' && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, 2.2, 2.5, 2.2); }
-                else if (tt === 'straight') { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-1.6, -1, 1.6, 2); }
+            if (c.crashed) {
+                ctx.fillStyle = '#111'; // 검게 탄 차
+                ctx.fillRect(-10, -3, 10, 6);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = blinkCar ? '#f00' : '#ff0'; // 경고등 깜빡임
+                ctx.strokeRect(-10, -3, 10, 6);
+                ctx.beginPath(); ctx.moveTo(-8, -2); ctx.lineTo(-2, 2); ctx.moveTo(-8, 2); ctx.lineTo(-2, -2); ctx.stroke();
+                
+                // 견인 타이머 표시 - 경고 테두리가 있는 적색 알림 필(Pill)로 표시
+                var remain = Math.max(0, 30 - (c.crashTimer || 0));
+                ctx.save();
+                ctx.translate(0, -9);
+                ctx.rotate(-Math.atan2(e.uy, e.ux)); // 텍스트가 항상 정방향이 되게
+                
+                var txt = remain.toFixed(0) + 's';
+                ctx.font = 'bold 7.5px sans-serif';
+                var tw = ctx.measureText(txt).width;
+                var rw = tw + 4, rh = 9;
+                
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 0.6;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(-rw/2, -rh/2, rw, rh, 3);
+                else ctx.rect(-rw/2, -rh/2, rw, rh);
+                ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(txt, 0, 0.4);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = c.color;
+                ctx.fillRect(-10, -3, 10, 6);
+                ctx.lineWidth = 0.5;
+                ctx.strokeStyle = '#000';
+                ctx.strokeRect(-10, -3, 10, 6);
+                // 방향지시등: 다음 회전 의도 (좌=왼쪽·우=오른쪽 주황 점멸 / 직진=전방 흰 점)
+                // 회전교차로 접근 중엔 최종 진출 방향(호 스플라이스 전 route의 다음 엣지)이 의도가 되고,
+                // 링(호) 위에서는 진출 직전에만 우측 지시등을 켠다 (실제 회전교차로 관행).
+                var ne = c.getNextEdge();
+                if (e.isArc) {
+                    if (ne && !ne.isArc && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, 2.2, 2.5, 2.2); }
+                } else if (ne) {
+                    var tt = getTurnType(e, ne);
+                    if (tt === 'left' && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, -4.4, 2.5, 2.2); }
+                    else if (tt === 'right' && blinkCar) { ctx.fillStyle = '#fb923c'; ctx.fillRect(-2.5, 2.2, 2.5, 2.2); }
+                    else if (tt === 'straight') { ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(-1.6, -1, 1.6, 2); }
+                }
             }
             ctx.restore();
         }
@@ -1359,14 +1792,51 @@ Renderer.prototype.render = function(network, jc, cam) {
         for (var i = 0; i < jc.peds.peds.length; i++) {
             var pd = jc.peds.peds[i];
             var cw = pd.cw, x, y;
-            if (pd.state === 'wait') {
+            if (pd.state === 'walk_sidewalk') {
+                var e = pd.edge;
+                var off = pd.side * 17.5; // 인도 중앙
+                x = e.from.x + e.ux * pd.s - e.uy * off + e.ux * pd.jit;
+                y = e.from.y + e.uy * pd.s + e.ux * off + e.uy * pd.jit;
+            } else if (pd.state === 'wait') {
+                var cw = pd.cw;
                 x = cw.cx + cw.px * pd.side * (CW_HALF + 4) + cw.tx * pd.jit;
                 y = cw.cy + cw.py * pd.side * (CW_HALF + 4) + cw.ty * pd.jit;
             } else {
+                var cw = pd.cw;
                 var off = pd.side * (CW_HALF - pd.prog * CW_HALF * 2);
                 x = cw.cx + cw.px * off + cw.tx * pd.jit * 0.5;
                 y = cw.cy + cw.py * off + cw.ty * pd.jit * 0.5;
             }
+            
+            if (pd.crashed) {
+                ctx.fillStyle = '#f00'; // 피/사고 표시
+                ctx.fillRect(x - pd.type.r - 2, y - pd.type.r, pd.type.r*2 + 4, pd.type.r*2);
+                
+                // 부상자 구조 타이머 표시 - 적색 알림 필(Pill)로 표시
+                var remain = Math.max(0, 30 - (pd.crashTimer || 0));
+                ctx.save();
+                ctx.translate(x, y - 8);
+                var txt = remain.toFixed(0) + 's';
+                ctx.font = 'bold 7.5px sans-serif';
+                var tw = ctx.measureText(txt).width;
+                var rw = tw + 4, rh = 9;
+                
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.9)';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 0.6;
+                ctx.beginPath();
+                if (ctx.roundRect) ctx.roundRect(-rw/2, -rh/2, rw, rh, 3);
+                else ctx.rect(-rw/2, -rh/2, rw, rh);
+                ctx.fill(); ctx.stroke();
+                
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(txt, 0, 0.4);
+                ctx.restore();
+                continue;
+            }
+
             ctx.fillStyle = pd.type.color;
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 0.5;
@@ -1391,13 +1861,15 @@ function SimController() {
     this.spawnRate = 3.0;
     this.maxCars = 150;
     this.maxSpeed = 60;
-    this.cycleLength = 40;
+    this.cycleLength = 20;
     this.gridSize = 4;
     this.spawnAcc = 0;
     this.sampleAcc = 0;
     this.optAcc = 0;
     this.adaptiveMode = false; // 기본 OFF — 켜져 있으면 권장이 자동 적용되어 전/후 비교가 불가능해짐
     this.optimizeInterval = 10;
+    this.speedMultiplier = 1; // 배속 (1x, 2x, 3x, 4x)
+    this.greenWaveOffset = 0; // 신호 연동 오프셋
     this.cam = {x: 0, y: 0, scale: 1.0};
     this.isDragging = false;
     this.dragStartX = 0;
@@ -1434,16 +1906,25 @@ SimController.prototype._initDOM = function() {
 
     var bindSlider = function(id, prop, valId) {
         var el = document.getElementById(id), valEl = document.getElementById(valId);
-        el.oninput = function() {
-            self[prop] = parseFloat(el.value);
-            valEl.textContent = el.value;
-            if (prop === 'gridSize') self.reset();
-            if (prop === 'cycleLength' && self.jc) {
-                var iter = self.jc.lights.values();
-                for (var r = iter.next(); !r.done; r = iter.next()) r.value.updateCycle(self.cycleLength);
-            }
-            if (prop === 'maxSpeed' && self.logger) self.logger.maxSpeed = self.maxSpeed;
-        };
+        if (prop === 'gridSize') {
+            el.oninput = function() {
+                valEl.textContent = el.value;
+            };
+            el.onchange = function() {
+                self[prop] = parseFloat(el.value);
+                self.reset();
+            };
+        } else {
+            el.oninput = function() {
+                self[prop] = parseFloat(el.value);
+                valEl.textContent = el.value;
+                if (prop === 'cycleLength' && self.jc) {
+                    var iter = self.jc.lights.values();
+                    for (var r = iter.next(); !r.done; r = iter.next()) r.value.updateCycle(self.cycleLength);
+                }
+                if (prop === 'maxSpeed' && self.logger) self.logger.maxSpeed = self.maxSpeed;
+            };
+        }
     };
     bindSlider('sim-spawn-rate','spawnRate','val-spawn');
     var pedSlider = document.getElementById('sim-ped-rate');
@@ -1534,113 +2015,14 @@ SimController.prototype._initDOM = function() {
     var chkAdapt = document.getElementById('chk-adaptive');
     var optSlider = document.getElementById('sim-opt-int');
 
-    btnOpt.onclick = async function() {
-    var lt = document.getElementById('log-text');
-    lt.textContent = 'AI 에이전트 분석을 시작합니다...\n\n';
-    document.getElementById('log-overlay').classList.remove('hidden');
-
-    var stopped = 0;
-    for (var i = 0; i < self.cars.length; i++) {
-        if (self.cars[i].v < 3) stopped++;
-    }
-
-    var latest = self.logger && self.logger.buffer.length > 0
-        ? self.logger.buffer[self.logger.buffer.length - 1]
-        : null;
-
-    var scenario = {
-        intersection_id: "simulation-current",
-        tick: Math.round(self.simTime),
-        signals: {
-            cycle_sec: self.cycleLength
-        },
-        queues: {
-            total_cars: self.cars.length,
-            stopped_cars: stopped
-        },
-        pedestrians: {
-            waiting_or_crossing: self.pedSys ? self.pedSys.peds.length : 0
-        },
-        context: {
-            source: "cityflow_5_html",
-            grid_size: self.gridSize
-        },
-        metrics: {
-            congestion: latest ? latest.network.congestion : 0,
-            throughput_per_min: latest ? latest.network.throughputPerMin : 0
-        }
+    btnOpt.onclick = function() {
+        if (!self.analyzer) return;
+        var rep = self.analyzer.analyze();
+        var lt = document.getElementById('log-text');
+        if (rep) { lt.textContent = JSON.stringify(rep, null, 2); btnApply.disabled = false; }
+        else { lt.textContent = '데이터가 부족합니다. 시뮬레이션을 더 실행해주세요.'; }
+        document.getElementById('log-overlay').classList.remove('hidden');
     };
-
-    try {
-        var response = await fetch('http://127.0.0.1:8000/api/agent/stream', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(scenario)
-        });
-
-        var reader = response.body.getReader();
-        var decoder = new TextDecoder("utf-8");
-        var buffer = "";
-
-        while (true) {
-            var result = await reader.read();
-            if (result.done) break;
-
-            buffer += decoder.decode(result.value, { stream: true });
-
-            var events = buffer.split("\n\n");
-            buffer = events.pop();
-
-            for (var e of events) {
-                var lines = e.split("\n");
-                var eventName = "";
-                var dataText = "";
-
-                for (var line of lines) {
-                    if (line.startsWith("event:")) {
-                        eventName = line.replace("event:", "").trim();
-                    }
-                    if (line.startsWith("data:")) {
-                        dataText = line.replace("data:", "").trim();
-                    }
-                }
-
-                if (!dataText) continue;
-
-                var data = JSON.parse(dataText);
-
-                if (eventName === "message") {
-                    lt.textContent += "[진행] " + data.message + "\n";
-
-                    if (data.durations) {
-                        lt.textContent += "권장 신호 시간: " + JSON.stringify(data.durations, null, 2) + "\n";
-                    }
-                }
-
-                if (eventName === "done") {
-                    lt.textContent += "\n===== 최종 판단 =====\n";
-                    lt.textContent += JSON.stringify(data.final_decision, null, 2);
-                    lt.textContent += "\n\n===== 입력된 시뮬레이션 데이터 =====\n";
-                    lt.textContent += JSON.stringify(data.input_state, null, 2);
-                    lt.textContent += "\n\n===== 전체 결과 =====\n";
-                    lt.textContent += JSON.stringify(data, null, 2);
-
-                    btnApply.disabled = false;
-                }
-
-                if (eventName === "error") {
-                    lt.textContent += "\n[오류]\n";
-                    lt.textContent += JSON.stringify(data, null, 2);
-                }
-            }
-        }
-    } catch (err) {
-        lt.textContent += "\n[오류] FastAPI 서버 연결 실패\n";
-        lt.textContent += err.message;
-    }
-};
     document.getElementById('btn-close-log').onclick = function(){ document.getElementById('log-overlay').classList.add('hidden'); };
     btnApply.onclick = function() {
         if (self.analyzer) self.analyzer.applyRecommendations();
@@ -1653,6 +2035,75 @@ SimController.prototype._initDOM = function() {
     };
     chkAdapt.onchange = function(){ self.adaptiveMode = chkAdapt.checked; };
     document.getElementById('btn-ab-test').onclick = function(){ self.startABTest(); };
+
+    // 배속 버튼
+    var speedBtns = document.querySelectorAll('.speed-btn');
+    for (var i = 0; i < speedBtns.length; i++) {
+        speedBtns[i].onclick = function() {
+            for (var j = 0; j < speedBtns.length; j++) speedBtns[j].classList.remove('active');
+            this.classList.add('active');
+            self.speedMultiplier = parseInt(this.getAttribute('data-speed'));
+        };
+    }
+
+    // 신호 연동 오프셋 슬라이더
+    var offsetSlider = document.getElementById('sim-offset');
+    offsetSlider.oninput = function() {
+        document.getElementById('val-offset').textContent = offsetSlider.value;
+        self.greenWaveOffset = parseFloat(offsetSlider.value);
+        if (self.jc) {
+            self.jc.greenWaveOffset = self.greenWaveOffset;
+            // 기존 신호등 재생성 (새 오프셋 적용)
+            var iter = self.jc.lights.entries();
+            for (var r = iter.next(); !r.done; r = iter.next()) {
+                var nodeId = r.value[0];
+                var node = null;
+                for (var ni = 0; ni < self.network.nodes.length; ni++) {
+                    if (self.network.nodes[ni].id === nodeId) { node = self.network.nodes[ni]; break; }
+                }
+                if (!node) continue;
+                var offsetVal = self.greenWaveOffset;
+                var gridIdx = Math.round(node.x / 100) + Math.round(node.y / 100);
+                var nodeOffset = offsetVal > 0 ? (gridIdx * offsetVal) % self.cycleLength : 0;
+                var newLight = new TrafficLight(node, self.cycleLength, nodeOffset);
+                self.jc.lights.set(nodeId, newLight);
+            }
+        }
+    };
+
+    // 확대/축소 버튼 클릭 바인딩
+    document.getElementById('btn-zoom-in').onclick = function() {
+        var rect = self.canvas.getBoundingClientRect();
+        var mx = rect.width / 2;
+        var my = rect.height / 2;
+        var zoom = Math.exp(0.2);
+        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
+        zoom = newScale / self.cam.scale;
+        self.cam.x = mx - (mx - self.cam.x) * zoom;
+        self.cam.y = my - (my - self.cam.y) * zoom;
+        self.cam.scale = newScale;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+    document.getElementById('btn-zoom-out').onclick = function() {
+        var rect = self.canvas.getBoundingClientRect();
+        var mx = rect.width / 2;
+        var my = rect.height / 2;
+        var zoom = Math.exp(-0.2);
+        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
+        zoom = newScale / self.cam.scale;
+        self.cam.x = mx - (mx - self.cam.x) * zoom;
+        self.cam.y = my - (my - self.cam.y) * zoom;
+        self.cam.scale = newScale;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+    document.getElementById('btn-zoom-reset').onclick = function() {
+        var rect = self.canvas.getBoundingClientRect();
+        var nw = (self.gridSize+1)*100, nh = (self.gridSize+1)*100;
+        self.cam.scale = 1.0;
+        self.cam.x = (rect.width-nw)/2;
+        self.cam.y = (rect.height-nh)/2;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
 
     setTimeout(resize, 0);
 };
@@ -1679,7 +2130,14 @@ SimController.prototype._loop = function(ts) {
     if (!this.running) return;
     var dt = Math.min((ts - this.lastTime) / 1000, 0.1);
     this.lastTime = ts;
-    this._update(dt);
+    // 배속 적용: dt에 배속 배수를 곱함
+    var effectiveDt = dt * this.speedMultiplier;
+    // 안정성을 위해 배속이 높을 때는 여러 번 나누어 시뮬레이션
+    var steps = this.speedMultiplier;
+    var stepDt = effectiveDt / steps;
+    for (var i = 0; i < steps; i++) {
+        this._update(stepDt);
+    }
     this.renderer.render(this.network, this.jc, this.cam);
     var self = this;
     requestAnimationFrame(function(t){ self._loop(t); });
@@ -1693,9 +2151,63 @@ SimController.prototype._update = function(dt, skipUI) {
     }
     this.jc.update(dt, this.simTime, this.cycleLength);
     for (var i = this.cars.length - 1; i >= 0; i--) {
-        this.cars[i].update(dt, this.simTime, this.jc);
-        if (this.cars[i].routeIndex >= this.cars[i].route.length) this.cars.splice(i, 1);
+        var status = this.cars[i].update(dt, this.simTime, this.jc);
+        if (status === 'removed' || this.cars[i].routeIndex >= this.cars[i].route.length) {
+            if (status === 'removed') {
+                var idx = this.cars[i].edge.cars.indexOf(this.cars[i]);
+                if (idx > -1) this.cars[i].edge.cars.splice(idx, 1);
+            }
+            this.cars.splice(i, 1);
+        }
     }
+
+    // 사고 판정 (차량 겹침 감지 및 사고 처리)
+    for (var i = 0; i < this.cars.length; i++) {
+        var c1 = this.cars[i];
+        if (c1.crashed) continue;
+        var cx1 = c1.edge.ax + c1.edge.ux * (c1.s - 5);
+        var cy1 = c1.edge.ay + c1.edge.uy * (c1.s - 5);
+        
+        // 1. 차량간 충돌
+        for (var j = i + 1; j < this.cars.length; j++) {
+            var c2 = this.cars[j];
+            if (c2.crashed) continue;
+            var cx2 = c2.edge.ax + c2.edge.ux * (c2.s - 5);
+            var cy2 = c2.edge.ay + c2.edge.uy * (c2.s - 5);
+            var distSq = (cx1 - cx2)*(cx1 - cx2) + (cy1 - cy2)*(cy1 - cy2);
+            if (distSq < 49) { // 중심거리가 7픽셀 이내면 충돌
+                c1.crashed = true;
+                c2.crashed = true;
+            }
+        }
+        
+        // 2. 보행자와 충돌
+        if (this.pedSys && this.pedSys.peds) {
+            for (var k = 0; k < this.pedSys.peds.length; k++) {
+                var pd = this.pedSys.peds[k];
+                if (pd.state === 'wait' || pd.crashed) continue;
+                var px, py;
+                if (pd.state === 'walk_sidewalk') {
+                    var e = pd.edge;
+                    var off = pd.side * 17.5; // 인도 중앙
+                    px = e.from.x + e.ux * pd.s - e.uy * off + e.ux * pd.jit;
+                    py = e.from.y + e.uy * pd.s + e.ux * off + e.uy * pd.jit;
+                } else {
+                    var cw = pd.cw;
+                    var off = pd.side * (14 - pd.prog * 28); // 14는 CW_HALF
+                    px = cw.cx + cw.px * off + cw.tx * pd.jit * 0.5;
+                    py = cw.cy + cw.py * off + cw.ty * pd.jit * 0.5;
+                }
+                
+                var distSq = (cx1 - px)*(cx1 - px) + (cy1 - py)*(cy1 - py);
+                if (distSq < 36) { // 반경 6픽셀 이내 (차체와 보행자 중심)
+                    c1.crashed = true;
+                    pd.crashed = true;
+                }
+            }
+        }
+    }
+
     this.pedSys.update(dt); // 보행자는 A/B 평가에도 포함 (교통에 영향)
     this.sampleAcc += dt;
     if (this.sampleAcc >= this.logger.sampleInterval) {
@@ -1782,7 +2294,7 @@ SimController.prototype.startABTest = function() {
         document.getElementById('log-overlay').classList.remove('hidden');
         return;
     }
-    var T = 180;          // 각 단계 시뮬레이션 시간 (초) - 신호 주기를 고려해 180초로 연장
+    var T = 180;          // 각 단계 시뮬레이션 시간 (초) - 신호 주기를 고려해 최소 180초로 연장
     var SEED = 20260702;  // 고정 시드
     var FIXED_DT = 1/30;  // 결정성 보장: 고정 스텝 (프레임레이트 무관)
     var wasRunning = this.running;
@@ -1874,4 +2386,3 @@ document.addEventListener('DOMContentLoaded', function() {
     </script>
 </body>
 </html>
-
