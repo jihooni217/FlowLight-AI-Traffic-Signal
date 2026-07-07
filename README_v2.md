@@ -234,3 +234,50 @@ FlowLight-AI-Traffic-Signal
     ├── before_ai.mp4
     ├── after_ai.mp4
     └── full_demo.mp4
+
+---
+
+## 📄 Presentation
+
+프로젝트의 문제 정의, AI Agent 설계, 시스템 아키텍처, 실험 결과, 회고 내용을 발표 자료로 정리했습니다.
+
+[📑 View Final Presentation](docs/FlowLight_Final_Presentation.pdf)
+
+### Presentation Contents
+
+| Section | Description |
+|--------|-------------|
+| Problem | 고정형 교통 신호 체계의 한계 |
+| Method | LLM Agent 기반 분석·계획·평가 구조 |
+| Architecture | FastAPI, SSE, Solar API, Guardrail 기반 시스템 구성 |
+| Experiment | AI 적용 전후 교통 흐름 비교 |
+| Retrospective | 프로젝트를 통해 배운 점과 향후 개선 방향 |
+
+---
+
+## 🚀 Future Work
+
+FlowLight는 현재 시뮬레이션 기반 MVP로 구현되었으며, 향후 실제 교통 데이터와 더 복잡한 도로 환경으로 확장할 수 있습니다.
+
+| Improvement Area | Description |
+|------------------|-------------|
+| **Real Traffic Data** | 공공 교통 API, CCTV, 센서 데이터와 연동하여 실제 교통 상황 반영 |
+| **Roundabout Scenario** | 회전교차로 차량 흐름과 우선순위 규칙 추가 |
+| **Multi-Intersection Control** | 인접 교차로 간 신호 연동 및 녹색파 제어 확장 |
+| **Reinforcement Learning** | LLM Agent와 강화학습을 결합한 하이브리드 신호 최적화 |
+| **Evaluation Automation** | 평균 속도, 대기 차량 수, 통행량 등 성능 지표 자동 수집 및 분석 |
+
+---
+
+## 📝 Lessons Learned
+
+이번 프로젝트를 통해 단순히 LLM API를 호출하는 것보다,  
+AI 결과를 **평가하고 검증한 뒤 서비스 흐름에 안전하게 연결하는 과정**이 더 중요하다는 점을 배웠습니다.
+
+### Key Takeaways
+
+- LLM을 단순 질의응답이 아니라 **Agent 기반 의사결정 구조**로 설계하는 방법을 경험했습니다.
+- Prompt Engineering을 통해 AI가 **정해진 입력과 출력 형식**을 따르도록 설계했습니다.
+- FastAPI와 SSE를 활용하여 AI의 분석 과정과 결과를 **실시간으로 사용자 화면에 전달**했습니다.
+- Guardrail과 JSON Validation을 통해 AI가 생성한 결과를 **그대로 적용하지 않고 검증 후 적용**하는 구조를 구현했습니다.
+- 실험 결과를 수치와 영상으로 함께 제시하는 것이 프로젝트 설득력에 중요하다는 점을 확인했습니다.
