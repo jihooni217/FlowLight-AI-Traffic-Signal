@@ -105,3 +105,34 @@ FlowLight는 **Frontend → FastAPI → Multi-Agent → Guardrail → CityFlow**
 | 🤖 Solar API | LLM 기반 교통 분석 및 신호 계획 생성 |
 | 🛡 Guardrail | JSON 및 신호 시간 검증 |
 | 🚦 Simulation | 검증된 신호 계획만 적용 |
+
+---
+
+# 📊 Experiment Results
+
+동일한 교통 시나리오(동일 Seed, 동일 차량 수)에서 **고정 신호(Baseline)** 와 **FlowLight AI 기반 적응형 신호 제어**를 비교했습니다.
+
+<p align="center">
+  <img src="docs/experiment_results.png" width="100%">
+</p>
+
+### Performance Comparison
+
+| Metric | Fixed Signal | FlowLight AI | Improvement |
+|---------|-------------:|-------------:|------------:|
+| 🚗 Waiting Vehicles | **18** | **13** | ⬇️ **27.8% 감소** |
+| 🚦 Throughput (veh/min) | **107** | **115** | ⬆️ **7.5% 증가** |
+| 📈 Congestion Index | **1.00** | **0.76** | ⬇️ **24.0% 감소** |
+
+### Key Findings
+
+- 🚗 **Waiting Vehicles 감소**
+  - AI가 혼잡 방향의 Green Time을 동적으로 조정하여 대기 차량 수를 줄였습니다.
+
+- 🚦 **Throughput 증가**
+  - 동일한 시간 동안 더 많은 차량이 교차로를 통과했습니다.
+
+- 📈 **Congestion 감소**
+  - 정체 지수가 낮아져 전체 교통 흐름이 개선되었습니다.
+
+> **동일한 시나리오와 동일한 초기 조건에서 비교를 수행하여 AI 기반 신호 제어의 개선 효과를 확인했습니다.**
