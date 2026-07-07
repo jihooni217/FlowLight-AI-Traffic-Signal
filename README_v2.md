@@ -158,3 +158,44 @@ FlowLight는 **동일한 교통 시나리오와 동일한 초기 조건**에서
 | **Frontend** | HTML, JavaScript | 시뮬레이션 실행 및 결과 시각화 |
 | **Simulation** | CityFlow 기반 시뮬레이션 | 교통 상태 생성 및 AI 적용 효과 비교 |
 | **Reliability** | Guardrail, JSON Validation | 비정상 응답 필터링 및 안전한 신호 계획 적용 |
+
+---
+
+## 👨‍💻 My Contributions
+
+본 프로젝트에서 저는 **LLM Agent 설계, Backend 연동, Guardrail 검증, Frontend 연결, 실험 및 발표 자료 제작**을 중심으로 수행했습니다.
+
+### AI / LLM
+
+- Traffic Analysis Agent, Signal Planning Agent, Plan Evaluation Agent 구조 설계
+- Upstage Solar API 기반 LLM 호출 흐름 구현
+- 교통 상태 데이터를 LLM 입력에 적합한 Prompt 형식으로 변환
+- JSON 기반 신호 계획 출력 형식 설계
+
+### Backend
+
+- FastAPI 기반 AI Agent 서버 구현
+- Frontend와 통신하기 위한 API Endpoint 구성
+- SSE(Server-Sent Events)를 활용한 실시간 스트리밍 응답 구현
+- AI 분석 단계, 신호 계획 생성, 평가 결과를 순차적으로 전달하는 흐름 구성
+
+### Reliability
+
+- Guardrail을 통한 신호 시간 최소/최대 범위 검증
+- JSON 응답 형식 검증
+- 비정상 값 필터링 및 안전한 신호 계획만 적용하도록 처리
+- 오류 발생 시 데모가 중단되지 않도록 예외 처리 보완
+
+### Frontend / Demo
+
+- HTML / JavaScript 기반 시뮬레이션 화면과 Backend 연동
+- AI 분석 결과 및 신호 계획을 사용자 화면에 표시
+- AI 적용 전 / 후 비교 시나리오 구성
+- 전체 시뮬레이션 데모 영상 제작
+
+### Documentation / Presentation
+
+- 프로젝트 발표 자료 제작
+- 시스템 아키텍처 및 AI 의사결정 과정 정리
+- 실험 결과 분석 및 발표
+- 최종 발표 진행
