@@ -133,3 +133,28 @@ FlowLight는 **동일한 교통 시나리오와 동일한 초기 조건**에서
 | 📈 Congestion Index | **1.00** | **0.76** | **⬇ 24.0%** |
 
 > 동일한 시나리오와 동일한 초기 조건에서 비교를 수행하여 AI 기반 신호 제어의 개선 효과를 확인했습니다.
+
+---
+
+## ⚙ Tech Stack
+
+### Core Technologies
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white">
+  <img src="https://img.shields.io/badge/SSE-2563EB?style=for-the-badge&logo=googletagmanager&logoColor=white">
+  <img src="https://img.shields.io/badge/Solar_API-FF7A00?style=for-the-badge&logo=openai&logoColor=white">
+  <img src="https://img.shields.io/badge/CityFlow-0F172A?style=for-the-badge&logo=roadmapdotsh&logoColor=white">
+</p>
+
+### Technology Overview
+
+| Category | Stack | Role |
+|---------|-------|------|
+| **Backend** | Python, FastAPI | AI Agent 호출 및 API 서버 구현 |
+| **AI / LLM** | Upstage Solar API, Prompt Engineering | 교통 상황 분석 및 신호 계획 생성 |
+| **Streaming** | SSE(Server-Sent Events) | AI 분석 과정과 결과를 실시간 전달 |
+| **Frontend** | HTML, JavaScript | 시뮬레이션 실행 및 결과 시각화 |
+| **Simulation** | CityFlow 기반 시뮬레이션 | 교통 상태 생성 및 AI 적용 효과 비교 |
+| **Reliability** | Guardrail, JSON Validation | 비정상 응답 필터링 및 안전한 신호 계획 적용 |
