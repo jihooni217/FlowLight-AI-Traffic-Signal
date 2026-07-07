@@ -69,24 +69,9 @@ FastAPI와 SSE(Server-Sent Events)를 이용하여 AI의 의사결정 과정을
 
 FlowLight는 **Multi-Agent 기반 AI Workflow**를 통해 교통 상황을 분석하고 최적의 신호 계획을 생성합니다.
 
-```text
-Traffic State
-      │
-      ▼
-Traffic Analysis Agent
-      │
-      ▼
-Signal Planning Agent
-      │
-      ▼
-Plan Evaluation Agent
-      │
-      ▼
-Guardrail Validation
-      │
-      ▼
-Signal Plan Apply
-```
+<p align="center">
+  <img src="docs/ai_decision_process.png" width="100%">
+</p>
 
 ### AI Workflow
 
