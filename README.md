@@ -199,7 +199,6 @@ FlowLight는 **동일한 교통 시나리오와 동일한 초기 조건**에서
 - 시스템 아키텍처 및 AI 의사결정 과정 정리
 - 실험 결과 분석 및 발표
 - 최종 발표 진행
-
 ---
 
 ## 📂 Project Structure
@@ -208,6 +207,13 @@ FlowLight는 **동일한 교통 시나리오와 동일한 초기 조건**에서
 FlowLight-AI-Traffic-Signal
 ├── README.md
 ├── README_v2.md
+├── requirements.txt
+├── .gitignore
+│
+├── app/
+│   ├── main.py
+│   ├── agents.py
+│   └── ...
 │
 ├── docs/
 │   ├── flowlight_banner.png
@@ -216,24 +222,21 @@ FlowLight-AI-Traffic-Signal
 │   ├── experiment_results.png
 │   ├── flowlight_live_demo.gif
 │   ├── flowlight_before_ai.gif
-│   └── flowlight_after_ai.gif
+│   ├── flowlight_after_ai.gif
+│   └── FlowLight_Final_Presentation.pdf
 │
-├── backend/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── agents.py
-│   │   └── prompts.py
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── index.html
-│   ├── script.js
-│   └── style.css
-│
-└── demo/
-    ├── before_ai.mp4
-    ├── after_ai.mp4
-    └── full_demo.mp4
+└── tests/
+```
+
+### Directory Description
+
+| Path | Description |
+|------|-------------|
+| `app/` | FastAPI 기반 AI Agent 서버 및 주요 로직 |
+| `docs/` | README 이미지, GIF, 발표 자료 등 문서 리소스 |
+| `tests/` | 테스트 코드 |
+| `requirements.txt` | Python 패키지 의존성 목록 |
+| `README_v2.md` | 포트폴리오용 README 작업 버전 |
 
 ---
 
