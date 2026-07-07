@@ -18,17 +18,23 @@
 
 ## 🎬 Live Demo
 
-> 🚧 Demo GIF를 추가할 예정입니다.
+FlowLight의 전체 시뮬레이션 실행 화면입니다.
+
+<p align="center">
+  <img src="docs/flowlight_live_demo.gif" width="100%">
+</p>
 
 ---
 
 ## 📊 AI Performance Comparison
 
-| Before AI | After AI |
-|------------|----------|
-| 🚧 GIF 예정 | 🚧 GIF 예정 |
+동일한 조건에서 **AI 미적용 고정 신호**와 **FlowLight AI 적용 신호**를 비교했습니다.
 
-> 📈 성능 비교 표와 실험 결과를 추가할 예정입니다.
+| Before AI | After AI |
+|----------|---------|
+| <img src="docs/flowlight_before_ai.gif" width="100%"> | <img src="docs/flowlight_after_ai.gif" width="100%"> |
+
+> AI가 교통 상황을 분석하여 신호 시간을 조정하고, 검증된 신호 계획만 시뮬레이션에 적용합니다.
 
 ---
 
