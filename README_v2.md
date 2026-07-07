@@ -199,3 +199,38 @@ FlowLight는 **동일한 교통 시나리오와 동일한 초기 조건**에서
 - 시스템 아키텍처 및 AI 의사결정 과정 정리
 - 실험 결과 분석 및 발표
 - 최종 발표 진행
+
+---
+
+## 📂 Project Structure
+
+```text
+FlowLight-AI-Traffic-Signal
+├── README.md
+├── README_v2.md
+│
+├── docs/
+│   ├── flowlight_banner.png
+│   ├── ai_decision_process.png
+│   ├── system_architecture.png
+│   ├── experiment_results.png
+│   ├── flowlight_live_demo.gif
+│   ├── flowlight_before_ai.gif
+│   └── flowlight_after_ai.gif
+│
+├── backend/
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── agents.py
+│   │   └── prompts.py
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── index.html
+│   ├── script.js
+│   └── style.css
+│
+└── demo/
+    ├── before_ai.mp4
+    ├── after_ai.mp4
+    └── full_demo.mp4
