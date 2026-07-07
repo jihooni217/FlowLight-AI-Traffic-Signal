@@ -1,7 +1,7 @@
 # 🚦 FlowLight AI Traffic Signal Optimization
 
 <p align="center">
-  <img src="docs/hero.png" width="900">
+  <img src="docs/flowlight_banner.png" width="900">
 </p>
 
 > **LLM 기반 Multi-Agent 교통 신호 최적화 시스템**  
