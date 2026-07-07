@@ -1,5 +1,9 @@
 # 🚦 FlowLight AI Traffic Signal Optimization
 
+<p align="center">
+  <img src="docs/hero.png" width="900">
+</p>
+
 > **LLM 기반 Multi-Agent 교통 신호 최적화 시스템**  
 > FastAPI와 SSE(Server-Sent Events)를 활용하여 AI의 의사결정 과정을 실시간으로 확인할 수 있는 교통 신호 제어 프로젝트입니다.
 
