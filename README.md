@@ -1,15 +1,36 @@
-# 🚦 FlowLight AI Traffic Signal Optimization
+# 🚦 FlowLight
 
-> **Upstage Solar Pro 4 기반 Multi-Agent 교통 신호 최적화 데모**
-> 실제 교통량 데이터로 차량을 발생시키는 브라우저 시뮬레이터와, 그 상태를 읽고 신호 계획을 세우는 세 개의 LLM Agent를
-> FastAPI + SSE(Server-Sent Events)로 연결한 프로젝트입니다. AI의 의사결정 과정을 단계별로 실시간 확인할 수 있습니다.
+<p align="center">
+  <img src="docs/flowlight_banner.png" width="100%">
+</p>
+
+<div align="center">
+
+# AI-based Real-Time Traffic Signal Optimization
+
+### Upstage Solar Pro 4 기반 Multi-Agent 실시간 교통 신호 최적화 데모
+
+**FastAPI · SSE · Solar Pro 4 · Structured Outputs · Guardrail · Traffic Simulator**
+
+</div>
+
+---
+
+## 🎬 Live Demo
+
+FlowLight의 전체 시뮬레이션 실행 화면입니다.
+
+<p align="center">
+  <img src="docs/flowlight_live_demo.gif" width="100%">
+</p>
 
 ---
 
 # 📌 프로젝트 소개
 
 FlowLight는 고정 시간 신호 대신 **LLM Agent 세 개**가 교통 상황을 분석하고 신호 시간을 계획한 뒤 스스로 평가하는 구조입니다.
-LLM 출력은 **Structured Outputs(JSON Schema)** 로 형식이 강제되고, **Guardrail**(규칙 기반 안전 장치)을 거친 뒤에만 시뮬레이터에 적용됩니다.
+LLM 출력은 **Structured Outputs(JSON Schema)** 로 형식이 강제되고, **Guardrail**(규칙 기반 안전 장치)을 거친 뒤에만 시뮬레이터에 적용되며,
+FastAPI + SSE(Server-Sent Events)로 AI의 의사결정 과정을 단계별로 실시간 확인할 수 있습니다.
 
 이 저장소는 Upstage 공식 Demo/튜토리얼로 발전시키는 중이며, 다음 원칙을 따릅니다.
 
@@ -19,10 +40,25 @@ LLM 출력은 **Structured Outputs(JSON Schema)** 로 형식이 강제되고, **
 
 ---
 
+## 📊 AI Performance Comparison
+
+동일한 조건에서 **AI 미적용 고정 신호**와 **FlowLight AI 적용 신호**를 비교한 영상입니다.
+
+| Before AI | After AI |
+|----------|---------|
+| <img src="docs/flowlight_before_ai.gif" width="100%"> | <img src="docs/flowlight_after_ai.gif" width="100%"> |
+
+> AI가 교통 상황을 분석하여 신호 시간을 조정하고, 검증된 신호 계획만 시뮬레이션에 적용합니다.
+> 영상은 이전 버전(Solar Pro 3, 수동 교통량 모드)에서 촬영했으며, 현재 UI 에는 진행 상태 패널과 수요 입력 패널이 추가되어 있습니다.
+
+---
+
 # 🏗 시스템 구조
 
+FlowLight는 **교통 데이터 → 시뮬레이터 → FastAPI → Multi-Agent → Guardrail → 시뮬레이터 적용**으로 이어지는 구조입니다.
+
 <p align="center">
-  <img src="docs/architecture.png" alt="FlowLight System Architecture" width="1000">
+  <img src="docs/system_architecture.png" width="100%">
 </p>
 
 ```
@@ -32,6 +68,15 @@ LLM 출력은 **Structured Outputs(JSON Schema)** 로 형식이 강제되고, **
    ─(POST /api/agent/stream, SSE)─▶ Agent 1 분석 → Agent 2 계획 → Guardrail → Agent 3 평가 → 최종 판단
    ─▶ 화면 표시 및 신호 적용
 ```
+
+| Layer | Description |
+|-------|-------------|
+| 📈 Traffic Data | 공공 교통량 CSV 를 접근로별 수요 프로파일로 정규화하고 차량 발생률로 변환 |
+| 🖥 Frontend | HTML/JavaScript 시뮬레이터. 수요 프로파일로 차량 생성, 상태 집계, 결과 시각화 |
+| ⚙ FastAPI | API 서버, Agent 오케스트레이션, SSE 스트리밍, 수요 프로파일 제공 |
+| 🤖 Solar Pro 4 | LLM 기반 교통 분석·신호 계획·평가 (Structured Outputs) |
+| 🛡 Guardrail | 최소 녹색 시간·주기 검증, 최종 판단 보정 |
+| 🚦 Simulation | 검증된 신호 계획만 적용 |
 
 ## 세 가지 값의 구분
 
@@ -43,7 +88,21 @@ LLM 출력은 **Structured Outputs(JSON Schema)** 로 형식이 강제되고, **
 
 ---
 
-# ✨ 주요 기능
+# 🤖 AI 의사결정 과정
+
+FlowLight는 **Multi-Agent 기반 AI Workflow**로 교통 상황을 분석하고 신호 계획을 생성한 뒤 스스로 평가합니다.
+
+<p align="center">
+  <img src="docs/ai_decision_process.png" width="100%">
+</p>
+
+| 단계 | 역할 |
+|------|------|
+| 🔍 Traffic Situation Agent | 교통 수준·위험도·주요 혼잡 방향 판단 |
+| 📝 Signal Planning Agent | 남북/동서/보행자 녹색 시간 계획 |
+| 🛡 Guardrail | 최소 녹색 시간과 주기 검증, 보정 전/후 전달 |
+| 📊 Plan Evaluation Agent | 점수화와 자동 적용 / 운영자 승인 / 재계획 판단 |
+| 🚦 Apply | 검증된 계획만 시뮬레이터에 적용 |
 
 ## 🚗 Traffic Situation Agent (Agent 1)
 - 차량 수·정지 차량·혼잡도·보행자 수로 교통 수준과 위험도를 판단
@@ -91,7 +150,45 @@ LLM 판단을 다음 규칙이 덮어씁니다. 프롬프트의 자동 적용 �
 
 ---
 
+# 📊 실험 결과
+
+## AI 적용 전후 비교 (이전 버전)
+
+**동일한 교통 시나리오와 동일한 초기 조건**에서 기존 **고정 신호 제어(Fixed Signal)** 와 **AI 기반 적응형 신호 제어**의 성능을 비교했습니다.
+이 실험은 Solar Pro 3 · 수동 교통량 모드 시점의 결과입니다.
+
+<p align="center">
+  <img src="docs/experiment_results.png" width="100%">
+</p>
+
+| Metric | Fixed Signal | FlowLight AI | Improvement |
+|:--------|-------------:|-------------:|------------:|
+| 🚗 Waiting Vehicles | **18** | **13** | **⬇ 27.8%** |
+| 🚦 Throughput | **107** | **115** | **⬆ 7.5%** |
+| 📈 Congestion Index | **1.00** | **0.76** | **⬇ 24.0%** |
+
+> 동일한 시나리오와 동일한 초기 조건에서 비교를 수행하여 AI 기반 신호 제어의 개선 효과를 확인했습니다.
+
+## 실제 API 검증 기록 (solar-pro4-260806, 2026-09-10)
+
+| 조건 | 결과 |
+|---|---|
+| 기존 입력, `json_object` | 3회 모두 200·`stop`, 12/8/0, 88점, 자동 적용, 전체 15.4초 |
+| 기존 입력, `json_schema` | 3회 모두 200·`stop`, Schema 준수, 동일 결과, 전체 15.1초 |
+| 접근로별 상태 포함 입력, `json_schema` | 주요 혼잡 방향 "남북", 계획 14/6/0 → Guardrail 이 12/8/0 으로 보정, 88점, 자동 적용, 전체 24.6초 |
+
+reasoning 은 켜지 않았습니다(`reasoning_effort` 미전송, reasoning 토큰 0). 응답 시간은 네트워크 상태에 따라 달라집니다.
+
+---
+
 # 🛠 기술 스택
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white">
+  <img src="https://img.shields.io/badge/SSE-2563EB?style=for-the-badge&logo=googletagmanager&logoColor=white">
+  <img src="https://img.shields.io/badge/Solar_Pro_4-FF7A00?style=for-the-badge&logo=openai&logoColor=white">
+</p>
 
 | 영역 | 내용 |
 |---|---|
@@ -119,7 +216,14 @@ FlowLight-AI-Traffic-Signal
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
 ├── tests                           # 215개 (mock 214 + live 1, live 는 opt-in)
-├── docs                            # 아키텍처 그림, 실행 화면
+├── docs
+│   ├── flowlight_banner.png, flowlight_live_demo.gif
+│   ├── flowlight_before_ai.gif, flowlight_after_ai.gif
+│   ├── ai_decision_process.png, system_architecture.png, experiment_results.png
+│   ├── main.png, sse.png, ai_result.png, fastapi.png
+│   └── FlowLight_Final_Presentation.pdf
+├── README_v2.md                    # 포트폴리오용 README 작업 버전
+├── README_old.md                   # 초기 README 보관본
 ├── .env.example
 ├── pytest.ini
 ├── requirements.txt
@@ -246,18 +350,6 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 
 ---
 
-# 📊 실제 API 검증 기록 (solar-pro4-260806, 2026-09-10)
-
-| 조건 | 결과 |
-|---|---|
-| 기존 입력, `json_object` | 3회 모두 200·`stop`, 12/8/0, 88점, 자동 적용, 전체 15.4초 |
-| 기존 입력, `json_schema` | 3회 모두 200·`stop`, Schema 준수, 동일 결과, 전체 15.1초 |
-| 접근로별 상태 포함 입력, `json_schema` | 주요 혼잡 방향 "남북", 계획 14/6/0 → Guardrail 이 12/8/0 으로 보정, 88점, 자동 적용, 전체 24.6초 |
-
-reasoning 은 켜지 않았습니다(`reasoning_effort` 미전송, reasoning 토큰 0). 응답 시간은 네트워크 상태에 따라 달라집니다.
-
----
-
 # 📸 실행 화면
 
 ## 메인 화면
@@ -280,6 +372,22 @@ reasoning 은 켜지 않았습니다(`reasoning_effort` 미전송, reasoning 토
 
 ---
 
+# 📄 발표 자료
+
+프로젝트의 문제 정의, AI Agent 설계, 시스템 아키텍처, 실험 결과, 회고 내용을 발표 자료로 정리했습니다.
+
+[📑 View Final Presentation](docs/FlowLight_Final_Presentation.pdf)
+
+| Section | Description |
+|--------|-------------|
+| Problem | 고정형 교통 신호 체계의 한계 |
+| Method | LLM Agent 기반 분석·계획·평가 구조 |
+| Architecture | FastAPI, SSE, Solar API, Guardrail 기반 시스템 구성 |
+| Experiment | AI 적용 전후 교통 흐름 비교 |
+| Retrospective | 프로젝트를 통해 배운 점과 향후 개선 방향 |
+
+---
+
 # ⚠️ 알려진 한계
 
 - 시뮬레이터는 픽셀 단위의 자체 구현으로, 비율(포화유출률 1800대/시/차로)은 현실과 맞추었지만 속도·거리 절대값은 현실과 다릅니다.
@@ -292,10 +400,64 @@ reasoning 은 켜지 않았습니다(`reasoning_effort` 미전송, reasoning 토
 
 # 🚀 향후 계획
 
-- 실제 공공 데이터 파일 연동과 회전비율 반영
-- 프론트엔드 정적 서빙으로 실행 절차 단순화
-- 보행자 현시의 실제 적용과 주기 표시 정합성
-- 다중 교차로 협업 제어
+| Improvement Area | Description |
+|------------------|-------------|
+| **Real Traffic Data** | 실제 공공 데이터 파일 연동, 회전비율(`turn_ratio`) 반영, 혼잡 강조 배율(`demo_scale`) |
+| **Demo Packaging** | 프론트엔드 정적 서빙으로 실행 절차 단순화 |
+| **Signal Fidelity** | 보행자 현시의 실제 적용과 주기 표시 정합성 |
+| **Roundabout Scenario** | 회전교차로 차량 흐름과 우선순위 규칙 추가 |
+| **Multi-Intersection Control** | 인접 교차로 간 신호 연동 및 녹색파 제어 확장 |
+| **Reinforcement Learning** | LLM Agent 와 강화학습을 결합한 하이브리드 신호 최적화 |
+| **Evaluation Automation** | 평균 속도, 대기 차량 수, 통행량 등 성능 지표 자동 수집 및 분석 |
+
+---
+
+# 👨‍💻 My Contributions
+
+본 프로젝트에서 저는 **LLM Agent 설계, Backend 연동, Guardrail 검증, Frontend 연결, 실험 및 발표 자료 제작**을 중심으로 수행했습니다.
+
+### AI / LLM
+- Traffic Analysis Agent, Signal Planning Agent, Plan Evaluation Agent 구조 설계
+- Upstage Solar API 기반 LLM 호출 흐름 구현
+- 교통 상태 데이터를 LLM 입력에 적합한 Prompt 형식으로 변환
+- JSON 기반 신호 계획 출력 형식 설계
+
+### Backend
+- FastAPI 기반 AI Agent 서버 구현
+- Frontend와 통신하기 위한 API Endpoint 구성
+- SSE(Server-Sent Events)를 활용한 실시간 스트리밍 응답 구현
+- AI 분석 단계, 신호 계획 생성, 평가 결과를 순차적으로 전달하는 흐름 구성
+
+### Reliability
+- Guardrail을 통한 신호 시간 최소/최대 범위 검증
+- JSON 응답 형식 검증
+- 비정상 값 필터링 및 안전한 신호 계획만 적용하도록 처리
+- 오류 발생 시 데모가 중단되지 않도록 예외 처리 보완
+
+### Frontend / Demo
+- HTML / JavaScript 기반 시뮬레이션 화면과 Backend 연동
+- AI 분석 결과 및 신호 계획을 사용자 화면에 표시
+- AI 적용 전 / 후 비교 시나리오 구성
+- 전체 시뮬레이션 데모 영상 제작
+
+### Documentation / Presentation
+- 프로젝트 발표 자료 제작
+- 시스템 아키텍처 및 AI 의사결정 과정 정리
+- 실험 결과 분석 및 발표
+- 최종 발표 진행
+
+---
+
+# 📝 Lessons Learned
+
+이번 프로젝트를 통해 단순히 LLM API를 호출하는 것보다,
+AI 결과를 **평가하고 검증한 뒤 서비스 흐름에 안전하게 연결하는 과정**이 더 중요하다는 점을 배웠습니다.
+
+- LLM을 단순 질의응답이 아니라 **Agent 기반 의사결정 구조**로 설계하는 방법을 경험했습니다.
+- Prompt Engineering과 Structured Outputs를 통해 AI가 **정해진 입력과 출력 형식**을 따르도록 설계했습니다.
+- FastAPI와 SSE를 활용하여 AI의 분석 과정과 결과를 **실시간으로 사용자 화면에 전달**했습니다.
+- Guardrail과 JSON Validation을 통해 AI가 생성한 결과를 **그대로 적용하지 않고 검증 후 적용**하는 구조를 구현했습니다.
+- 실험 결과를 수치와 영상으로 함께 제시하는 것이 프로젝트 설득력에 중요하다는 점을 확인했습니다.
 
 ---
 
