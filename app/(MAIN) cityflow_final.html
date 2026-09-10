@@ -262,12 +262,12 @@ input[type="range"]:disabled { opacity: 0.35; }
                         <input type="checkbox" id="chk-demand-autohour"> 시간대 자동 진행 (<span id="val-demand-secs">120</span>초/시간)
                     </label>
                     <table class="demand-table">
-                        <thead><tr><th>접근로</th><th>수요<br>대/시</th><th>차로</th><th>발생률<br>대/초</th><th>진입<br>60초</th><th>손실</th></tr></thead>
+                        <thead><tr><th>접근로</th><th>수요<br>대/시</th><th>차로</th><th>발생률<br>대/초</th><th>진입<br>60초</th><th>손실</th><th>대기<br>대</th></tr></thead>
                         <tbody>
-                            <tr id="demand-row-N"><td>N 북측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-                            <tr id="demand-row-S"><td>S 남측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-                            <tr id="demand-row-E"><td>E 동측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-                            <tr id="demand-row-W"><td>W 서측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-N"><td>N 북측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-S"><td>S 남측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-E"><td>E 동측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-W"><td>W 서측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
                         </tbody>
                     </table>
                     <p class="hint mt-2">수요(대/시)는 입력값이고 발생률은 차로당 값입니다. 대기 차량 수는 시뮬레이션이 계산한 결과이며 여기 값이 아닙니다.<br>손실 = 진입로가 막혀 만들지 못한 차량 수.</p>
@@ -2433,6 +2433,40 @@ SimController.prototype._initDOM = function() {
             }
         };
 
+        // 6-4: 입력 수요(demand)와 접근로별 현재 상태(queues.by_approach)를 구분해서 함께 보낸다.
+        // demand 는 프로파일/슬라이더에서 온 "입력"이고, by_approach 는 시뮬레이션이 만든 "결과"다.
+        var WINDOW_SEC = 30;
+        var approachState = self._approachState(WINDOW_SEC);
+        if (self.demandMode === 'profile' && self.currentDemand && self.profile) {
+            var lostWin = {};
+            for (var ai = 0; ai < APPROACH_KEYS.length; ai++) {
+                lostWin[APPROACH_KEYS[ai]] = self.demandSpawn[APPROACH_KEYS[ai]].lostRecent.length;
+            }
+            scenario.demand = {
+                mode: "profile",
+                site_id: self.profile.meta.site_id,
+                hour: self.profileHour,
+                unit: self.profile.meta.unit,
+                volume_per_hour: self.currentDemand.volume,
+                lanes: self.profile.meta.lanes,
+                arrival_rate_per_sec: self.currentDemand.arrival_rate_per_sec,
+                lost_demand_last_60s: lostWin,
+                note: self.profile.meta.note
+            };
+        } else {
+            scenario.demand = {
+                mode: "manual",
+                spawn_rate_per_sec_total: self.spawnRate,
+                note: "수동 슬라이더 값(네트워크 전체 대/초). 입력 수요이며 현재 대기 차량 수가 아니다."
+            };
+        }
+        scenario.context.demand_mode = self.demandMode;
+        if (approachState) {
+            scenario.queues.by_approach = approachState.by_approach;
+            scenario.context.by_approach_scope = self.gridSize === 3 ? "intersection_approaches" : "entry_edges_only";
+            scenario.context.window_sec = approachState.window_sec;
+        }
+
         try {
             var response = await fetch(API_BASE + '/api/agent/stream', {
                 method: 'POST',
@@ -2537,6 +2571,17 @@ SimController.prototype._initDOM = function() {
 
                         // 아래 문장들은 모두 Agent 가 실제로 반환한 값(summary / explanation / reason)이다.
                         lt.textContent += "[Agent 1 · 교통 상황 분석]\n";
+                        // 수요(입력)와 대기(결과)를 나란히 보여 둘이 다른 값임을 드러낸다.
+                        if (input.demand && input.demand.mode === "profile") {
+                            var dv = input.demand.volume_per_hour;
+                            lt.textContent += "• 입력 수요(대/시, " + pad2(input.demand.hour) + "시): N " + dv.N + " / S " + dv.S + " / E " + dv.E + " / W " + dv.W + "\n";
+                        } else if (input.demand) {
+                            lt.textContent += "• 입력 수요: 수동 " + input.demand.spawn_rate_per_sec_total + "대/초 (네트워크 전체)\n";
+                        }
+                        if (input.queues.by_approach) {
+                            var bq = input.queues.by_approach;
+                            lt.textContent += "• 현재 대기(대, 시뮬레이션 결과): N " + bq.N.queue + " / S " + bq.S.queue + " / E " + bq.E.queue + " / W " + bq.W.queue + "\n";
+                        }
                         lt.textContent += "• 입력: 차량 " + input.queues.total_cars + "대, 정지 " + input.queues.stopped_cars + "대, 보행자 " +
                             input.pedestrians.waiting_or_crossing + "명, 혼잡도 " + congestionText + " (" + congestionValue.toFixed(2) + ")\n";
                         lt.textContent += "• 요약: " + (analysis.summary || "-") + "\n";
@@ -3182,11 +3227,12 @@ SimController.prototype.mapApproachEdges = function() {
 SimController.prototype._initDemandSpawn = function() {
     this.demandSpawn = {};
     for (var k = 0; k < APPROACH_KEYS.length; k++) {
-        this.demandSpawn[APPROACH_KEYS[k]] = { rate: 0, nextAt: null, spawned: 0, lost: 0, recent: [] };
+        this.demandSpawn[APPROACH_KEYS[k]] = { rate: 0, nextAt: null, spawned: 0, lost: 0, recent: [], lostRecent: [] };
     }
     this.hourAcc = 0;
+    // 접근로 매핑은 모드와 무관하게 만든다 (6-4: 수동 모드에서도 접근로별 대기 상태를 AI 에 보낼 수 있도록). 2x2 는 지원하지 않음.
+    this.approachEdges = this.gridSize >= 3 ? this.mapApproachEdges() : null;
     if (this.demandMode === 'profile') {
-        this.mapApproachEdges();
         this.applyProfileHour(this.profileHour);
     }
 };
@@ -3224,10 +3270,69 @@ SimController.prototype._spawnFromProfile = function(gridlockRisk) {
                 ok = this._spawnCarOn(edge);
             }
             if (ok) { st.spawned++; st.recent.push(this.simTime); }
-            else { st.lost++; }   // 진입로 차단·상한·gridlock 으로 만들지 못한 수요
+            else { st.lost++; st.lostRecent.push(this.simTime); }   // 진입로 차단·상한·gridlock 으로 만들지 못한 수요
         }
         while (st.recent.length > 0 && this.simTime - st.recent[0] > 60) st.recent.shift();
+        while (st.lostRecent.length > 0 && this.simTime - st.lostRecent[0] > 60) st.lostRecent.shift();
     }
+};
+
+// ===== 접근로별 현재 상태 (6-4) — 시뮬레이션의 "결과" =====
+// 진입 엣지(테두리 → 교차로) 기준. 3x3 에서는 교차로 접근로 4개와 정확히 일치하고, 더 큰 격자에서는 진입 엣지만 집계한다.
+// queue = 그 엣지에서 속도 3px/s 미만인 차량 수. 입력 수요(volume)와는 다른 값이며 AI 에는 둘을 따로 보낸다.
+SimController.prototype._approachQueue = function(edges) {
+    var q = 0;
+    for (var i = 0; i < edges.length; i++) {
+        for (var j = 0; j < edges[i].cars.length; j++) if (edges[i].cars[j].v < 3) q++;
+    }
+    return q;
+};
+SimController.prototype._approachState = function(windowSec) {
+    if (!this.approachEdges) return null;
+    var SAT = 0.5;   // 포화유출률 (DataLogger/Analyzer 와 동일)
+    var interval = this.logger ? this.logger.sampleInterval : 1;
+    var nSamples = Math.max(1, Math.round(windowSec / interval));
+    var samples = this.logger ? this.logger.buffer.slice(-nSamples) : [];
+    var actualWindow = samples.length * interval;
+    var out = {};
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k], edges = this.approachEdges[a];
+        var queue = 0, waitSum = 0, nCars = 0, arrS = 0, arrL = 0, arrR = 0;
+        for (var i = 0; i < edges.length; i++) {
+            var e = edges[i];
+            for (var j = 0; j < e.cars.length; j++) {
+                if (e.cars[j].v < 3) queue++;
+                waitSum += e.cars[j].waitTime;
+                nCars++;
+            }
+            // 윈도 내 도착 수: DataLogger 샘플의 접근로 통계(엣지 id 키)에서 합산
+            for (var si = 0; si < samples.length; si++) {
+                var ints = samples[si].intersections;
+                for (var ii = 0; ii < ints.length; ii++) {
+                    var ap = ints[ii].approaches[e.id];
+                    if (ap) { arrS += ap.arrS || 0; arrL += ap.arrL || 0; arrR += ap.arrR || 0; }
+                }
+            }
+        }
+        var saturation = 0;
+        if (edges.length > 0 && actualWindow > 0) {
+            var light = this.jc.lights.get(edges[0].to.id);
+            if (light) {
+                var C = 0;
+                for (var pi = 0; pi < light.phases.length; pi++) C += light.phases[pi].duration;
+                var g = light.greenTimes['straight_' + edges[0].dir] || GREEN_MIN;
+                var lam = (arrS + arrR) / actualWindow;
+                if (C > 0) saturation = lam / (SAT * g / C);
+            }
+        }
+        out[a] = {
+            queue: queue,
+            mean_wait_sec: nCars > 0 ? Math.round(waitSum / nCars * 10) / 10 : 0,
+            arrivals_last_window: arrS + arrL + arrR,
+            saturation: Math.round(saturation * 100) / 100
+        };
+    }
+    return { by_approach: out, window_sec: actualWindow };
 };
 
 SimController.prototype._renderDemandTable = function() {
@@ -3242,6 +3347,7 @@ SimController.prototype._renderDemandTable = function() {
         row.cells[3].textContent = st.rate.toFixed(3);
         row.cells[4].textContent = st.recent.length;
         row.cells[5].textContent = st.lost;
+        row.cells[6].textContent = this.approachEdges ? this._approachQueue(this.approachEdges[a]) : '-';   // 시뮬레이션 결과
     }
 };
 
