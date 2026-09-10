@@ -435,7 +435,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <span class="l-item"><span class="color-box" style="background:#ef4444"></span>정체</span>
                 |
                 <span class="l-item">🟢직진·우회전</span>
-                <span class="l-item"><span class="color-box" style="background:#22c55e;border-radius:50%"></span>좌회전 신호 (녹색 화살표 ←)</span>
+                <span class="l-item"><span style="color:#22c55e;font-weight:700;font-size:1.1em">←</span> 좌회전 신호 (녹색 화살표, 차가 꺾는 방향)</span>
                 <span class="l-item">🟡황색</span>
                 <span class="l-item">🔴적색(우회전가능·보행자양보)</span>
                 |
@@ -2045,10 +2045,14 @@ Renderer.prototype.render = function(network, jc, cam) {
                 
                 ctx.fillStyle = cR; ctx.beginPath(); ctx.arc(0, -6, 1.5, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = cY; ctx.beginPath(); ctx.arc(0, -2, 1.5, 0, Math.PI*2); ctx.fill();
-                // 좌회전 등: 한국 4색 신호등처럼 녹색 화살표(←). 진행 방향이 +x 이므로 운전자의 왼쪽은 -y 쪽이다.
-                ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(0, 2, 1.5, 0, Math.PI*2); ctx.fill();
-                ctx.strokeStyle = cL; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
-                ctx.beginPath(); ctx.moveTo(0, 3.3); ctx.lineTo(0, 0.9); ctx.moveTo(-0.9, 1.8); ctx.lineTo(0, 0.9); ctx.lineTo(0.9, 1.8); ctx.stroke();
+                // 좌회전 등: 한국 4색 신호등의 녹색 왼쪽 화살표(←) 렌즈. 위에서 내려다보는 화면이므로 운전자 기준 왼쪽,
+                // 즉 그 방향 차가 실제로 꺾는 쪽을 가리키게 그린다 (진행 방향 +x 에서 왼쪽은 -y). 꺼지면 어두운 렌즈, 켜지면 녹색.
+                ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(0, 2, 1.7, 0, Math.PI*2); ctx.fill();
+                ctx.save();
+                ctx.translate(0, 2);
+                ctx.strokeStyle = cL === '#444' ? '#3a3a3a' : cL; ctx.lineWidth = 0.85; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.beginPath(); ctx.moveTo(0, 1.3); ctx.lineTo(0, -1.3); ctx.moveTo(-1.0, -0.3); ctx.lineTo(0, -1.3); ctx.lineTo(1.0, -0.3); ctx.stroke();
+                ctx.restore();
                 ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(0,  6, 1.5, 0, Math.PI*2); ctx.fill();
                 
                 // 실제 신호 남은 시간 표시
