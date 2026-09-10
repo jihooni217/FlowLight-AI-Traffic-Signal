@@ -1,9 +1,12 @@
 import logging
 import json
+import os
+from functools import lru_cache
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Body
+from fastapi import Body, HTTPException
 
 from app.agents import (
     mock_scenario,
@@ -12,6 +15,13 @@ from app.agents import (
     plan_evaluation_agent,
     is_error,
     apply_guardrail,
+)
+from app.traffic_data import (
+    APPROACHES,
+    DEMAND_NOTE,
+    TrafficDataError,
+    load_profile_from_meta,
+    validate_hour,
 )
 
 app = FastAPI(title="FlowLight Agent Backend MVP")
@@ -65,6 +75,70 @@ def correct_final_decision(state: dict, signal_plan: dict, evaluation: dict):
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "FlowLight Agent Backend"}
+
+
+# ---------------------------------------------------------------------------
+# 교통 수요 프로파일 조회 (6-2)
+# data/*.meta.json → app.traffic_data → 정규화 프로파일. 응답에는 시간대별 입력 수요(volume, 대/시)와
+# 백엔드가 계산한 차량 발생률(arrival_rate_per_sec, 차로당 대/초)만 담긴다. queue 는 시뮬레이션 결과라 없다.
+# ---------------------------------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_TRAFFIC_PROFILE_META = PROJECT_ROOT / "data" / "sample_seoul_traffic_history.meta.json"
+APPROACH_NAMING = "N = 북측에서 진입해 남쪽으로 향하는 차량 (S/E/W 도 같은 규칙)"
+
+
+def traffic_profile_meta_path() -> Path:
+    """환경 변수 TRAFFIC_PROFILE_META 로 다른 메타 파일을 지정할 수 있다. 기본은 6-1 샘플."""
+    return Path(os.getenv("TRAFFIC_PROFILE_META") or DEFAULT_TRAFFIC_PROFILE_META)
+
+
+@lru_cache(maxsize=4)
+def get_traffic_profile(meta_path: str):
+    """메타 경로별로 한 번만 읽는다. 로드 실패는 캐시되지 않는다."""
+    return load_profile_from_meta(meta_path)
+
+
+def profile_to_payload(profile, hours, meta_file: str) -> dict:
+    return {
+        "meta": {
+            **profile.to_dict()["meta"],
+            "profile_file": meta_file,
+            "approach_naming": APPROACH_NAMING,
+            "note": DEMAND_NOTE,
+        },
+        "available_hours": profile.available_hours(),
+        "hours": [
+            {
+                **hv.to_dict(),
+                "arrival_rate_per_sec": {
+                    a: round(r, 6) for a, r in profile.arrival_rates(hv.hour).items()
+                },
+            }
+            for hv in hours
+        ],
+    }
+
+
+@app.get("/api/traffic/profile")
+def traffic_profile(hour: str | None = None):
+    meta_path = traffic_profile_meta_path()
+    try:
+        profile = get_traffic_profile(str(meta_path))
+    except TrafficDataError as e:
+        raise HTTPException(status_code=500, detail=f"교통 프로파일을 불러올 수 없습니다: {e}")
+
+    hours = profile.hours
+    if hour is not None:
+        try:
+            wanted = validate_hour(hour)
+        except TrafficDataError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        try:
+            hours = [profile.hour(wanted)]
+        except TrafficDataError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+    return profile_to_payload(profile, hours, meta_path.name)
 
 
 @app.get("/api/agent/stream")
