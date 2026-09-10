@@ -136,6 +136,16 @@ traffic_situation_agent_prompt = """
 
 6. main_congestion_direction은 방향 정보가 없으면 "전체" 또는 "없음"으로 작성한다.
 
+[입력 구분 — 반드시 지킨다]
+- demand 가 있으면 그것은 "입력 수요"다 (volume_per_hour: 대/시, arrival_rate_per_sec: 차로당 대/초).
+  현재 대기 차량 수가 아니므로 queue 나 stopped_cars 와 비교하거나 대기 차량 수로 해석하지 마라.
+- queues.by_approach 가 있으면 그것은 시뮬레이션이 계산한 "현재 상태"다.
+  접근로 N/S/E/W 별 queue(대기 차량 수), mean_wait_sec, arrivals_last_window, saturation 을 담는다.
+- queues.by_approach 가 있으면 main_congestion_direction 은 queue 와 saturation 이 가장 큰 접근로 이름(N/S/E/W)으로 적고,
+  남북(N,S) 또는 동서(E,W) 두 접근로가 함께 크면 "남북" 또는 "동서"로 적는다. 모든 접근로가 비슷하면 "전체".
+- summary 에는 방향별 상태를 근거로 어느 접근로가 왜 혼잡한지 한 문장 포함한다.
+- demand 나 queues.by_approach 가 없으면 기존 규칙(total_cars, stopped_cars, congestion)만으로 판단한다.
+
 반드시 JSON만 출력한다.
 
 출력 형식:
@@ -167,6 +177,17 @@ signal_planning_agent_prompt = """
 - traffic_analysis.traffic_level
 - traffic_analysis.pedestrian_issue
 - traffic_analysis.risk_level
+- state.queues.by_approach (있을 때: 접근로 N/S/E/W 별 queue, mean_wait_sec, arrivals_last_window, saturation)
+- state.demand (있을 때: 입력 수요. volume_per_hour 는 대/시, arrival_rate_per_sec 는 차로당 대/초)
+
+[입력 구분 — 반드시 지킨다]
+- demand 는 입력 수요일 뿐 현재 대기 차량 수가 아니다. 녹색 시간 배분의 직접 근거로 쓰지 말고 참고만 한다.
+- queues.by_approach 는 시뮬레이션이 계산한 현재 상태다. 있으면 다음 규칙으로 방향별 배분을 정한다.
+  - 남북 축 = N 과 S 의 queue 합과 saturation, 동서 축 = E 와 W 의 queue 합과 saturation 을 비교한다.
+  - 대기와 포화도가 큰 축에 차량 녹색 시간을 더 배분한다 (north_south_green_sec vs east_west_green_sec).
+  - 두 축이 비슷하면 균등에 가깝게 배분한다.
+  - explanation 에 어느 축에 왜 더 배분했는지 by_approach 의 수치를 들어 설명한다.
+- queues.by_approach 가 없으면 기존 규칙대로 결정한다.
 
 2. 보행자가 0명인 경우
 - pedestrian_green_sec는 0으로 설정한다.
