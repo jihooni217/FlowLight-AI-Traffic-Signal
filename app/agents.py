@@ -129,6 +129,11 @@ traffic_situation_agent_prompt = """
 - waiting_or_crossing >= 5 이면 true
 - 그 외는 false
 
+4-1. vulnerable_user_detected 판단:
+- state.pedestrians.vulnerable_count (횡단보도의 어린이·노약자·휠체어 이용자 수) 가 1 이상이면 true
+- 그 외는 false
+- true 이면 summary 에 교통약자가 횡단보도에 있다는 문장을 포함한다.
+
 5. risk_level 판단:
 - traffic_level이 "높음"이고 pedestrian_issue가 true이면 "높음"
 - traffic_level이 "높음"이면 "보통"
@@ -172,10 +177,12 @@ signal_planning_agent_prompt = """
 - state.queues.total_cars
 - state.queues.stopped_cars
 - state.pedestrians.waiting_or_crossing
+- state.pedestrians.vulnerable_count (횡단보도의 어린이·노약자·휠체어 이용자 수)
 - state.metrics.congestion
 - state.metrics.throughput_per_min
 - traffic_analysis.traffic_level
 - traffic_analysis.pedestrian_issue
+- traffic_analysis.vulnerable_user_detected
 - traffic_analysis.risk_level
 - state.queues.by_approach (있을 때: 접근로 N/S/E/W 별 queue, mean_wait_sec, arrivals_last_window, saturation)
 - state.demand (있을 때: 입력 수요. volume_per_hour 는 대/시, arrival_rate_per_sec 는 차로당 대/초)
@@ -186,7 +193,8 @@ signal_planning_agent_prompt = """
   - 남북 축 = N 과 S 의 queue 합과 saturation, 동서 축 = E 와 W 의 queue 합과 saturation 을 비교한다.
   - 대기와 포화도가 큰 축에 차량 녹색 시간을 더 배분한다 (north_south_green_sec vs east_west_green_sec).
   - 두 축이 비슷하면 균등에 가깝게 배분한다.
-  - explanation 에 어느 축에 왜 더 배분했는지 by_approach 의 수치를 들어 설명한다.
+  - 대기 시간도 본다. 어느 접근로의 mean_wait_sec 가 state.signals.cycle_sec 의 2배를 넘으면, 그 접근로의 차량이 적더라도 그 축에 최소 녹색(8초)보다 더 배분한다. 차량이 많은 축을 우선하되 적은 축을 계속 기다리게 두지 않는다.
+  - explanation 에 어느 축에 왜 더 배분했는지 by_approach 의 수치(대기 수, 포화도, 대기 시간)를 들어 설명한다.
 - queues.by_approach 가 없으면 기존 규칙대로 결정한다.
 
 2. 보행자가 0명인 경우
@@ -201,6 +209,10 @@ signal_planning_agent_prompt = """
 4. 보행자가 5명 이상인 경우
 - pedestrian_green_sec는 10~14초로 설정한다.
 - priority는 "PEDESTRIAN" 또는 "BALANCED"로 설정한다.
+
+4-1. 교통약자가 있는 경우 (state.pedestrians.vulnerable_count 가 1명 이상이거나 traffic_analysis.vulnerable_user_detected 가 true)
+- 어린이·노약자·휠체어 이용자는 횡단 속도가 느리므로, 보행자 수와 관계없이 pedestrian_green_sec 를 10초 이상으로 설정한다.
+- explanation 에 교통약자 때문에 보행 녹색을 늘렸다고 적는다.
 
 [우선순위 선택 규칙]
 - 보행자 대기 인원이 10명 이상이고 congestion이 0.7 이상이면 priority는 반드시 "BALANCED"로 설정한다.
@@ -237,7 +249,7 @@ signal_planning_agent_prompt = """
   "durations": {
     "north_south_green_sec": "현재 차량/정지차량/혼잡도에 따라 계산한 정수",
     "east_west_green_sec": "현재 차량/정지차량/혼잡도에 따라 계산한 정수",
-    "pedestrian_green_sec": "보행자 수에 따라 계산한 정수"
+    "pedestrian_green_sec": "보행자 수와 교통약자 유무에 따라 계산한 정수 (교통약자가 있으면 10 이상)"
   },
   "priority": "VEHICLE / PEDESTRIAN / BALANCED 중 하나",
   "explanation": "왜 이 신호 시간을 선택했는지 입력값 기반으로 설명"
@@ -271,6 +283,7 @@ plan_evaluation_agent_prompt = """
 4. 안전 점수 safety는 다음을 고려한다.
 - state.pedestrians.waiting_or_crossing가 0명이면 pedestrian_green_sec가 0초여도 감점하지 않는다.
 - state.pedestrians.waiting_or_crossing가 1명 이상인데 pedestrian_green_sec가 6초 미만이면 감점한다.
+- state.pedestrians.vulnerable_count가 1명 이상인데 pedestrian_green_sec가 10초 미만이면 감점한다 (교통약자 횡단 시간 부족).
 - 전체 신호 시간이 state.signals.cycle_sec를 초과하면 크게 감점한다.
 
 5. 효율 점수 efficiency는 다음을 고려한다.
@@ -428,7 +441,9 @@ def is_error(result: dict):
     return isinstance(result, dict) and result.get("status") == "error"
 
 
-def apply_guardrail(signal_plan: dict, cycle_sec: int = 40, pedestrian_count: int = 0):
+def apply_guardrail(signal_plan: dict, cycle_sec: int = 40, pedestrian_count: int = 0, vulnerable_count: int = 0):
+    """규칙 기반 안전 장치. 보행자가 없으면 보행 녹색 0초, 있으면 최소 6초,
+    교통약자(어린이·노약자·휠체어)가 있으면 최소 10초. 합계가 주기를 넘으면 차량 시간만 줄인다."""
     durations = signal_plan["durations"]
 
     ns = int(durations.get("north_south_green_sec", 15))
@@ -439,10 +454,13 @@ def apply_guardrail(signal_plan: dict, cycle_sec: int = 40, pedestrian_count: in
     ns = max(8, ns)
     ew = max(8, ew)
 
+    # 보행 녹색 하한: 보행자 없음 0초 / 있음 6초 / 교통약자 있음 10초 (횡단 속도가 느리다)
+    ped_floor = 0 if pedestrian_count <= 0 else (10 if vulnerable_count > 0 else 6)
+
     if pedestrian_count <= 0:
         ped = 0
     else:
-        ped = max(6, ped)
+        ped = max(ped_floor, ped)
 
     # 2. 주기 초과 방지
     total = ns + ew + ped
@@ -452,7 +470,7 @@ def apply_guardrail(signal_plan: dict, cycle_sec: int = 40, pedestrian_count: in
             ped = 0
             available = cycle_sec
         else:
-            ped = 6
+            ped = ped_floor
             available = cycle_sec - ped
 
         # 차량 신호에 배분 가능한 시간이 부족하면 최소값도 줄여서라도 주기 안에 맞춤

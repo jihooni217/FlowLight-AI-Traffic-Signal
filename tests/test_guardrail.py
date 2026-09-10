@@ -100,14 +100,37 @@ class TestApplyGuardrail:
         # 30+20+0 = 50 > 40 -> ns=int(40*30/50)=24, ew=16
         assert _durations(plan) == (24, 16, 0)
 
+    # ---- 교통약자(어린이·노약자·휠체어) 규칙: 보행 녹색 최소 10초 ----
+    def test_vulnerable_pedestrian_raises_ped_floor_to_10(self):
+        plan = apply_guardrail(_plan(10, 10, 6), cycle_sec=40, pedestrian_count=2, vulnerable_count=1)
+        assert _durations(plan) == (10, 10, 10)
+
+    def test_vulnerable_floor_does_not_lower_a_longer_plan(self):
+        plan = apply_guardrail(_plan(10, 10, 14), cycle_sec=40, pedestrian_count=6, vulnerable_count=2)
+        assert _durations(plan) == (10, 10, 14)
+
+    def test_vulnerable_count_without_pedestrians_is_ignored(self):
+        # 횡단보도에 아무도 없으면 교통약자 수가 남아 있어도 보행 녹색은 0
+        plan = apply_guardrail(_plan(12, 8, 0), cycle_sec=20, pedestrian_count=0, vulnerable_count=1)
+        assert _durations(plan) == (12, 8, 0)
+
+    def test_over_cycle_with_vulnerable_keeps_ped_10_and_splits_rest(self):
+        plan = apply_guardrail(_plan(20, 20, 6), cycle_sec=30, pedestrian_count=3, vulnerable_count=1)
+        assert _durations(plan) == (10, 10, 10)
+        assert sum(_durations(plan)) == 30
+
+    def test_no_vulnerable_keeps_old_floor_of_6(self):
+        plan = apply_guardrail(_plan(10, 10, 3), cycle_sec=40, pedestrian_count=2, vulnerable_count=0)
+        assert _durations(plan) == (10, 10, 6)
+
 
 # ==========================================================================
 # correct_final_decision
 # ==========================================================================
-def _state(cycle=20, peds=0, stopped=0, congestion=0.5):
+def _state(cycle=20, peds=0, stopped=0, congestion=0.5, vulnerable=0):
     return {
         "signals": {"cycle_sec": cycle},
-        "pedestrians": {"waiting_or_crossing": peds},
+        "pedestrians": {"waiting_or_crossing": peds, "vulnerable_count": vulnerable},
         "queues": {"total_cars": stopped + 5, "stopped_cars": stopped},
         "metrics": {"congestion": congestion},
     }
@@ -128,6 +151,23 @@ class TestCorrectFinalDecision:
         ev = correct_final_decision(_state(cycle=40, peds=1), _plan(10, 10, 5), _eval("자동 적용"))
         assert ev["decision_recommendation"] == "재계획 필요"
         assert "6초 미만" in ev["reason"]
+
+    def test_vulnerable_pedestrian_with_ped_green_under_10_forces_replan(self):
+        ev = correct_final_decision(_state(cycle=40, peds=2, vulnerable=1), _plan(10, 10, 8), _eval("자동 적용"))
+        assert ev["decision_recommendation"] == "재계획 필요"
+        assert "교통약자" in ev["reason"] and "10초 미만" in ev["reason"]
+
+    def test_vulnerable_pedestrian_with_ped_green_10_is_left_alone(self):
+        ev_in = _eval("운영자 승인 필요")
+        snapshot = copy.deepcopy(ev_in)
+        ev = correct_final_decision(_state(cycle=40, peds=2, vulnerable=1), _plan(10, 10, 10), ev_in)
+        assert ev == snapshot
+
+    def test_missing_vulnerable_count_defaults_to_zero(self):
+        state = _state(cycle=40, peds=2)
+        del state["pedestrians"]["vulnerable_count"]
+        ev = correct_final_decision(state, _plan(10, 10, 6), _eval("운영자 승인 필요"))
+        assert ev["decision_recommendation"] == "운영자 승인 필요"
 
     def test_no_pedestrians_heavy_queue_high_congestion_forces_auto_apply(self):
         ev = correct_final_decision(_state(cycle=20, peds=0, stopped=25, congestion=0.9), _plan(12, 8, 0), _eval("재계획 필요"))
