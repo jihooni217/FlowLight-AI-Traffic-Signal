@@ -193,7 +193,7 @@ input[type="range"]:disabled { opacity: 0.35; }
 .panel.advanced[open] summary::before { content: '▾ '; }
 .panel.advanced .sub { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); }
 .panel.advanced h3 { font-size: 0.9rem; color: #fff; margin-bottom: 0.5rem; }
-.mode-note { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; }
+.mode-note { display: block; color: var(--text-muted); font-weight: 400; font-size: 0.75rem; }
 .sidebar .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: -0.6rem; margin-bottom: 0.25rem; }
 
 #ai-floating-panel {
@@ -240,7 +240,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                     </div>
                 </div>
                 <div class="slider-group mt-2">
-                    <label>교통량 (대/초): <span id="val-spawn">3</span> <span id="spawn-mode-note" class="mode-note" style="display:none">· 프로파일 모드에서는 사용 안 함</span></label>
+                    <label>교통량 (대/초): <span id="val-spawn">3</span> <span id="spawn-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 사용 안 함</span></label>
                     <input type="range" id="sim-spawn-rate" min="0" max="6" step="1" value="3">
                     <label>보행자 (명/초): <span id="val-ped">0</span></label>
                     <input type="range" id="sim-ped-rate" min="0" max="2" step="1" value="0">
@@ -250,7 +250,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <input type="range" id="sim-max-cars" min="1" max="400" step="1" value="150">
                     <label>최고 속도 (px/s): <span id="val-speed">60</span></label>
                     <input type="range" id="sim-max-speed" min="20" max="120" step="5" value="60">
-                    <label>격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드에서는 3x3 고정</span></label>
+                    <label>격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 3x3 고정</span></label>
                     <input type="range" id="sim-grid-size" min="2" max="6" step="1" value="4">
                 </div>
             </section>
@@ -268,7 +268,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                         <input type="range" id="sim-demand-hour" min="0" max="23" step="1" value="8">
                     </div>
                     <label class="toggle-label mt-2">
-                        <input type="checkbox" id="chk-demand-autohour"> 자동 진행 (<span id="val-demand-secs">120</span>초마다 다음 시간대)
+                        <input type="checkbox" id="chk-demand-autohour"> <span>시간대 자동 진행 (<span id="val-demand-secs">120</span>초마다)</span>
                     </label>
                     <table class="demand-table">
                         <thead><tr><th>접근로</th><th>수요<br><small>대/시</small></th><th>발생률<br><small>대/초</small></th><th>진입<br><small>60초</small></th><th>손실</th><th>대기</th></tr></thead>
