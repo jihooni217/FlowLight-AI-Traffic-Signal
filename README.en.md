@@ -42,16 +42,25 @@ The repository is being turned into an official Upstage demo and tutorial. Two r
 
 ---
 
-## 📊 AI Performance Comparison
+## 📊 Before and after AI
 
-Fixed-time signals and FlowLight's AI plan under the same conditions.
+The same seed builds the same state, then **fixed-time signals** and **the plan Solar Pro 4 produced** each run for 30 seconds. The only difference between the two runs is the green times.
 
-| Before AI | After AI |
+| Before AI (fixed signal) | After AI (12 s / 8 s / 0 s applied) |
 |----------|---------|
 | <img src="docs/flowlight_before_ai.gif" width="100%"> | <img src="docs/flowlight_after_ai.gif" width="100%"> |
 
-> The AI analyses the situation, adjusts the green times, and only a verified plan is applied to the simulation.
-> These clips were recorded on the previous version (Solar Pro 3, manual traffic mode). The current UI adds a progress panel and a demand input panel.
+| Metric (after 30 s) | Fixed Signal | FlowLight AI | Change |
+|:--------|-------------:|-------------:|------------:|
+| 🚗 Stopped vehicles | **34** | **21** | **⬇ 38.2%** |
+| 🚦 Throughput (last minute) | **106** | **123** | **⬆ 16.0%** |
+| 📈 Congestion index | **0.93** | **0.73** | **⬇ 21.1%** |
+
+- Setup: manual mode, 4x4 grid, 5 veh/s, seed 20260702. At the split (120 s warm-up): 49 cars, 33 stopped, congestion 0.94.
+- That state was sent to the real Solar Pro 4: plan 12 s north-south / 8 s east-west / 0 s pedestrian, no Guardrail correction, score 88, final decision auto apply.
+- 30-second means: stopped 33.4 → 28.6, congestion 0.915 → 0.857. Instantaneous values swing with the signal cycle, so the means are listed too.
+- In manual mode, applying a plan normally halves the inflow for 120 s. That relief was switched off right after applying so both runs saw identical demand.
+- The method matches the built-in A/B check under Advanced settings: same seed, fixed 1/30 s step, same warm-up, then branch.
 
 ---
 
@@ -62,6 +71,8 @@ The pipeline runs **traffic data → simulator → FastAPI → multi-agent → G
 <p align="center">
   <img src="docs/system_architecture.png" width="100%">
 </p>
+
+> "CityFlow" in the banner and in this figure means the repository's own simulator (`app/index.html`), and "Solar API" is now Solar Pro 4. The figures date from the first version.
 
 This is how traffic data travels to the agents. Hourly volume only ever becomes an arrival rate. The number of waiting cars is computed by the simulator.
 
@@ -98,7 +109,7 @@ public traffic CSV ─(app/traffic_data.py: normalise · lane correction · veh/
 
 # 🤖 How the AI decides
 
-FlowLight is a **multi-agent workflow**: analyse the situation, plan the signal, grade the plan.
+FlowLight is a **multi-agent workflow**: analyse the situation, plan the signal, grade the plan. The Guardrail runs right after planning and before evaluation.
 
 <p align="center">
   <img src="docs/ai_decision_process.png" width="100%">
@@ -161,20 +172,17 @@ These rules override the LLM's decision. They mirror the auto-apply precondition
 
 # 📊 Results
 
-## Before and after AI (previous version)
+The before/after comparison is in the [Before and after AI](#-before-and-after-ai) section above.
 
-Fixed-time control against AI-adaptive control on **the same scenario and the same initial state**.
-This experiment dates from the Solar Pro 3 / manual traffic mode version.
+<details>
+<summary>Previous version (Solar Pro 3, July 2026)</summary>
+
+Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8%), throughput 107 → 115 veh/min (+7.5%), congestion index 1.00 → 0.76 (-24.0%).
 
 <p align="center">
   <img src="docs/experiment_results.png" width="100%">
 </p>
-
-| Metric | Fixed Signal | FlowLight AI | Improvement |
-|:--------|-------------:|-------------:|------------:|
-| 🚗 Waiting Vehicles | **18** | **13** | **⬇ 27.8%** |
-| 🚦 Throughput | **107** | **115** | **⬆ 7.5%** |
-| 📈 Congestion Index | **1.00** | **0.76** | **⬇ 24.0%** |
+</details>
 
 ## Live API verification (solar-pro4-260806, 2026-09-10)
 
@@ -184,6 +192,7 @@ This experiment dates from the Solar Pro 3 / manual traffic mode version.
 | Legacy input, `json_schema` | 3/3 runs 200 · `stop`, schema compliant, same result, 15.1 s total |
 | Input with per-approach state, `json_schema` | main direction "north-south", plan 14/6/0 → Guardrail corrected to 12/8/0, score 88, auto apply, 24.6 s total |
 | Run from the profile-mode UI (9 cars, 2 queued on N, saturation 1.2) | main direction "N", plan 12/8/0, score 82, operator approval → applied manually, congestion index 0.61 → 0.35 |
+| Manual mode 4x4, 49 cars, 33 stopped (the split state of the before/after GIFs) | plan 12/8/0, no Guardrail correction, score 88, auto apply → stopped 34 → 21 after 30 s |
 
 Reasoning stayed off (`reasoning_effort` not sent, 0 reasoning tokens). Response times depend on the network.
 Cases where the Guardrail actually corrected a real Solar Pro 4 plan:
