@@ -123,6 +123,12 @@ input[type="range"]:disabled { opacity: 0.35; }
 .color-box { width: 12px; height: 12px; border-radius: 2px; }
 .log-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
 .log-overlay.hidden { display: none; }
+.help-body { padding: 1rem 1.25rem 1.25rem; color: var(--text-main); font-size: 0.92rem; line-height: 1.7; overflow-y: auto; }
+.help-body ol { padding-left: 1.3rem; margin: 0.5rem 0 0.75rem; }
+.help-body li { margin-bottom: 0.45rem; }
+.help-body b { color: #fff; }
+.help-body code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+.btn.small { flex: 0 0 auto; padding: 0.3rem 0.7rem; font-size: 0.8rem; }
 .log-content { background: #111; border: 1px solid #444; border-radius: 8px; width: 80%; max-width: 700px; max-height: 80%; display: flex; flex-direction: column; }
 .log-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #333; }
 .btn-close { background: transparent; color: #999; border: none; font-size: 1.5rem; cursor: pointer; }
@@ -224,6 +230,9 @@ input[type="range"]:disabled { opacity: 0.35; }
         <aside class="sidebar">
             <h1>FlowLight</h1>
             <p class="subtitle">CityFlow v2 시뮬레이터 · Solar Pro 4 신호 계획</p>
+            <div class="btn-group" style="margin-top:-0.25rem;">
+                <button id="btn-help" class="btn outline small">사용법 보기</button>
+            </div>
             <section class="panel controls">
                 <h2>시뮬레이션 제어</h2>
                 <div class="btn-group">
@@ -437,6 +446,31 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <span class="l-item"><span class="color-box" style="background:#38bdf8"></span>장애인(휠체어)</span>
             </div>
         </main>
+    </div>
+
+    <!-- 처음 열었을 때 한 번 보여 주는 사용법. 사이드바의 "사용법 보기" 버튼으로 다시 열 수 있다. -->
+    <div id="help-overlay" class="log-overlay hidden">
+        <div class="log-content" style="max-width:640px">
+            <div class="log-header">
+                <h3>FlowLight 사용법</h3>
+                <button id="btn-close-help" class="btn-close">&times;</button>
+            </div>
+            <div class="help-body">
+                <p>실제 교통량으로 차량을 만들고, Solar Pro 4 Agent 세 개가 신호 계획을 세우는 데모입니다. 아래 순서대로 눌러 보세요.</p>
+                <ol>
+                    <li><b>백엔드 켜기</b> · 터미널에서 <code>uvicorn app.main:app --reload</code>. 이 화면은 <code>127.0.0.1:8000</code> 을 호출합니다.</li>
+                    <li><b>Play</b> · 시뮬레이션을 시작합니다. 배속은 4x 가 보기 편합니다.</li>
+                    <li><b>교통 수요 입력 → 실데이터 프로파일</b> · 격자가 3x3(교차로 1개)이 되고 시간대별 실제 교통량으로 차량이 들어옵니다. 표의 "수요"는 입력값, "대기"는 시뮬레이션 결과입니다.</li>
+                    <li><b>AI 분석</b> · 왼쪽 위 패널에서 5단계 진행을 보고, 리포트에서 Agent 가 실제로 돌려준 분석·계획·평가를 읽습니다.</li>
+                    <li><b>권장값 적용</b> · 판단이 "자동 적용"이면 바로 적용되고, 아니면 이 버튼으로 적용합니다. 15초 뒤 적용 효과가 표시됩니다.</li>
+                </ol>
+                <p class="hint">교차로 유형, 데이터 내보내기, 내장 Webster 최적화는 사이드바의 "고급 설정"에 있습니다.</p>
+                <label class="toggle-label mt-2"><input type="checkbox" id="chk-help-hide" checked> 다음에 열 때 자동으로 보지 않기</label>
+                <div class="btn-group mt-2">
+                    <button id="btn-help-start" class="btn primary">시작하기</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="log-overlay" class="log-overlay hidden">
@@ -2700,6 +2734,24 @@ SimController.prototype._initDOM = function() {
         }
     };
     document.getElementById('btn-close-log').onclick = function(){ document.getElementById('log-overlay').classList.add('hidden'); };
+
+    // ===== 사용법 안내 (처음 열 때 한 번, 이후 "사용법 보기" 버튼) =====
+    var HELP_SEEN_KEY = 'flowlight_help_seen';
+    var helpOverlay = document.getElementById('help-overlay');
+    function showHelp() { helpOverlay.classList.remove('hidden'); }
+    function hideHelp() {
+        helpOverlay.classList.add('hidden');
+        try {   // localStorage 는 file:// 이나 사생활 보호 모드에서 막힐 수 있어 실패해도 무시한다
+            if (document.getElementById('chk-help-hide').checked) localStorage.setItem(HELP_SEEN_KEY, '1');
+            else localStorage.removeItem(HELP_SEEN_KEY);
+        } catch (e) {}
+    }
+    document.getElementById('btn-help').onclick = showHelp;
+    document.getElementById('btn-close-help').onclick = hideHelp;
+    document.getElementById('btn-help-start').onclick = hideHelp;
+    var helpSeen = false;
+    try { helpSeen = localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch (e) {}
+    if (!helpSeen) showHelp();
     
     btnApply.onclick = function() {
         console.log("권장값 적용 버튼 클릭!");
