@@ -52,6 +52,11 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .radio-group { display: flex; flex-direction: column; gap: 0.4rem; }
 .radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
 .mt-2 { margin-top: 0.75rem; }
+.demand-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+.demand-table th, .demand-table td { padding: 2px 3px; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.demand-table th { color: #fff; font-weight: 600; }
+.demand-table td:first-child, .demand-table th:first-child { text-align: left; color: #fff; }
+input[type="range"]:disabled { opacity: 0.35; }
 .toggle-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
 .speed-group {
     display: flex;
@@ -241,6 +246,34 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                 </div>
             </section>
 
+            <section class="panel demand-panel">
+                <h2>교통 수요 입력</h2>
+                <div class="radio-group" id="demand-mode">
+                    <label><input type="radio" name="dmode" value="manual" checked> 수동 (교통량 슬라이더)</label>
+                    <label><input type="radio" name="dmode" value="profile"> 실데이터 프로파일 (교차로 1개, 3x3)</label>
+                </div>
+                <div id="demand-profile-box" class="mt-2" style="display:none">
+                    <p class="hint" id="demand-profile-meta">프로파일 불러오는 중...</p>
+                    <div class="slider-group">
+                        <label>시간대: <span id="val-demand-hour">08</span>시</label>
+                        <input type="range" id="sim-demand-hour" min="0" max="23" step="1" value="8">
+                    </div>
+                    <label class="toggle-label mt-2">
+                        <input type="checkbox" id="chk-demand-autohour"> 시간대 자동 진행 (<span id="val-demand-secs">120</span>초/시간)
+                    </label>
+                    <table class="demand-table">
+                        <thead><tr><th>접근로</th><th>수요<br>대/시</th><th>차로</th><th>발생률<br>대/초</th><th>진입<br>60초</th><th>손실</th></tr></thead>
+                        <tbody>
+                            <tr id="demand-row-N"><td>N 북측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-S"><td>S 남측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-E"><td>E 동측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-W"><td>W 서측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="hint mt-2">수요(대/시)는 입력값이고 발생률은 차로당 값입니다. 대기 차량 수는 시뮬레이션이 계산한 결과이며 여기 값이 아닙니다.<br>손실 = 진입로가 막혀 만들지 못한 차량 수.</p>
+                </div>
+            </section>
+
             <section class="panel control-types">
                 <h2>교차로 제어 유형</h2>
                 <p class="hint">유형을 선택하고 교차로를 클릭하세요.</p>
@@ -410,6 +443,7 @@ var COL_GREEN = '#22c55e';
 var COL_YELLOW = '#eab308';
 var COL_RED = '#ef4444';
 var COL_LEFT_ARROW = '#a855f7';
+var API_BASE = 'http://127.0.0.1:8000';   // FastAPI 백엔드 (Agent 스트림, 교통 수요 프로파일)
 
 // ===== 보행자 상수 =====
 var PED_TYPES = [
@@ -2072,6 +2106,16 @@ function SimController() {
     this.dragStartY = 0;
     this.logger = null;
     this.analyzer = null;
+    // 교통 수요 입력 모드 (6-3): 'manual' = 교통량 슬라이더(기존), 'profile' = 백엔드 실데이터 프로파일
+    this.demandMode = 'manual';
+    this.profile = null;          // GET /api/traffic/profile 응답
+    this.profileHour = 8;
+    this.currentDemand = null;    // 선택된 시간대의 {hour, volume, arrival_rate_per_sec}
+    this.approachEdges = null;    // {N:[edge], S:[edge], E:[edge], W:[edge]}
+    this.demandSpawn = {};        // 접근로별 발생률·다음 도착 시각·진입/손실 카운터
+    this.autoHour = false;
+    this.secsPerHour = 120;       // 시간대 자동 진행 시 시간대 하나가 지속되는 시뮬레이션 초
+    this.hourAcc = 0;
     this._initDOM();
     this.reset();
 }
@@ -2132,6 +2176,55 @@ SimController.prototype._initDOM = function() {
     bindSlider('sim-max-speed','maxSpeed','val-speed');
     bindSlider('sim-cycle','cycleLength','val-cycle');
     bindSlider('sim-grid-size','gridSize','val-grid');
+
+    // ===== 교통 수요 입력 모드 (6-3) =====
+    var spawnSlider = document.getElementById('sim-spawn-rate');
+    var profileBox = document.getElementById('demand-profile-box');
+    var hourSlider = document.getElementById('sim-demand-hour');
+    var autoHourChk = document.getElementById('chk-demand-autohour');
+    async function setDemandMode(mode) {
+        if (mode === 'profile') {
+            if (!self.profile) {
+                var ok = await self.loadTrafficProfile();
+                if (!ok) {
+                    document.querySelector('input[name="dmode"][value="manual"]').checked = true;
+                    profileBox.style.display = 'block';   // 오류 메시지가 보이도록
+                    return;
+                }
+            }
+            self.demandMode = 'profile';
+            profileBox.style.display = 'block';
+            spawnSlider.disabled = true;
+            // 프로파일은 교차로 1개·접근로 4개를 기술하므로 격자를 3x3 으로 맞춘다 (진입 엣지 4개 = N/S/E/W).
+            if (self.gridSize !== 3) {
+                self.gridSize = 3;
+                document.getElementById('sim-grid-size').value = 3;
+                document.getElementById('val-grid').textContent = 3;
+            }
+            // 첨두 시간대에 인위적 상한이 걸리지 않도록 최대 차량을 400 으로 올린다.
+            if (self.maxCars < 400) {
+                self.maxCars = 400;
+                document.getElementById('sim-max-cars').value = 400;
+                document.getElementById('val-maxcars').textContent = 400;
+            }
+        } else {
+            self.demandMode = 'manual';
+            profileBox.style.display = 'none';
+            spawnSlider.disabled = false;
+        }
+        self.reset();
+    }
+    var modeRadios = document.querySelectorAll('input[name="dmode"]');
+    for (var mi = 0; mi < modeRadios.length; mi++) {
+        modeRadios[mi].onchange = function() { if (this.checked) setDemandMode(this.value); };
+    }
+    hourSlider.oninput = function() {
+        document.getElementById('val-demand-hour').textContent = pad2(parseInt(hourSlider.value));
+        self.applyProfileHour(parseInt(hourSlider.value));
+        self.hourAcc = 0;
+    };
+    autoHourChk.onchange = function() { self.autoHour = autoHourChk.checked; self.hourAcc = 0; };
+    document.getElementById('val-demand-secs').textContent = self.secsPerHour;
 
     // 확대/축소 (휠)
     this.canvas.addEventListener('wheel', function(ev) {
@@ -2341,7 +2434,7 @@ SimController.prototype._initDOM = function() {
         };
 
         try {
-            var response = await fetch('http://127.0.0.1:8000/api/agent/stream', {
+            var response = await fetch(API_BASE + '/api/agent/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -2561,13 +2654,16 @@ SimController.prototype._initDOM = function() {
         self.jc.aiPedGreenSec = Number(plan.pedestrian_green_sec);
 
         // AI 적용 후 정체 완화 모드: 새 차량 유입을 잠시 줄여 기존 정체 차량을 먼저 배출
-        self.aiControlApplied = true;
-        self.aiReliefUntil = self.simTime + 120;
-        self.jc.aiReliefMode = true;
-        self.originalSpawnRate = self.spawnRate;
-        self.spawnRate = Math.max(2, Math.floor(self.originalSpawnRate * 0.5));
-        document.getElementById('val-spawn').textContent = self.spawnRate;
-        document.getElementById('sim-spawn-rate').value = self.spawnRate;
+        // 실데이터 프로파일 모드에서는 입력 수요를 임의로 줄이면 안 되므로 적용하지 않는다.
+        if (self.demandMode !== 'profile') {
+            self.aiControlApplied = true;
+            self.aiReliefUntil = self.simTime + 120;
+            self.jc.aiReliefMode = true;
+            self.originalSpawnRate = self.spawnRate;
+            self.spawnRate = Math.max(2, Math.floor(self.originalSpawnRate * 0.5));
+            document.getElementById('val-spawn').textContent = self.spawnRate;
+            document.getElementById('sim-spawn-rate').value = self.spawnRate;
+        }
 
         console.log("AI pedestrian control:", self.jc.aiPedGreenSec);
 
@@ -2841,6 +2937,7 @@ SimController.prototype.reset = function() {
     this.logger.sampleInterval = parseFloat(document.getElementById('sim-sample-int').value);
     this.analyzer = new Analyzer(this.network, this.jc, this.logger);
     this.optimizeInterval = parseFloat(document.getElementById('sim-opt-int').value);
+    this._initDemandSpawn();
     this.cam = {x: 0, y: 0, scale: 1.0};
     window.dispatchEvent(new Event('resize'));
     if (!this.running) this.renderer.render(this.network, this.jc, this.cam);
@@ -2872,7 +2969,6 @@ SimController.prototype._update = function(dt, skipUI) {
             this.aiControlApplied = false;
             this.jc.aiReliefMode = false;
         }
-    this.spawnAcc += this.spawnRate * dt;
     var stoppedForSpawn = 0;
     for (var si = 0; si < this.cars.length; si++) {
         if (this.cars[si].v < 3) stoppedForSpawn++;
@@ -2885,11 +2981,26 @@ SimController.prototype._update = function(dt, skipUI) {
         this.cars.length >= this.maxCars * 0.8 &&
         stoppedRatio >= 0.75;
 
-    while (this.spawnAcc >= 1.0) {
-        this.spawnAcc -= 1.0;
+    if (this.demandMode === 'profile') {
+        // 실데이터 프로파일: 접근로별 발생률(차로당 대/초)로 Poisson 도착 생성
+        this._spawnFromProfile(gridlockRisk);
+        if (!skipUI && this.autoHour && this.profile) {
+            this.hourAcc += dt;
+            if (this.hourAcc >= this.secsPerHour) {
+                this.hourAcc -= this.secsPerHour;
+                var hs = this.profile.available_hours;
+                this.applyProfileHour(hs[(hs.indexOf(this.profileHour) + 1) % hs.length]);
+            }
+        }
+    } else {
+        // 수동: 네트워크 전체 발생률(슬라이더)을 누적해 무작위 진입로에 생성 (기존 방식)
+        this.spawnAcc += this.spawnRate * dt;
+        while (this.spawnAcc >= 1.0) {
+            this.spawnAcc -= 1.0;
 
-        if (!gridlockRisk && this.cars.length < this.maxCars) {
-            this._spawnCar();
+            if (!gridlockRisk && this.cars.length < this.maxCars) {
+                this._spawnCar();
+            }
         }
     }
     this.jc.update(dt, this.simTime, this.cycleLength);
@@ -2974,6 +3085,7 @@ SimController.prototype._update = function(dt, skipUI) {
     }
     var n = this.cars.length;
     var sr = n > 0 ? (sumV / n) / this.maxSpeed : 0;
+    this._renderDemandTable();
     document.getElementById('stat-cars').textContent = n;
     document.getElementById('stat-peds').textContent = this.pedSys.peds.length;
     document.getElementById('stat-stopped').textContent = stopped;
@@ -2997,13 +3109,139 @@ SimController.prototype._update = function(dt, skipUI) {
             COL_RED;
     }
 };
+// 수동 모드: 무작위 진입로에 1대 생성 (기존 동작)
 SimController.prototype._spawnCar = function() {
-    var edge = this.network.getRandomSourceEdge();
-    if (!edge) return;
-    if (edge.cars.length > 0 && edge.cars[0].s < 15) return;
+    return this._spawnCarOn(this.network.getRandomSourceEdge());
+};
+// 지정한 진입 엣지에 1대 생성. 진입로 첫 차가 15px 미만이면 생성하지 못하고 false 를 돌려준다.
+SimController.prototype._spawnCarOn = function(edge) {
+    if (!edge) return false;
+    if (edge.cars.length > 0 && edge.cars[0].s < 15) return false;
     var route = this.network.findRandomRoute(edge);
     if (route.length > 0) {
         this.cars.push(new Car(edge, this.maxSpeed, this.maxSpeed, route, this.simTime));
+        return true;
+    }
+    return false;
+};
+
+// ===== 실데이터 수요 프로파일 모드 (6-3) =====
+// 백엔드 GET /api/traffic/profile 이 준 접근로별 발생률(차로당 대/초)로 N/S/E/W 진입 엣지에 차량을 만든다.
+// 도착 간격은 지수분포(Poisson 도착)이고 시드 고정 rand() 만 쓰므로 A/B 검증의 재현성이 유지된다.
+// 여기서 만드는 것은 "도착"뿐이다. 대기 차량 수(queue)는 신호와 차간 상호작용의 결과로 시뮬레이터가 계산한다.
+var APPROACH_KEYS = ['N', 'S', 'E', 'W'];
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function nextArrivalGap(rate) {
+    if (!(rate > 0)) return Infinity;              // 발생률 0 이면 생성 없음
+    return -Math.log(1 - rand()) / rate;           // 지수분포 (평균 1/rate 초)
+}
+
+SimController.prototype.loadTrafficProfile = async function() {
+    var metaEl = document.getElementById('demand-profile-meta');
+    metaEl.textContent = '프로파일 불러오는 중...';
+    try {
+        var resp = await fetch(API_BASE + '/api/traffic/profile');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        this.profile = await resp.json();
+    } catch (err) {
+        this.profile = null;
+        metaEl.textContent = '프로파일을 불러오지 못했습니다: ' + err.message + ' (FastAPI 서버가 켜져 있는지 확인)';
+        return false;
+    }
+    var m = this.profile.meta;
+    metaEl.textContent = m.site_name + ' · ' + m.date + ' (' + m.weekday + ') · 차로 N' + m.lanes.N +
+        '/S' + m.lanes.S + '/E' + m.lanes.E + '/W' + m.lanes.W + ' · ' + m.approach_naming;
+    var hours = this.profile.available_hours;
+    var slider = document.getElementById('sim-demand-hour');
+    slider.min = Math.min.apply(null, hours);
+    slider.max = Math.max.apply(null, hours);
+    if (hours.indexOf(this.profileHour) < 0) this.profileHour = hours[0];
+    slider.value = this.profileHour;
+    document.getElementById('val-demand-hour').textContent = pad2(this.profileHour);
+    return true;
+};
+
+// 진입 엣지(테두리 → 내부)를 접근로로 분류한다. 3x3 이면 접근로당 1개.
+// 격자가 더 크면 같은 변의 진입로 여러 개가 그 접근로의 수요를 나눠 받는다. 2x2 는 진입 엣지 정의가 달라 지원하지 않는다.
+SimController.prototype.mapApproachEdges = function() {
+    var N = this.network.gridSize, sp = this.network.spacing;
+    var map = { N: [], S: [], E: [], W: [] };
+    for (var i = 0; i < this.network.edges.length; i++) {
+        var e = this.network.edges[i];
+        if (e.isArc || !e.from.isBoundary || e.to.isBoundary) continue;
+        var f = e.from;
+        if (f.y === sp) map.N.push(e);            // 위쪽 테두리에서 남쪽으로 진입 = 북측 접근로
+        else if (f.y === N * sp) map.S.push(e);
+        else if (f.x === N * sp) map.E.push(e);
+        else if (f.x === sp) map.W.push(e);
+    }
+    this.approachEdges = map;
+    return map;
+};
+
+SimController.prototype._initDemandSpawn = function() {
+    this.demandSpawn = {};
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        this.demandSpawn[APPROACH_KEYS[k]] = { rate: 0, nextAt: null, spawned: 0, lost: 0, recent: [] };
+    }
+    this.hourAcc = 0;
+    if (this.demandMode === 'profile') {
+        this.mapApproachEdges();
+        this.applyProfileHour(this.profileHour);
+    }
+};
+
+SimController.prototype.applyProfileHour = function(hour) {
+    if (!this.profile) return;
+    var entry = null;
+    for (var i = 0; i < this.profile.hours.length; i++) {
+        if (this.profile.hours[i].hour === hour) { entry = this.profile.hours[i]; break; }
+    }
+    if (!entry) return;
+    this.profileHour = hour;
+    this.currentDemand = entry;
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var st = this.demandSpawn[APPROACH_KEYS[k]];
+        st.rate = entry.arrival_rate_per_sec[APPROACH_KEYS[k]] || 0;
+        st.nextAt = null;   // 다음 _update 에서 새 발생률로 다시 뽑는다 (A/B: setSeed 이후에 뽑히도록)
+    }
+    document.getElementById('val-demand-hour').textContent = pad2(hour);
+    document.getElementById('sim-demand-hour').value = hour;
+};
+
+SimController.prototype._spawnFromProfile = function(gridlockRisk) {
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k];
+        var st = this.demandSpawn[a];
+        var edges = this.approachEdges ? this.approachEdges[a] : [];
+        if (st.nextAt === null) st.nextAt = this.simTime + nextArrivalGap(st.rate);
+        var guard = 0;
+        while (this.simTime >= st.nextAt && guard++ < 50) {
+            st.nextAt += nextArrivalGap(st.rate);
+            var ok = false;
+            if (edges.length > 0 && !gridlockRisk && this.cars.length < this.maxCars) {
+                var edge = edges.length === 1 ? edges[0] : edges[Math.floor(rand() * edges.length)];
+                ok = this._spawnCarOn(edge);
+            }
+            if (ok) { st.spawned++; st.recent.push(this.simTime); }
+            else { st.lost++; }   // 진입로 차단·상한·gridlock 으로 만들지 못한 수요
+        }
+        while (st.recent.length > 0 && this.simTime - st.recent[0] > 60) st.recent.shift();
+    }
+};
+
+SimController.prototype._renderDemandTable = function() {
+    if (this.demandMode !== 'profile' || !this.currentDemand || !this.profile) return;
+    var lanes = this.profile.meta.lanes;
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k], st = this.demandSpawn[a];
+        var row = document.getElementById('demand-row-' + a);
+        if (!row) continue;
+        row.cells[1].textContent = this.currentDemand.volume[a];
+        row.cells[2].textContent = lanes[a];
+        row.cells[3].textContent = st.rate.toFixed(3);
+        row.cells[4].textContent = st.recent.length;
+        row.cells[5].textContent = st.lost;
     }
 };
 
@@ -3025,6 +3263,7 @@ SimController.prototype.softReset = function() {
     for (var r = it.next(); !r.done; r = it.next()) { r.value.phaseIdx = 0; r.value.t = 0; }
     this.pedSys.clear();
     this.logger.buffer.length = 0;
+    this._initDemandSpawn();   // 프로파일 모드: 도착 타이머·카운터 초기화 (A/B 두 단계가 같은 시드로 같은 도착을 만들도록)
 };
 SimController.prototype._collectKPI = function(congSum, congN) {
     var trips = this.jc.completedTrips;
