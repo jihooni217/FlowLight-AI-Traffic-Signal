@@ -162,14 +162,14 @@ def eval_ok(decision="운영자 승인 필요", score=78, **overrides):
 # --------------------------------------------------------------------------
 @pytest.fixture
 def frontend_scenario():
-    """Exactly the JSON the HTML frontend POSTs (see (MAIN) cityflow_final.html ~line 2250)."""
+    """Exactly the JSON the HTML frontend (app/index.html, the scenario builder in the AI 분석 handler) POSTs."""
     return {
         "intersection_id": "simulation-current",
         "tick": 348,
         "signals": {"cycle_sec": 20},
         "queues": {"total_cars": 28, "stopped_cars": 19},
         "pedestrians": {"waiting_or_crossing": 0, "vulnerable_count": 0},
-        "context": {"source": "cityflow_final_html", "grid_size": 4},
+        "context": {"source": "flowlight_index_html", "grid_size": 4},
         "metrics": {"congestion": 0.894, "throughput_per_min": 125},
     }
 

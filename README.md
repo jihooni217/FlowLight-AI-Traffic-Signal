@@ -12,13 +12,15 @@
 
 **FastAPI · SSE · Solar Pro 4 · Structured Outputs · Guardrail · Traffic Simulator**
 
+**한국어** · [English](README.en.md)
+
 </div>
 
 ---
 
 ## 🎬 Live Demo
 
-FlowLight의 전체 시뮬레이션 실행 화면입니다.
+사용법 안내 → 실데이터 프로파일 → AI 분석 → 신호 적용까지의 실행 화면입니다.
 
 <p align="center">
   <img src="docs/flowlight_live_demo.gif" width="100%">
@@ -59,6 +61,12 @@ FlowLight는 **교통 데이터 → 시뮬레이터 → FastAPI → Multi-Agent 
 
 <p align="center">
   <img src="docs/system_architecture.png" width="100%">
+</p>
+
+교통량 데이터가 Agent 까지 흘러가는 경로는 다음과 같습니다. 교통량(대/시)은 발생률로만 바뀌고, 대기 차량 수는 시뮬레이터가 계산합니다.
+
+<p align="center">
+  <img src="docs/data_flow.png" width="100%">
 </p>
 
 ```
@@ -146,7 +154,8 @@ LLM 판단을 다음 규칙이 덮어씁니다. 프롬프트의 자동 적용 �
   - 수동: 교통량 슬라이더(네트워크 전체 대/초)로 무작위 진입로에 차량 생성
   - 실데이터 프로파일: 백엔드 프로파일의 접근로별 발생률로 3x3 교차로의 N/S/E/W 진입로에 Poisson 도착 생성, 시간대 선택·자동 진행, 접근로별 수요·발생률·진입·손실·대기 표
 - AI 분석 진행 패널(5단계, 단계별 소요 시간), Agent 실제 출력 표시, Guardrail 보정 전후 표시
-- Webster 기반 로컬 최적화기와 시드 고정 A/B 검증 하네스(LLM 과 무관)
+- 처음 열면 다섯 단계 사용법 안내가 뜨고, 사이드바의 "사용법 보기"로 다시 열 수 있음
+- 교차로 유형, 데이터 내보내기, Webster 기반 로컬 최적화기와 시드 고정 A/B 검증(LLM 과 무관)은 "고급 설정" 접기에 정리
 
 ---
 
@@ -176,8 +185,14 @@ LLM 판단을 다음 규칙이 덮어씁니다. 프롬프트의 자동 적용 �
 | 기존 입력, `json_object` | 3회 모두 200·`stop`, 12/8/0, 88점, 자동 적용, 전체 15.4초 |
 | 기존 입력, `json_schema` | 3회 모두 200·`stop`, Schema 준수, 동일 결과, 전체 15.1초 |
 | 접근로별 상태 포함 입력, `json_schema` | 주요 혼잡 방향 "남북", 계획 14/6/0 → Guardrail 이 12/8/0 으로 보정, 88점, 자동 적용, 전체 24.6초 |
+| 프로파일 모드 화면에서 실행 (차량 9대, 북측 대기 2대·포화도 1.2) | 주요 혼잡 방향 "N", 계획 12/8/0, 82점, 운영자 승인 필요 → 수동 적용 후 정체 지수 0.61 → 0.35 |
 
 reasoning 은 켜지 않았습니다(`reasoning_effort` 미전송, reasoning 토큰 0). 응답 시간은 네트워크 상태에 따라 달라집니다.
+Guardrail 이 실제 Solar Pro 4 계획을 고친 사례는 다음과 같습니다.
+
+<p align="center">
+  <img src="docs/guardrail_cases.png" width="100%">
+</p>
 
 ---
 
@@ -208,26 +223,24 @@ FlowLight-AI-Traffic-Signal
 │   ├── main.py                     # FastAPI: SSE 파이프라인, 최종 판단 보정, 프로파일 엔드포인트
 │   ├── agents.py                   # Solar 클라이언트, 프롬프트 3개, JSON Schema 3개, Guardrail
 │   ├── traffic_data.py             # 공공 교통량 CSV → 정규화 프로파일 → 발생률
-│   ├── (MAIN) cityflow_final.html  # 시뮬레이터 + UI + 백엔드 연동 (현재 사용본)
-│   ├── cityflow_5_ai_backup.html   # 이전 버전 (참고용)
-│   └── cityflow_6_orignal.html     # AI 연동 전 원본 (참고용)
+│   └── index.html                  # 시뮬레이터 + UI + 백엔드 연동 (브라우저로 여는 파일)
 ├── data
 │   ├── README.md                   # 데이터 출처, 컬럼 매핑, 합성 예제 공식, 교체 절차
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
 ├── tests                           # 215개 (mock 214 + live 1, live 는 opt-in)
 ├── docs
+│   ├── screens/                    # 현재 UI 화면 (사용법, 메인, 프로파일 모드, 진행 패널, 리포트, 적용, 고급 설정)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
-│   ├── flowlight_before_ai.gif, flowlight_after_ai.gif
-│   ├── ai_decision_process.png, system_architecture.png, experiment_results.png
-│   ├── main.png, sse.png, ai_result.png, fastapi.png
+│   ├── system_architecture.png, data_flow.png, ai_decision_process.png, guardrail_cases.png
+│   ├── flowlight_before_ai.gif, flowlight_after_ai.gif, experiment_results.png   # 이전 버전 실험
 │   └── FlowLight_Final_Presentation.pdf
-├── README_v2.md                    # 포트폴리오용 README 작업 버전
-├── README_old.md                   # 초기 README 보관본
+├── LICENSE                         # MIT
 ├── .env.example
 ├── pytest.ini
 ├── requirements.txt
-└── README.md
+├── README.md                       # 한국어
+└── README.en.md                    # English
 ```
 
 ---
@@ -267,14 +280,15 @@ uvicorn app.main:app --reload
 
 ### 5. 프론트엔드 열기
 
-`app/(MAIN) cityflow_final.html` 파일을 브라우저에서 직접 엽니다. 프론트는 `http://127.0.0.1:8000` 의 백엔드를 호출하며, CORS 는 열려 있습니다.
+`app/index.html` 파일을 브라우저에서 직접 엽니다. 프론트는 `http://127.0.0.1:8000` 의 백엔드를 호출하며, CORS 는 열려 있습니다.
 
 ### 6. 데모 진행
 
-1. **Play** 로 시뮬레이션을 시작합니다.
-2. 사이드바 **교통 수요 입력** 에서 *실데이터 프로파일* 을 선택하면 격자가 3x3 으로 바뀌고, 시간대(0~23시)별 접근로 수요로 차량이 생성됩니다. 기본은 08시 첨두입니다.
-3. **AI 분석** 을 누르면 좌측 패널에 5단계 진행 상태가 표시되고, 리포트에 Agent 별 실제 출력·Guardrail 보정·평가 근거가 나타납니다.
-4. 최종 판단이 `자동 적용` 이면 신호가 자동 적용되고, 그 외에는 **권장값 적용** 으로 수동 적용할 수 있습니다.
+1. 처음 열면 다섯 단계 **사용법 안내** 가 뜹니다. 읽고 "시작하기"를 누릅니다. 사이드바의 "사용법 보기"로 다시 볼 수 있습니다.
+2. **Play** 로 시뮬레이션을 시작합니다. 배속은 4x 가 보기 편합니다.
+3. 사이드바 **교통 수요 입력** 에서 *실데이터 프로파일* 을 선택하면 격자가 3x3 으로 바뀌고, 시간대(0~23시)별 접근로 수요로 차량이 생성됩니다. 기본은 08시 첨두입니다.
+4. **AI 분석** 을 누르면 좌측 패널에 5단계 진행 상태가 표시되고, 리포트에 Agent 별 실제 출력·Guardrail 보정·평가 근거가 나타납니다.
+5. 최종 판단이 `자동 적용` 이면 신호가 자동 적용되고, 그 외에는 **권장값 적용** 으로 수동 적용할 수 있습니다. 15초 뒤 적용 전후 효과가 표시됩니다.
 
 ---
 
@@ -306,7 +320,7 @@ uvicorn app.main:app --reload
     }
   },
   "pedestrians": {"waiting_or_crossing": 0, "vulnerable_count": 0},
-  "context": {"source": "cityflow_final_html", "grid_size": 3, "demand_mode": "profile",
+  "context": {"source": "flowlight_index_html", "grid_size": 3, "demand_mode": "profile",
               "by_approach_scope": "intersection_approaches", "window_sec": 30},
   "metrics": {"congestion": 0.894, "throughput_per_min": 125},
   "demand": {
@@ -352,23 +366,47 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 
 # 📸 실행 화면
 
+모두 현재 버전(Solar Pro 4, 실데이터 프로파일 모드)에서 실제 API 호출로 캡처한 화면입니다.
+
+## 처음 열었을 때의 사용법 안내
+
+![사용법 안내](docs/screens/help.png)
+
 ## 메인 화면
 
-![메인 화면](docs/main.png)
+![메인 화면](docs/screens/main.png)
 
-## AI 스트리밍(SSE)
+## 실데이터 프로파일 모드
 
-![SSE](docs/sse.png)
+격자가 3x3 교차로로 바뀌고, 접근로별 수요(입력)와 대기(시뮬레이션 결과)가 한 표에 나란히 표시됩니다.
 
-## 신호 계획 생성 결과
+| 프로파일 모드 | 접근로별 수요·발생률·진입·손실·대기 |
+|---|---|
+| ![프로파일 모드](docs/screens/profile_mode.png) | ![수요 표](docs/screens/demand_table.png) |
 
-![AI Result](docs/ai_result.png)
+## AI 분석 진행 패널
 
-## FastAPI 로그
+| 2단계 진행 중 | 다섯 단계 완료 |
+|---|---|
+| ![진행 중](docs/screens/ai_progress.png) | ![완료](docs/screens/ai_progress_done.png) |
 
-![FastAPI](docs/fastapi.png)
+## 분석 리포트
 
-일부 화면은 이전 버전에서 촬영한 것으로, 현재 UI 에는 진행 상태 패널과 수요 입력 패널이 추가되어 있습니다.
+Agent 가 실제로 돌려준 `summary` / `explanation` / `reason` 과 Guardrail 검증 결과가 그대로 표시됩니다.
+
+![분석 리포트](docs/screens/report.png)
+
+## 신호 적용
+
+![적용 배너와 결과 패널](docs/screens/applied.png)
+
+## 고급 설정
+
+교차로 유형, 데이터 내보내기, 내장 Webster 최적화는 접기 안에 있습니다.
+
+<p align="center">
+  <img src="docs/screens/advanced.png" width="320">
+</p>
 
 ---
 
@@ -458,6 +496,12 @@ AI 결과를 **평가하고 검증한 뒤 서비스 흐름에 안전하게 연�
 - FastAPI와 SSE를 활용하여 AI의 분석 과정과 결과를 **실시간으로 사용자 화면에 전달**했습니다.
 - Guardrail과 JSON Validation을 통해 AI가 생성한 결과를 **그대로 적용하지 않고 검증 후 적용**하는 구조를 구현했습니다.
 - 실험 결과를 수치와 영상으로 함께 제시하는 것이 프로젝트 설득력에 중요하다는 점을 확인했습니다.
+
+---
+
+# 📄 라이선스
+
+MIT 라이선스입니다. [LICENSE](LICENSE) 를 참고하세요.
 
 ---
 
