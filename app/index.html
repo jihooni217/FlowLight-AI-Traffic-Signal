@@ -1,6 +1,4 @@
 
-cityflow_6.html
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -52,6 +50,11 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .radio-group { display: flex; flex-direction: column; gap: 0.4rem; }
 .radio-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
 .mt-2 { margin-top: 0.75rem; }
+.demand-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; }
+.demand-table th, .demand-table td { padding: 2px 3px; text-align: right; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.demand-table th { color: #fff; font-weight: 600; }
+.demand-table td:first-child, .demand-table th:first-child { text-align: left; color: #fff; }
+input[type="range"]:disabled { opacity: 0.35; }
 .toggle-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
 .speed-group {
     display: flex;
@@ -120,6 +123,12 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .color-box { width: 12px; height: 12px; border-radius: 2px; }
 .log-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
 .log-overlay.hidden { display: none; }
+.help-body { padding: 1rem 1.25rem 1.25rem; color: var(--text-main); font-size: 0.92rem; line-height: 1.7; overflow-y: auto; }
+.help-body ol { padding-left: 1.3rem; margin: 0.5rem 0 0.75rem; }
+.help-body li { margin-bottom: 0.45rem; }
+.help-body b { color: #fff; }
+.help-body code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-size: 0.85em; }
+.btn.small { flex: 0 0 auto; padding: 0.3rem 0.7rem; font-size: 0.8rem; }
 .log-content { background: #111; border: 1px solid #444; border-radius: 8px; width: 80%; max-width: 700px; max-height: 80%; display: flex; flex-direction: column; }
 .log-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #333; }
 .btn-close { background: transparent; color: #999; border: none; font-size: 1.5rem; cursor: pointer; }
@@ -158,17 +167,77 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 .canvas-controls button:active {
     transform: scale(0.95);
 }
+
+#ai-apply-banner {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(16, 185, 129, 0.92);
+    color: white;
+    padding: 0.8rem 1.4rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-align: center;
+    z-index: 30;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    line-height: 1.5;
+}
+
+#ai-apply-banner.hidden {
+    display: none;
+}
+
+#ai-banner-detail {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.panel.advanced summary { cursor: pointer; color: #fff; font-size: 1rem; font-weight: 600; list-style: none; }
+.panel.advanced summary::before { content: '▸ '; color: var(--text-muted); }
+.panel.advanced[open] summary::before { content: '▾ '; }
+.panel.advanced .sub { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); }
+.panel.advanced h3 { font-size: 0.9rem; color: #fff; margin-bottom: 0.5rem; }
+.mode-note { display: block; color: var(--text-muted); font-weight: 400; font-size: 0.75rem; }
+.sidebar .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: -0.6rem; margin-bottom: 0.25rem; }
+
+#ai-floating-panel {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    width: 270px;
+    background: rgba(17, 17, 17, 0.88);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 1rem;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    z-index: 20;
+    color: var(--text-muted);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+
+#ai-floating-panel .hint {
+    margin: 0;
+    color: var(--text-muted);
+}
+
     </style>
 </head>
 <body>
     <div class="container">
         <aside class="sidebar">
-            <h1>CityFlow v2</h1>
+            <h1>FlowLight</h1>
+            <p class="subtitle">CityFlow v2 시뮬레이터 · Solar Pro 4 신호 계획</p>
+            <div class="btn-group" style="margin-top:-0.25rem;">
+                <button id="btn-help" class="btn outline small">사용법 보기</button>
+            </div>
             <section class="panel controls">
                 <h2>시뮬레이션 제어</h2>
                 <div class="btn-group">
                     <button id="btn-toggle-play" class="btn primary">Play</button>
-                    <button id="btn-reset" class="btn danger">Reset</button>
+                    <button id="btn-reset" class="btn danger">시뮬레이션 초기화</button>
                 </div>
                 <div class="slider-group mt-2">
                     <label>배속:</label>
@@ -180,67 +249,105 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                     </div>
                 </div>
                 <div class="slider-group mt-2">
-                    <label>교통량 (대/초): <span id="val-spawn">3.0</span></label>
-                    <input type="range" id="sim-spawn-rate" min="0" max="6" step="0.1" value="3.0">
-                    <label>보행자 (명/초): <span id="val-ped">0.3</span></label>
-                    <input type="range" id="sim-ped-rate" min="0" max="2" step="0.1" value="0.3">
+                    <label>교통량 (대/초): <span id="val-spawn">3</span> <span id="spawn-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 사용 안 함</span></label>
+                    <input type="range" id="sim-spawn-rate" min="0" max="6" step="1" value="3">
+                    <label>보행자 (명/초): <span id="val-ped">0</span></label>
+                    <input type="range" id="sim-ped-rate" min="0" max="2" step="1" value="0">
+                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
+                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
                     <label>최대 차량 (대): <span id="val-maxcars">150</span></label>
                     <input type="range" id="sim-max-cars" min="1" max="400" step="1" value="150">
                     <label>최고 속도 (px/s): <span id="val-speed">60</span></label>
                     <input type="range" id="sim-max-speed" min="20" max="120" step="5" value="60">
-                    <label>격자 크기 (NxN): <span id="val-grid">4</span></label>
+                    <label>격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 3x3 고정</span></label>
                     <input type="range" id="sim-grid-size" min="2" max="6" step="1" value="4">
                 </div>
             </section>
 
-            <section class="panel control-types">
-                <h2>교차로 제어 유형</h2>
-                <p class="hint">유형을 선택하고 교차로를 클릭하세요.</p>
-                <div class="radio-group" id="junction-types">
-                    <label><input type="radio" name="jtype" value="signal" checked> 🚦 신호교차로 (한국 4현시)</label>
-                    <label><input type="radio" name="jtype" value="allway_stop"> 🛑 전방향 정지</label>
-                    <label><input type="radio" name="jtype" value="priority"> ⚠️ 우선도로</label>
-                    <label><input type="radio" name="jtype" value="roundabout"> 🔄 회전교차로</label>
+            <section class="panel demand-panel">
+                <h2>교통 수요 입력</h2>
+                <div class="radio-group" id="demand-mode">
+                    <label><input type="radio" name="dmode" value="manual" checked> 수동 (교통량 슬라이더)</label>
+                    <label><input type="radio" name="dmode" value="profile"> 실데이터 프로파일 (교차로 1개, 3x3)</label>
                 </div>
-                <div class="slider-group mt-2">
-                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
-                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
-                    <label>신호 연동 오프셋 (s): <span id="val-offset">0</span></label>
-                    <input type="range" id="sim-offset" min="0" max="20" step="1" value="0">
-                    <p class="hint">인접 교차로 간 녹색파(Green Wave) 시차. 0이면 동시 시작.</p>
-                </div>
-            </section>
-
-            <section class="panel data-panel">
-                <h2>데이터 수집</h2>
-                <div class="slider-group">
-                    <label>샘플 간격 (s): <span id="val-sample">1.0</span></label>
-                    <input type="range" id="sim-sample-int" min="0.5" max="5.0" step="0.5" value="1.0">
-                </div>
-                <div class="btn-group mt-2">
-                    <button id="btn-export-json" class="btn outline">JSON 내보내기</button>
-                    <button id="btn-export-csv" class="btn outline">CSV 내보내기</button>
+                <div id="demand-profile-box" class="mt-2" style="display:none">
+                    <p class="hint" id="demand-profile-meta">프로파일 불러오는 중...</p>
+                    <div class="slider-group">
+                        <label>시간대: <span id="val-demand-hour">08</span>시</label>
+                        <input type="range" id="sim-demand-hour" min="0" max="23" step="1" value="8">
+                    </div>
+                    <label class="toggle-label mt-2">
+                        <input type="checkbox" id="chk-demand-autohour"> <span>시간대 자동 진행 (<span id="val-demand-secs">120</span>초마다)</span>
+                    </label>
+                    <table class="demand-table">
+                        <thead><tr><th>접근로</th><th>수요<br><small>대/시</small></th><th>발생률<br><small>대/초</small></th><th>진입<br><small>60초</small></th><th>손실</th><th>대기</th></tr></thead>
+                        <tbody>
+                            <tr id="demand-row-N"><td>N 북측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-S"><td>S 남측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-E"><td>E 동측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-W"><td>W 서측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                        </tbody>
+                    </table>
+                    <p class="hint mt-2">수요(대/시)는 입력값이고 발생률은 차로당 값입니다. 대기 차량 수는 시뮬레이션이 계산한 결과이며 여기 값이 아닙니다.<br>손실 = 진입로가 막혀 만들지 못한 차량 수.</p>
                 </div>
             </section>
 
             <section class="panel optimize-panel">
-                <h2>신호 최적화</h2>
-                <div class="slider-group">
-                    <label>분석 주기 (s): <span id="val-opt-int">10</span></label>
-                    <input type="range" id="sim-opt-int" min="5" max="60" step="1" value="10">
-                </div>
+                <h2>AI 신호 최적화 (Solar Pro 4)</h2>
+                <p class="hint">현재 교차로 상태를 보내 Agent 3개가 분석 → 계획 → 평가합니다. 판단이 "자동 적용"이면 바로 적용되고, 아니면 아래 버튼으로 적용합니다.</p>
                 <div class="btn-group mt-2">
-                    <button id="btn-optimize" class="btn secondary">최적화 분석</button>
+                    <button id="btn-optimize" class="btn secondary">AI 분석</button>
                     <button id="btn-apply-opt" class="btn success" disabled>권장값 적용</button>
                 </div>
-                <div class="btn-group mt-2">
-                    <button id="btn-ab-test" class="btn primary">A/B 검증 (180s×2, 시드 고정)</button>
-                </div>
-                <div id="ab-status" class="hint mt-2" style="display:none"></div>
-                <label class="toggle-label mt-2">
-                    <input type="checkbox" id="chk-adaptive"> 적응형 신호 자동 적용
-                </label>
             </section>
+
+            <details class="panel advanced">
+                <summary>고급 설정 (교차로 유형 · 데이터 수집 · 내장 Webster 최적화)</summary>
+
+                <div class="sub">
+                    <h3>교차로 제어 유형</h3>
+                    <p class="hint">유형을 선택하고 교차로를 클릭하세요. 데모는 신호교차로 1개로 진행합니다.</p>
+                    <div class="radio-group" id="junction-types">
+                        <label><input type="radio" name="jtype" value="signal" checked> 🚦 신호교차로 (한국 4현시)</label>
+                        <label><input type="radio" name="jtype" value="allway_stop"> 🛑 전방향 정지</label>
+                        <label><input type="radio" name="jtype" value="priority"> ⚠️ 우선도로</label>
+                        <label><input type="radio" name="jtype" value="roundabout"> 🔄 회전교차로</label>
+                    </div>
+                    <div class="slider-group mt-2">
+                        <label>신호 연동 오프셋 (s): <span id="val-offset">0</span></label>
+                        <input type="range" id="sim-offset" min="0" max="20" step="1" value="0">
+                        <p class="hint">인접 교차로 간 녹색파(Green Wave) 시차. 교차로가 여러 개일 때만 의미가 있습니다.</p>
+                    </div>
+                </div>
+
+                <div class="sub">
+                    <h3>데이터 수집</h3>
+                    <div class="slider-group">
+                        <label>샘플 간격 (s): <span id="val-sample">1.0</span></label>
+                        <input type="range" id="sim-sample-int" min="0.5" max="5.0" step="0.5" value="1.0">
+                    </div>
+                    <div class="btn-group mt-2">
+                        <button id="btn-export-json" class="btn outline">JSON 내보내기</button>
+                        <button id="btn-export-csv" class="btn outline">CSV 내보내기</button>
+                    </div>
+                </div>
+
+                <div class="sub">
+                    <h3>내장 Webster 최적화 (LLM 과 무관)</h3>
+                    <p class="hint">도착률로 계산하는 고전적 신호 배분입니다. AI 결과와 비교하는 용도로 남겨 두었습니다.</p>
+                    <div class="slider-group">
+                        <label>분석 주기 (s): <span id="val-opt-int">10</span></label>
+                        <input type="range" id="sim-opt-int" min="5" max="60" step="1" value="10">
+                    </div>
+                    <label class="toggle-label mt-2">
+                        <input type="checkbox" id="chk-adaptive"> Webster 권장값 자동 적용
+                    </label>
+                    <div class="btn-group mt-2">
+                        <button id="btn-ab-test" class="btn primary">A/B 검증 (Webster 권장안, 180s×2, 시드 고정)</button>
+                    </div>
+                    <div id="ab-status" class="hint mt-2" style="display:none"></div>
+                </div>
+            </details>
         </aside>
 
         <main class="main-content">
@@ -248,7 +355,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                 <div class="stat">차량: <b id="stat-cars">0</b></div>
                 <div class="stat">보행자: <b id="stat-peds">0</b></div>
                 <div class="stat">대기: <b id="stat-stopped">0</b></div>
-                <div class="stat">평균속도: <b id="stat-speed">0%</b></div>
+                <div class="stat">평균속도(최고 대비): <b id="stat-speed">0%</b></div>
                 <div class="stat">통과(1분): <b id="stat-throughput">0</b></div>
                 <div class="stat congestion">
                     정체 지수:
@@ -258,6 +365,62 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
 
             <div class="canvas-container">
                 <canvas id="sim-canvas"></canvas>
+                <div id="ai-apply-banner" class="hidden">
+                    ✅ AI 신호 제어 적용 완료<br>
+                    <span id="ai-banner-detail">-</span>
+                </div>
+
+                <div id="ai-floating-panel">
+                    <div id="ai-progress-panel" class="hint"
+                         style="line-height:1.6;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:.6rem;margin-bottom:.6rem;">
+                        <b style="color:#fff;">AI 분석 진행</b><br>
+                        <span class="ai-step" data-step="analysis">○ 1. 교통 상황 분석</span><br>
+                        <span class="ai-step" data-step="planning">○ 2. 신호 계획 생성</span><br>
+                        <span class="ai-step" data-step="guardrail">○ 3. Guardrail 검증</span><br>
+                        <span class="ai-step" data-step="evaluation">○ 4. 계획 평가</span><br>
+                        <span class="ai-step" data-step="decision">○ 5. 최종 의사결정</span>
+                    </div>
+
+                    <div id="ai-status-panel" class="hint">
+                        <b style="color:#fff;">AI 제어 상태</b><br>
+                        상태: <span id="ai-state">대기 중</span><br>
+                        판단: <span id="ai-decision">-</span><br>
+                        우선순위: <span id="ai-priority">-</span><br>
+                        남북 직진: <span id="ai-ns">-</span><br>
+                        동서 직진: <span id="ai-ew">-</span><br>
+                        보행자 요청: <span id="ai-ped">-</span>
+                    </div>
+
+                    <div id="ai-result-panel" class="hint mt-2"
+                         style="line-height:1.6;border-top:1px solid rgba(255,255,255,.1);padding-top:.75rem;">
+                        <b style="color:#fff;">AI 적용 결과</b><br>
+                        적용 여부: <span id="ai-apply-state">대기 중</span><br>
+                        적용 교차로: <span id="ai-apply-count">-</span><br>
+                        차량 제어: <span id="ai-vehicle-control">-</span><br>
+                        보행자 제어: <span id="ai-ped-control">-</span><br>
+                        Guardrail: <span id="ai-guardrail">-</span>
+                        <hr>
+
+                        <b style="color:#fff;">AI 적용 효과</b><br>
+
+                        처리량 :
+                        <span id="effect-flow-before">-</span>
+                        →
+                        <span id="effect-flow-after">-</span><br>
+
+                        정지 차량 :
+                        <span id="effect-stop-before">-</span>
+                        →
+                        <span id="effect-stop-after">-</span><br>
+
+                        정체 상태 :
+                        <span id="effect-congestion-after">-</span><br>
+
+                        판단 :
+                        <span id="effect-summary">AI 신호 적용 대기</span>
+                    </div>
+                </div>
+
                 <div class="canvas-controls">
                     <button id="btn-zoom-in" title="확대">+</button>
                     <button id="btn-zoom-out" title="축소">-</button>
@@ -272,7 +435,7 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                 <span class="l-item"><span class="color-box" style="background:#ef4444"></span>정체</span>
                 |
                 <span class="l-item">🟢직진·우회전</span>
-                <span class="l-item">🟩좌회전↶</span>
+                <span class="l-item">🟣좌회전 신호</span>
                 <span class="l-item">🟡황색</span>
                 <span class="l-item">🔴적색(우회전가능·보행자양보)</span>
                 |
@@ -283,6 +446,31 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                 <span class="l-item"><span class="color-box" style="background:#38bdf8"></span>장애인(휠체어)</span>
             </div>
         </main>
+    </div>
+
+    <!-- 처음 열었을 때 한 번 보여 주는 사용법. 사이드바의 "사용법 보기" 버튼으로 다시 열 수 있다. -->
+    <div id="help-overlay" class="log-overlay hidden">
+        <div class="log-content" style="max-width:640px">
+            <div class="log-header">
+                <h3>FlowLight 사용법</h3>
+                <button id="btn-close-help" class="btn-close">&times;</button>
+            </div>
+            <div class="help-body">
+                <p>실제 교통량으로 차량을 만들고, Solar Pro 4 Agent 세 개가 신호 계획을 세우는 데모입니다. 아래 순서대로 눌러 보세요.</p>
+                <ol>
+                    <li><b>백엔드 켜기</b> · 터미널에서 <code>uvicorn app.main:app --reload</code>. 이 화면은 <code>127.0.0.1:8000</code> 을 호출합니다.</li>
+                    <li><b>Play</b> · 시뮬레이션을 시작합니다. 배속은 4x 가 보기 편합니다.</li>
+                    <li><b>교통 수요 입력 → 실데이터 프로파일</b> · 격자가 3x3(교차로 1개)이 되고 시간대별 실제 교통량으로 차량이 들어옵니다. 표의 "수요"는 입력값, "대기"는 시뮬레이션 결과입니다.</li>
+                    <li><b>AI 분석</b> · 왼쪽 위 패널에서 5단계 진행을 보고, 리포트에서 Agent 가 실제로 돌려준 분석·계획·평가를 읽습니다.</li>
+                    <li><b>권장값 적용</b> · 판단이 "자동 적용"이면 바로 적용되고, 아니면 이 버튼으로 적용합니다. 15초 뒤 적용 효과가 표시됩니다.</li>
+                </ol>
+                <p class="hint">교차로 유형, 데이터 내보내기, 내장 Webster 최적화는 사이드바의 "고급 설정"에 있습니다.</p>
+                <label class="toggle-label mt-2"><input type="checkbox" id="chk-help-hide" checked> 다음에 열 때 자동으로 보지 않기</label>
+                <div class="btn-group mt-2">
+                    <button id="btn-help-start" class="btn primary">시작하기</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="log-overlay" class="log-overlay hidden">
@@ -305,7 +493,8 @@ var GREEN_MIN = 2;
 var COL_GREEN = '#22c55e';
 var COL_YELLOW = '#eab308';
 var COL_RED = '#ef4444';
-var COL_LEFT_ARROW = '#4ade80';
+var COL_LEFT_ARROW = '#a855f7';
+var API_BASE = 'http://127.0.0.1:8000';   // FastAPI 백엔드 (Agent 스트림, 교통 수요 프로파일)
 
 // ===== 보행자 상수 =====
 var PED_TYPES = [
@@ -432,21 +621,47 @@ Network.prototype.getRandomSourceEdge = function() {
     }
     return bnd.length > 0 ? bnd[Math.floor(rand() * bnd.length)] : null;
 };
+
 Network.prototype.findRandomRoute = function(startEdge) {
-    var route = [startEdge], cur = startEdge;
-    for (var h = 0; h < 80; h++) {
+    var route = [startEdge];
+    var cur = startEdge;
+
+    for (var h = 0; h < 8; h++) {
         var nn = cur.to;
-        var cands = [];
-        for (var k = 0; k < nn.outgoing.length; k++) {
-            if (nn.outgoing[k].to !== cur.from && !nn.outgoing[k].isArc) cands.push(nn.outgoing[k]);
+
+        if (nn.isBoundary && route.length > 1) {
+            break;
         }
+
+        var cands = [];
+        var exitCands = [];
+
+        for (var k = 0; k < nn.outgoing.length; k++) {
+            var e = nn.outgoing[k];
+
+            if (e.to === cur.from || e.isArc) continue;
+
+            cands.push(e);
+
+            if (e.to.isBoundary && route.length >= 2) {
+                exitCands.push(e);
+            }
+        }
+
         if (cands.length === 0) break;
-        cur = cands[Math.floor(rand() * cands.length)];
+
+        if (exitCands.length > 0) {
+            cur = exitCands[Math.floor(rand() * exitCands.length)];
+        } else {
+            cur = cands[Math.floor(rand() * cands.length)];
+        }
+
         route.push(cur);
-        if (nn.isBoundary && route.length > 2) break;
     }
+
     return route;
 };
+
 
 // ===== TrafficLight =====
 function TrafficLight(node, totalCycle, offset) {
@@ -487,25 +702,37 @@ TrafficLight.prototype.buildPhases = function(totalCycle) {
         var d = dirs[0];
         this.phases.push({dir:d, type:'green', duration:totalCycle});
         this.greenTimes['straight_'+d] = totalCycle;
-        this.greenTimes['left_'+d] = totalCycle;
+        this.greenTimes['left_'+d] = 0;
         return;
     }
     var overhead = n * (this.YELLOW * 2 + this.ALL_RED);
     var eff = Math.max(n * GREEN_MIN * 2, totalCycle - overhead);
     var perDir = eff / n;
     for (var i = 0; i < dirs.length; i++) {
-        var d = dirs[i];
-        var sk = 'straight_'+d, lk = 'left_'+d;
-        var sg = this.greenTimes[sk] !== undefined ? this.greenTimes[sk] : Math.max(GREEN_MIN, perDir * 0.7);
-        var lg = this.greenTimes[lk] !== undefined ? this.greenTimes[lk] : Math.max(GREEN_MIN, perDir * 0.3);
-        this.greenTimes[sk] = sg;
-        this.greenTimes[lk] = lg;
-        this.phases.push({dir:d, type:'straight_right', duration:sg});
-        this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
+    var d = dirs[i];
+    var sk = 'straight_' + d, lk = 'left_' + d;
+
+    var sg = this.greenTimes[sk] !== undefined
+        ? this.greenTimes[sk]
+        : Math.max(GREEN_MIN, perDir * 0.7);
+
+    var lg = this.greenTimes[lk] !== undefined
+        ? this.greenTimes[lk]
+        : Math.max(GREEN_MIN, perDir * 0.3);
+
+    this.greenTimes[sk] = sg;
+    this.greenTimes[lk] = lg;
+
+    this.phases.push({dir:d, type:'straight_right', duration:sg});
+    this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
+
+    if (lg > 0) {
         this.phases.push({dir:d, type:'left_arrow', duration:lg});
         this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
-        this.phases.push({dir:'ALL', type:'all_red', duration:this.ALL_RED});
     }
+
+    this.phases.push({dir:'ALL', type:'all_red', duration:this.ALL_RED});
+}
 };
 TrafficLight.prototype.updateCycle = function(newCycle) {
     var dirs = this.directions, n = dirs.length;
@@ -554,7 +781,7 @@ TrafficLight.prototype.allows = function(edgeDir, turnType) {
     if (p.type === 'yellow') return turnType === 'right' ? 'yield_right' : 'red';
     if (p.type === 'straight_right') {
         if (p.dir === edgeDir) {
-            if (turnType === 'straight' || turnType === 'right') return 'green';
+            if (turnType === 'straight' || turnType === 'right' || turnType === 'left') return 'green';
             return 'red';
         }
         return turnType === 'right' ? 'yield_right' : 'red';
@@ -650,6 +877,8 @@ Car.prototype.update = function(dt, simTime, jc) {
     }
     var safe = Math.sqrt(2 * DECEL * Math.max(0, d - MIN_GAP));
     var target = Math.min(this.maxSpeed, safe);
+
+
     if (this.v < target) this.v = Math.min(target, this.v + ACCEL * dt);
     else this.v = Math.max(target, this.v - DECEL * dt);
     if (this.v < 0.5) this.v = 0;
@@ -841,14 +1070,23 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
 JunctionControl.prototype.nextEdgeHasSpace = function(car) {
     var ne = car.getNextEdge();
     if (!ne) return true;
-    // 신호교차로 통과 시엔 진출 엣지에 "교차로 상자 + 진출측 횡단보도"를 완전히
-    // 지나 정지할 수 있는 여유(CW_DIST+차체+간격)가 있어야 정지선을 출발할 수 있다.
-    // 이 여유가 없으면 커밋 후 교차로/횡단보도 위에 갇히는(box blocking) 상황이 생김.
+
     var need = CAR_LEN + MIN_GAP;
+
+    // 일반 상태에서는 교차로/횡단보도 위 정체 방지를 위해 더 넓은 여유 필요
     if (car.edge.to.control === 'signal' && !car.edge.to.isBoundary && !ne.isArc) {
         need = CW_DIST + CAR_LEN + MIN_GAP;
     }
-    return !(ne.cars.length > 0 && ne.cars[0].s < need);
+
+    // AI 적용 중에는 너무 빡빡한 기준만 조금 완화
+    // 단, 차량끼리 겹치지 않도록 최소 차간거리는 유지
+    if (this.aiReliefMode) {
+        need = CAR_LEN + MIN_GAP + 2;
+    }
+
+    if (ne.cars.length === 0) return true;
+
+    return ne.cars[0].s >= need;
 };
 JunctionControl.prototype.onEnterIntersection = function(car, node) {
     if (!node || node.isBoundary) return;
@@ -998,16 +1236,22 @@ PedSystem.prototype._buildCW = function(node) {
     return list;
 };
 PedSystem.prototype.pedGreen = function(cw) {
+    if (this.jc.aiPedGreenSec !== null && Number(this.jc.aiPedGreenSec) === 0) {
+        return { green:false, remain:0, totalGreen:0 };
+    }
+
     var light = this.jc.lights.get(cw.nodeId);
     if (!light) return { green:false, remain:0, totalGreen:0 };
+
     var p = light.phases[light.phaseIdx];
     var g = !!(p && p.type === 'straight_right' && p.dir !== cw.dirRoad);
-    // 전체 녹색 시간 계산 (카운트다운 표시용)
-    var totalGreen = 0;
-    if (g) {
-        totalGreen = p.duration;
-    }
-    return { green: g, remain: g ? (p.duration - light.t) : 0, totalGreen: totalGreen };
+    var remain = g ? (p.duration - light.t) : 0;
+
+    return {
+        green: g,
+        remain: remain,
+        totalGreen: g ? p.duration : 0
+    };
 };
 // 보행자가 물리적으로 올라와 있는가 (차량 차단 판정)
 PedSystem.prototype.isOccupied = function(cw) {
@@ -1177,8 +1421,10 @@ DataLogger.prototype.sample = function(simTime) {
     var n = allCars.length;
     var meanSpeed = n > 0 ? sumSpeed / n : 0;
     var recent = this.jc.completedTrips.filter(function(t){ return simTime - t.endTime <= 60; });
-    var congestion = Math.min(1, Math.max(0,
-        (stoppedCount / Math.max(1, n)) * 0.7 + (1 - meanSpeed / Math.max(1, this.maxSpeed)) * 0.6));
+    // 차량이 없으면 0 (상단 막대·AI 입력과 같은 정의)
+    var congestion = n > 0
+        ? Math.min(1, Math.max(0, (stoppedCount / n) * 0.7 + (1 - meanSpeed / Math.max(1, this.maxSpeed)) * 0.6))
+        : 0;
 
     var edgesStats = [];
     for (var i = 0; i < this.network.edges.length; i++) {
@@ -1585,11 +1831,18 @@ Renderer.prototype.render = function(network, jc, cam) {
                     var textStr = "";
                     var isGreen = sig.green;
                     var remainVal = 0;
-                    
-                    if (isGreen && sig.remain > 0) {
+
+                    if (jc.aiPedGreenSec !== null && Number(jc.aiPedGreenSec) === 0) {
+                        // AI 적용 후: 보행자 신호는 빨간불/0초 고정
+                        // 지도 위 0 표시는 너무 많아져서 숨김
+                        textStr = "";
+                        remainVal = 0;
+                    } else if (isGreen && sig.remain > 0) {
+                        // AI 적용 전 또는 보행자 신호가 살아있는 경우: 초록불 남은 시간 표시
                         textStr = Math.ceil(sig.remain).toString();
                         remainVal = sig.remain;
                     } else if (!isGreen) {
+                        // AI 적용 전: 빨간불일 때 다음 보행자 초록까지 남은 시간 표시
                         var light = jc.lights.get(cw.nodeId);
                         if (light && light.phases.length > 1) {
                             var redRemain = light.phases[light.phaseIdx].duration - light.t;
@@ -1711,6 +1964,35 @@ Renderer.prototype.render = function(network, jc, cam) {
                 ctx.fillStyle = cL; ctx.beginPath(); ctx.arc(0,  2, 1.5, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(0,  6, 1.5, 0, Math.PI*2); ctx.fill();
                 
+                // 실제 신호 남은 시간 표시
+                if (lightObj && p) {
+                    var remainSec = Math.ceil(p.duration - lightObj.t);
+
+                    var isActiveSignal =
+                        (p.type === 'straight_right' && p.dir === ie.dir) ||
+                        (p.type === 'left_arrow' && p.dir === ie.dir) ||
+                        (p.type === 'yellow' && p.dir === ie.dir);
+
+                    if (isActiveSignal) {
+                        ctx.save();
+                        ctx.rotate(-Math.atan2(uy, ux));
+
+                        ctx.font = 'bold 8px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+
+                        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                        ctx.beginPath();
+                        if (ctx.roundRect) ctx.roundRect(-9, -18, 18, 10, 4);
+                        else ctx.rect(-9, -18, 18, 10);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillText(remainSec.toString(), 0, -13);
+
+                        ctx.restore();
+                    }
+                }
                 ctx.restore();
             }
         } else if (nd.control === 'allway_stop') {
@@ -1869,13 +2151,24 @@ function SimController() {
     this.adaptiveMode = false; // 기본 OFF — 켜져 있으면 권장이 자동 적용되어 전/후 비교가 불가능해짐
     this.optimizeInterval = 10;
     this.speedMultiplier = 1; // 배속 (1x, 2x, 3x, 4x)
-    this.greenWaveOffset = 0; // 신호 연동 오프셋
+    this.greenWaveOffset = 0;
+    this.recommendedSignalPlan = null;
     this.cam = {x: 0, y: 0, scale: 1.0};
     this.isDragging = false;
     this.dragStartX = 0;
     this.dragStartY = 0;
     this.logger = null;
     this.analyzer = null;
+    // 교통 수요 입력 모드 (6-3): 'manual' = 교통량 슬라이더(기존), 'profile' = 백엔드 실데이터 프로파일
+    this.demandMode = 'manual';
+    this.profile = null;          // GET /api/traffic/profile 응답
+    this.profileHour = 8;
+    this.currentDemand = null;    // 선택된 시간대의 {hour, volume, arrival_rate_per_sec}
+    this.approachEdges = null;    // {N:[edge], S:[edge], E:[edge], W:[edge]}
+    this.demandSpawn = {};        // 접근로별 발생률·다음 도착 시각·진입/손실 카운터
+    this.autoHour = false;
+    this.secsPerHour = 120;       // 시간대 자동 진행 시 시간대 하나가 지속되는 시뮬레이션 초
+    this.hourAcc = 0;
     this._initDOM();
     this.reset();
 }
@@ -1936,6 +2229,61 @@ SimController.prototype._initDOM = function() {
     bindSlider('sim-max-speed','maxSpeed','val-speed');
     bindSlider('sim-cycle','cycleLength','val-cycle');
     bindSlider('sim-grid-size','gridSize','val-grid');
+
+    // ===== 교통 수요 입력 모드 (6-3) =====
+    var spawnSlider = document.getElementById('sim-spawn-rate');
+    var profileBox = document.getElementById('demand-profile-box');
+    var hourSlider = document.getElementById('sim-demand-hour');
+    var autoHourChk = document.getElementById('chk-demand-autohour');
+    async function setDemandMode(mode) {
+        if (mode === 'profile') {
+            if (!self.profile) {
+                var ok = await self.loadTrafficProfile();
+                if (!ok) {
+                    document.querySelector('input[name="dmode"][value="manual"]').checked = true;
+                    profileBox.style.display = 'block';   // 오류 메시지가 보이도록
+                    return;
+                }
+            }
+            self.demandMode = 'profile';
+            profileBox.style.display = 'block';
+            spawnSlider.disabled = true;
+            document.getElementById('sim-grid-size').disabled = true;   // 3x3 고정 (접근로 1:1 매핑 유지)
+            document.getElementById('spawn-mode-note').style.display = '';
+            document.getElementById('grid-mode-note').style.display = '';
+            // 프로파일은 교차로 1개·접근로 4개를 기술하므로 격자를 3x3 으로 맞춘다 (진입 엣지 4개 = N/S/E/W).
+            if (self.gridSize !== 3) {
+                self.gridSize = 3;
+                document.getElementById('sim-grid-size').value = 3;
+                document.getElementById('val-grid').textContent = 3;
+            }
+            // 첨두 시간대에 인위적 상한이 걸리지 않도록 최대 차량을 400 으로 올린다.
+            if (self.maxCars < 400) {
+                self.maxCars = 400;
+                document.getElementById('sim-max-cars').value = 400;
+                document.getElementById('val-maxcars').textContent = 400;
+            }
+        } else {
+            self.demandMode = 'manual';
+            profileBox.style.display = 'none';
+            spawnSlider.disabled = false;
+            document.getElementById('sim-grid-size').disabled = false;
+            document.getElementById('spawn-mode-note').style.display = 'none';
+            document.getElementById('grid-mode-note').style.display = 'none';
+        }
+        self.reset();
+    }
+    var modeRadios = document.querySelectorAll('input[name="dmode"]');
+    for (var mi = 0; mi < modeRadios.length; mi++) {
+        modeRadios[mi].onchange = function() { if (this.checked) setDemandMode(this.value); };
+    }
+    hourSlider.oninput = function() {
+        document.getElementById('val-demand-hour').textContent = pad2(parseInt(hourSlider.value));
+        self.applyProfileHour(parseInt(hourSlider.value));
+        self.hourAcc = 0;
+    };
+    autoHourChk.onchange = function() { self.autoHour = autoHourChk.checked; self.hourAcc = 0; };
+    document.getElementById('val-demand-secs').textContent = self.secsPerHour;
 
     // 확대/축소 (휠)
     this.canvas.addEventListener('wheel', function(ev) {
@@ -2015,20 +2363,612 @@ SimController.prototype._initDOM = function() {
     var chkAdapt = document.getElementById('chk-adaptive');
     var optSlider = document.getElementById('sim-opt-int');
 
-    btnOpt.onclick = function() {
-        if (!self.analyzer) return;
-        var rep = self.analyzer.analyze();
+    // ===== AI 분석 진행 상태 표시 =====
+    // SSE 단계 메시지에 따라 좌측 패널의 5단계(교통 상황 분석 → 신호 계획 → Guardrail → 계획 평가 → 최종 의사결정)를 갱신한다.
+    var AI_STEP_LABELS = {
+        analysis:   '1. 교통 상황 분석',
+        planning:   '2. 신호 계획 생성',
+        guardrail:  '3. Guardrail 검증',
+        evaluation: '4. 계획 평가',
+        decision:   '5. 최종 의사결정'
+    };
+    var AI_STEP_STYLE = {
+        idle:   { mark: '○', color: '#999' },
+        active: { mark: '◐', color: '#3b82f6' },
+        done:   { mark: '●', color: '#10b981' },
+        error:  { mark: '✕', color: '#ef4444' }
+    };
+    function setAIStep(key, state, note) {
+        var el = document.querySelector('.ai-step[data-step="' + key + '"]');
+        if (!el) return;
+        var st = AI_STEP_STYLE[state] || AI_STEP_STYLE.idle;
+        el.style.color = st.color;
+        el.textContent = st.mark + ' ' + AI_STEP_LABELS[key] + (note ? ' · ' + note : '');
+    }
+    function resetAISteps() {
+        for (var k in AI_STEP_LABELS) setAIStep(k, 'idle');
+    }
+    function fmtDurations(d) {
+        if (!d) return '-';
+        return '남북 ' + d.north_south_green_sec + '초 / 동서 ' + d.east_west_green_sec + '초 / 보행자 ' + d.pedestrian_green_sec + '초';
+    }
+    function yesNo(v) { return v === true ? '있음' : v === false ? '없음' : String(v); }
+
+    btnOpt.onclick = async function() {
         var lt = document.getElementById('log-text');
-        if (rep) { lt.textContent = JSON.stringify(rep, null, 2); btnApply.disabled = false; }
-        else { lt.textContent = '데이터가 부족합니다. 시뮬레이션을 더 실행해주세요.'; }
+        lt.textContent = 'AI 에이전트 분석을 시작합니다...\n\n';
         document.getElementById('log-overlay').classList.remove('hidden');
+
+        // 진행 표시 초기화. 단계별 소요 시간은 SSE 메시지 도착 시각 기준이다.
+        resetAISteps();
+        document.getElementById('ai-state').textContent = "분석 중";
+        self.lastGuardrail = null;
+        var activeStep = null;
+        var stepStartedAt = 0;
+        function startAIStep(key) {
+            finishAIStep();
+            activeStep = key;
+            stepStartedAt = performance.now();
+            setAIStep(key, 'active', '진행 중');
+            document.getElementById('ai-state').textContent = "분석 중: " + AI_STEP_LABELS[key];
+        }
+        function finishAIStep(note) {
+            if (!activeStep) return;
+            var secs = ((performance.now() - stepStartedAt) / 1000).toFixed(1) + 's';
+            setAIStep(activeStep, 'done', note ? note + ' · ' + secs : secs);
+            activeStep = null;
+        }
+
+        // AI 적용 전 성능 저장
+        var beforeStopped = 0;
+        var beforeSumV = 0;
+
+        for (var i = 0; i < self.cars.length; i++) {
+        if (self.cars[i].v < 3) beforeStopped++;
+            beforeSumV += self.cars[i].v;
+        }
+
+        var beforeSpeedRate = self.cars.length > 0
+            ? Math.round((beforeSumV / self.cars.length) / self.maxSpeed * 100)
+            : 0;
+
+        var beforeLatest = self.logger && self.logger.buffer.length > 0
+            ? self.logger.buffer[self.logger.buffer.length - 1]
+            : null;
+
+        self.aiBeforeMetrics = {
+            stopped: beforeStopped,
+            speed: beforeSpeedRate,
+            throughput: beforeLatest ? beforeLatest.network.throughputPerMin : 0,
+            congestion: beforeLatest ? beforeLatest.network.congestion : 0
+        };
+
+        document.getElementById("effect-stop-before").textContent = self.aiBeforeMetrics.stopped + "대";
+        document.getElementById("effect-flow-before").textContent = self.aiBeforeMetrics.throughput + "대/분";
+
+        document.getElementById("effect-stop-after").textContent = "측정 중";
+        document.getElementById("effect-flow-after").textContent = "측정 중";
+        document.getElementById("effect-congestion-after").textContent = "측정 중";
+
+        var stopped = 0;
+        for (var i = 0; i < self.cars.length; i++) {
+            if (self.cars[i].v < 3) stopped++;
+        }
+    
+
+        var latest = self.logger && self.logger.buffer.length > 0
+            ? self.logger.buffer[self.logger.buffer.length - 1]
+            : null;
+
+        var scenario = {
+            intersection_id: "simulation-current",
+            tick: Math.round(self.simTime),
+            signals: {
+                cycle_sec: self.cycleLength
+            },
+            queues: {
+                total_cars: self.cars.length,
+                stopped_cars: stopped
+            },
+            pedestrians: {
+                // 횡단보도에서 대기 중이거나 건너는 중인 보행자만 센다 (인도를 걷는 보행자는 신호와 무관)
+                waiting_or_crossing: self.pedSys
+                    ? self.pedSys.peds.filter(function(p) { return p.state === 'wait' || p.state === 'cross'; }).length
+                    : 0,
+                vulnerable_count: self.pedSys
+                    ? self.pedSys.peds.filter(function(p) {
+                        return (p.state === 'wait' || p.state === 'cross') && p.type && (
+                            p.type.key === "child" ||
+                            p.type.key === "elderly" ||
+                            p.type.key === "disabled"
+                        );
+                    }).length
+                    : 0
+            },
+            context: {
+                source: "flowlight_index_html",
+                grid_size: self.gridSize
+            },
+            metrics: {
+                congestion: latest ? latest.network.congestion : 0,
+                throughput_per_min: latest ? latest.network.throughputPerMin : 0
+            }
+        };
+
+        // 6-4: 입력 수요(demand)와 접근로별 현재 상태(queues.by_approach)를 구분해서 함께 보낸다.
+        // demand 는 프로파일/슬라이더에서 온 "입력"이고, by_approach 는 시뮬레이션이 만든 "결과"다.
+        var WINDOW_SEC = 30;
+        var approachState = self._approachState(WINDOW_SEC);
+        if (self.demandMode === 'profile' && self.currentDemand && self.profile) {
+            var lostWin = {};
+            for (var ai = 0; ai < APPROACH_KEYS.length; ai++) {
+                lostWin[APPROACH_KEYS[ai]] = self.demandSpawn[APPROACH_KEYS[ai]].lostRecent.length;
+            }
+            scenario.demand = {
+                mode: "profile",
+                site_id: self.profile.meta.site_id,
+                hour: self.profileHour,
+                unit: self.profile.meta.unit,
+                volume_per_hour: self.currentDemand.volume,
+                lanes: self.profile.meta.lanes,
+                arrival_rate_per_sec: self.currentDemand.arrival_rate_per_sec,
+                lost_demand_last_60s: lostWin,
+                note: self.profile.meta.note
+            };
+        } else {
+            scenario.demand = {
+                mode: "manual",
+                spawn_rate_per_sec_total: self.spawnRate,
+                note: "수동 슬라이더 값(네트워크 전체 대/초). 입력 수요이며 현재 대기 차량 수가 아니다."
+            };
+        }
+        scenario.context.demand_mode = self.demandMode;
+        if (approachState) {
+            scenario.queues.by_approach = approachState.by_approach;
+            scenario.context.by_approach_scope = self.gridSize === 3 ? "intersection_approaches" : "entry_edges_only";
+            scenario.context.window_sec = approachState.window_sec;
+        }
+
+        try {
+            var response = await fetch(API_BASE + '/api/agent/stream', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(scenario)
+            });
+
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder("utf-8");
+            var buffer = "";
+
+            while (true) {
+                var result = await reader.read();
+                if (result.done) break;
+
+                buffer += decoder.decode(result.value, { stream: true });
+
+                var events = buffer.split("\n\n");
+                buffer = events.pop();
+
+                for (var e of events) {
+                    var lines = e.split("\n");
+                    var eventName = "";
+                    var dataText = "";
+
+                    for (var line of lines) {
+                        if (line.startsWith("event:")) {
+                            eventName = line.replace("event:", "").trim();
+                        }
+                        if (line.startsWith("data:")) {
+                            dataText = line.replace("data:", "").trim();
+                        }
+                    }
+
+                    if (!dataText) continue;
+
+                    var data = JSON.parse(dataText);
+
+                    if (eventName === "message") {
+                        var agentLabel = "";
+
+                        if (data.message.includes("교통 상황 분석")) {
+                            agentLabel = "[Agent 1] Traffic Situation Agent\n";
+                            startAIStep('analysis');
+                        } else if (data.message.includes("신호 계획 생성")) {
+                            agentLabel = "[Agent 2] Signal Planning Agent\n";
+                            startAIStep('planning');
+                        } else if (data.message.includes("Guardrail")) {
+                            agentLabel = "[Guardrail] Safety Rule Check\n";
+                            finishAIStep();
+                            // 백엔드가 보정 전(before)/후(durations) 값을 보내면 보정 여부를 판정한다.
+                            var gBefore = data.before || null;
+                            var gAfter = data.durations || null;
+                            var gCorrected = !!(gBefore && gAfter && JSON.stringify(gBefore) !== JSON.stringify(gAfter));
+                            self.lastGuardrail = { before: gBefore, after: gAfter, corrected: gCorrected };
+                            setAIStep('guardrail', 'done', gCorrected ? '보정됨' : '보정 없음');
+                        } else if (data.message.includes("계획 평가")) {
+                            agentLabel = "[Agent 3] Plan Evaluation Agent\n";
+                            startAIStep('evaluation');
+                        }
+
+                        if (agentLabel) {
+                            lt.textContent += "\n" + agentLabel;
+                        }
+
+                        lt.textContent += "[진행] " + data.message + "\n";
+
+                        if (data.step === "guardrail" && self.lastGuardrail) {
+                            lt.textContent += self.lastGuardrail.corrected
+                                ? "[Guardrail] 보정됨: " + fmtDurations(self.lastGuardrail.before) + " → " + fmtDurations(self.lastGuardrail.after) + "\n"
+                                : "[Guardrail] 보정 없음: " + fmtDurations(self.lastGuardrail.after) + "\n";
+                        }
+                    }
+
+                    if (eventName === "done") {
+                        finishAIStep();
+
+                        var input = data.input_state;
+                        var analysis = data.traffic_analysis;
+                        var plan = data.signal_plan;
+                        var evalResult = data.evaluation;
+                        var d = plan.durations;
+                        var priorityText = {
+                        "VEHICLE": "차량 우선",
+                        "PEDESTRIAN": "보행자 우선",
+                        "BALANCED": "균형 제어"
+                        }[plan.priority] || plan.priority;
+
+                        var congestionValue = input.metrics.congestion;
+                        var congestionText =
+                            congestionValue >= 0.7 ? "매우 높음" :
+                            congestionValue >= 0.3 ? "보통" :
+                            "낮음";
+                        var scores = evalResult.scores || {};
+                        var g = self.lastGuardrail;
+
+                        lt.textContent += "\n==============================\n";
+                        lt.textContent += " FlowLight AI 분석 결과\n";
+                        lt.textContent += "==============================\n\n";
+
+                        // 아래 문장들은 모두 Agent 가 실제로 반환한 값(summary / explanation / reason)이다.
+                        lt.textContent += "[Agent 1 · 교통 상황 분석]\n";
+                        // 수요(입력)와 대기(결과)를 나란히 보여 둘이 다른 값임을 드러낸다.
+                        if (input.demand && input.demand.mode === "profile") {
+                            var dv = input.demand.volume_per_hour;
+                            lt.textContent += "• 입력 수요(대/시, " + pad2(input.demand.hour) + "시): N " + dv.N + " / S " + dv.S + " / E " + dv.E + " / W " + dv.W + "\n";
+                        } else if (input.demand) {
+                            lt.textContent += "• 입력 수요: 수동 " + input.demand.spawn_rate_per_sec_total + "대/초 (네트워크 전체)\n";
+                        }
+                        if (input.queues.by_approach) {
+                            var bq = input.queues.by_approach;
+                            lt.textContent += "• 현재 대기(대, 시뮬레이션 결과): N " + bq.N.queue + " / S " + bq.S.queue + " / E " + bq.E.queue + " / W " + bq.W.queue + "\n";
+                        }
+                        lt.textContent += "• 입력: 차량 " + input.queues.total_cars + "대, 정지 " + input.queues.stopped_cars + "대, 보행자 " +
+                            input.pedestrians.waiting_or_crossing + "명, 혼잡도 " + congestionText + " (" + congestionValue.toFixed(2) + ")\n";
+                        lt.textContent += "• 요약: " + (analysis.summary || "-") + "\n";
+                        lt.textContent += "• 교통 수준: " + analysis.traffic_level + " / 위험도: " + analysis.risk_level +
+                            " / 주요 혼잡 방향: " + analysis.main_congestion_direction + "\n";
+                        lt.textContent += "• 보행자 이슈: " + yesNo(analysis.pedestrian_issue) +
+                            " / 교통약자 감지: " + yesNo(analysis.vulnerable_user_detected) + "\n\n";
+
+                        lt.textContent += "[Agent 2 · 신호 계획]\n";
+                        lt.textContent += "• 우선순위: " + priorityText + "\n";
+                        lt.textContent += "• 남북 신호: " + d.north_south_green_sec + "초\n";
+                        lt.textContent += "• 동서 신호: " + d.east_west_green_sec + "초\n";
+                        lt.textContent += "• 보행자 요청: " + (d.pedestrian_green_sec === 0 ? "없음" : d.pedestrian_green_sec + "초") + "\n";
+                        lt.textContent += "• 전체 주기: " + input.signals.cycle_sec + "초\n";
+                        lt.textContent += "• 계획 근거: " + (plan.explanation || "-") + "\n\n";
+
+                        lt.textContent += "[Guardrail 검증]\n";
+                        if (g && g.corrected) {
+                            lt.textContent += "• 보정됨: " + fmtDurations(g.before) + " → " + fmtDurations(g.after) + "\n";
+                            lt.textContent += "• 규칙: 차량 녹색 최소 8초, 보행자가 있으면 보행 녹색 최소 6초, 합계는 주기 " + input.signals.cycle_sec + "초 이내\n\n";
+                        } else if (g) {
+                            lt.textContent += "• 보정 없음: " + fmtDurations(g.after) + " (최소 녹색 시간과 주기 " + input.signals.cycle_sec + "초 조건을 모두 만족)\n\n";
+                        } else {
+                            lt.textContent += "• Guardrail 결과를 수신하지 못했습니다.\n\n";
+                        }
+
+                        lt.textContent += "[Agent 3 · 계획 평가]\n";
+                        lt.textContent += "• 총점: " + evalResult.total_score + "점 (차량 " + scores.vehicle + " / 보행자 " + scores.pedestrian +
+                            " / 교통약자 " + scores.vulnerable_user + " / 안전 " + scores.safety + " / 효율 " + scores.efficiency + ")\n";
+                        lt.textContent += "• 평가 이유: " + (evalResult.reason || "-") + "\n";
+                        lt.textContent += "• 최종 판단: " + data.final_decision + "\n\n";
+
+                        if (data.final_decision === "자동 적용") {
+                            lt.textContent += "\n[자동 적용 예정]\n";
+                            lt.textContent += "평가 결과가 자동 적용으로 판단되어 신호 제어안을 반영합니다.\n";
+                        } else {
+                            lt.textContent += "\n[자동 적용 보류]\n";
+                            lt.textContent += "평가 결과가 '" + data.final_decision + "'이므로 자동 적용하지 않습니다.\n";
+                            lt.textContent += "필요하면 [권장값 적용] 버튼으로 수동 적용할 수 있습니다.\n";
+                        }
+
+                        lt.textContent += "\n==============================\n";
+                        lt.textContent += " 개발자용 상세 JSON\n";
+                        lt.textContent += "==============================\n";
+                        lt.textContent += JSON.stringify(data, null, 2);
+
+                        lt.scrollTop = lt.scrollHeight;
+
+                        // 적용 시 패널이 실제 판단/우선순위를 표시할 수 있도록 결과를 보관한다.
+                        self.lastAIResult = {
+                            decision: data.final_decision,
+                            priority: plan.priority,
+                            priorityText: priorityText,
+                            totalScore: evalResult.total_score
+                        };
+                        setAIStep('decision', 'done', data.final_decision);
+                        document.getElementById('ai-state').textContent = "분석 완료";
+                        document.getElementById('ai-decision').textContent = data.final_decision;
+                        document.getElementById('ai-priority').textContent = priorityText;
+                        document.getElementById('ai-ns').textContent = d.north_south_green_sec + "초 (권장)";
+                        document.getElementById('ai-ew').textContent = d.east_west_green_sec + "초 (권장)";
+                        document.getElementById('ai-ped').textContent =
+                            d.pedestrian_green_sec === 0 ? "없음" : d.pedestrian_green_sec + "초 (권장)";
+
+                        self.recommendedSignalPlan = d;
+                        btnApply.disabled = false;
+
+                        if (data.final_decision === "자동 적용") {
+                            setTimeout(function() {
+                                btnApply.click();
+                            }, 300);
+                        }
+                    }
+
+                    if (eventName === "error") {
+                        if (activeStep) { setAIStep(activeStep, 'error', '실패'); activeStep = null; }
+                        document.getElementById('ai-state').textContent = "분석 실패";
+                        lt.textContent += "\n[오류]\n";
+                        lt.textContent += JSON.stringify(data, null, 2);
+                    }
+                }
+            }
+        } catch (err) {
+            if (activeStep) { setAIStep(activeStep, 'error', '연결 실패'); activeStep = null; }
+            document.getElementById('ai-state').textContent = "서버 연결 실패";
+            lt.textContent += "\n[오류] FastAPI 서버 연결 실패\n";
+            lt.textContent += err.message;
+        }
     };
     document.getElementById('btn-close-log').onclick = function(){ document.getElementById('log-overlay').classList.add('hidden'); };
+
+    // ===== 사용법 안내 (처음 열 때 한 번, 이후 "사용법 보기" 버튼) =====
+    var HELP_SEEN_KEY = 'flowlight_help_seen';
+    var helpOverlay = document.getElementById('help-overlay');
+    function showHelp() { helpOverlay.classList.remove('hidden'); }
+    function hideHelp() {
+        helpOverlay.classList.add('hidden');
+        try {   // localStorage 는 file:// 이나 사생활 보호 모드에서 막힐 수 있어 실패해도 무시한다
+            if (document.getElementById('chk-help-hide').checked) localStorage.setItem(HELP_SEEN_KEY, '1');
+            else localStorage.removeItem(HELP_SEEN_KEY);
+        } catch (e) {}
+    }
+    document.getElementById('btn-help').onclick = showHelp;
+    document.getElementById('btn-close-help').onclick = hideHelp;
+    document.getElementById('btn-help-start').onclick = hideHelp;
+    var helpSeen = false;
+    try { helpSeen = localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch (e) {}
+    if (!helpSeen) showHelp();
+    
     btnApply.onclick = function() {
-        if (self.analyzer) self.analyzer.applyRecommendations();
+        console.log("권장값 적용 버튼 클릭!");
+        console.log("recommendedSignalPlan:", self.recommendedSignalPlan);
+
+        if (!self.recommendedSignalPlan) {
+            alert('적용할 AI 권장 신호안이 없습니다.');
+            return;
+        }
+
+        var plan = self.recommendedSignalPlan;
+        var vulnerableCount = self.pedSys
+            ? self.pedSys.peds.filter(function(p) {
+                return p.type && (
+                    p.type.key === "child" ||
+                    p.type.key === "elderly" ||
+                    p.type.key === "disabled"
+                );
+            }).length
+            : 0;
+
+        if (vulnerableCount > 0 && Number(plan.pedestrian_green_sec) > 0) {
+            plan.pedestrian_green_sec = Math.max(Number(plan.pedestrian_green_sec), 10);
+        }
+        self.jc.aiPedGreenSec = Number(plan.pedestrian_green_sec);
+
+        // AI 적용 후 정체 완화 모드: 새 차량 유입을 잠시 줄여 기존 정체 차량을 먼저 배출
+        // 실데이터 프로파일 모드에서는 입력 수요를 임의로 줄이면 안 되므로 적용하지 않는다.
+        if (self.demandMode !== 'profile') {
+            self.aiControlApplied = true;
+            self.aiReliefUntil = self.simTime + 120;
+            self.jc.aiReliefMode = true;
+            self.originalSpawnRate = self.spawnRate;
+            self.spawnRate = Math.max(2, Math.floor(self.originalSpawnRate * 0.5));
+            document.getElementById('val-spawn').textContent = self.spawnRate;
+            document.getElementById('sim-spawn-rate').value = self.spawnRate;
+        }
+
+        console.log("AI pedestrian control:", self.jc.aiPedGreenSec);
+
+        var nsLeft = 0;
+        var ewLeft = 0;
+
+        console.log("lights =", self.jc.lights);
+        console.log("lights size =", self.jc.lights.size);
+
+        var ng = {
+            straight_NS: plan.north_south_green_sec,
+            left_NS: nsLeft,
+            straight_EW: plan.east_west_green_sec,
+            left_EW: ewLeft
+        };
+
+        var cycle = self.cycleLength;
+
+        var appliedCount = 0;
+
+        var iter = self.jc.lights.values();
+        for (var r = iter.next(); !r.done; r = iter.next()) {
+            r.value.applyGreens(ng, cycle);
+            appliedCount++;
+        }
+
+        console.log("적용 교차로 수:", appliedCount);
+        alert("AI 권장안 적용 완료: " + appliedCount + "개 교차로");
+
+        var banner = document.getElementById("ai-apply-banner");
+        var bannerDetail = document.getElementById("ai-banner-detail");
+
+        bannerDetail.textContent =
+            "남북 직진 " + plan.north_south_green_sec + "초 / " +
+            "동서 직진 " + plan.east_west_green_sec + "초 / " +
+            "보행자 " + plan.pedestrian_green_sec + "초";
+
+        banner.classList.remove("hidden");
+
+        setTimeout(function() {
+            banner.classList.add("hidden");
+        }, 6000);
+
+        // 실제 AI 결과(최종 판단/우선순위)를 표시한다. 자동 적용이 아니면 운영자가 수동 적용한 것이다.
+        var aiResult = self.lastAIResult || {};
+        var applyStateText = aiResult.decision === "자동 적용"
+            ? "자동 적용 완료"
+            : "수동 적용 완료" + (aiResult.decision ? " (" + aiResult.decision + ")" : "");
+
+        document.getElementById("ai-apply-state").textContent = applyStateText;
+        document.getElementById("ai-apply-count").textContent = appliedCount + "개";
+        document.getElementById("ai-vehicle-control").textContent =
+            "남북 " + plan.north_south_green_sec + "초 / 동서 " + plan.east_west_green_sec + "초";
+        document.getElementById("ai-ped-control").textContent =
+            plan.pedestrian_green_sec === 0
+                ? "보행자 요청 없음 → 빨간불 고정"
+                : vulnerableCount > 0
+                    ? "교통약자 감지 → 보행자 " + plan.pedestrian_green_sec + "초 확보"
+                    : "보행자 " + plan.pedestrian_green_sec + "초 확보";
+        document.getElementById("ai-guardrail").textContent =
+            self.lastGuardrail
+                ? (self.lastGuardrail.corrected
+                    ? "보정됨: " + fmtDurations(self.lastGuardrail.before) + " → " + fmtDurations(self.lastGuardrail.after)
+                    : "보정 없음 (최소 신호 시간·주기 검증 통과)")
+                : "최소 신호 시간 및 주기 초과 검증 완료";
+
+        document.getElementById("effect-summary").textContent =
+            "AI 신호 제어 반영 완료";
+
+        document.getElementById('ai-state').textContent = applyStateText;
+        document.getElementById('ai-decision').textContent = aiResult.decision || "-";
+        document.getElementById('ai-priority').textContent = aiResult.priorityText || "-";
+        document.getElementById('ai-ns').textContent = plan.north_south_green_sec + "초";
+        document.getElementById('ai-ew').textContent = plan.east_west_green_sec + "초";
+        document.getElementById('ai-ped').textContent =
+            plan.pedestrian_green_sec === 0 ? "없음" : plan.pedestrian_green_sec + "초";
+
+        self.cycleLength = Math.round(cycle);
+        document.getElementById('val-cycle').textContent = self.cycleLength;
+        document.getElementById('sim-cycle').value = self.cycleLength;
+
+        var lt = document.getElementById('log-text');
+
+        lt.textContent += "\n\n===== AI 권장안 적용 완료 =====\n";
+        lt.textContent += "적용 교차로 수: " + appliedCount + "개\n";
+        lt.textContent += "남북 직진: " + plan.north_south_green_sec + "초\n";
+        lt.textContent += "동서 직진: " + plan.east_west_green_sec + "초\n";
+        lt.textContent += "보행자 요청: " + (plan.pedestrian_green_sec === 0 ? "없음" : plan.pedestrian_green_sec + "초") + "\n";
+        lt.textContent += "적용된 전체 주기: " + Math.round(cycle) + "초\n";
+
+        lt.scrollTop = lt.scrollHeight;
+
         btnApply.disabled = true;
-        document.getElementById('log-overlay').classList.add('hidden');
+
+        // AI 적용 효과: 15초 동안 평균값으로 측정
+        var effectSamples = [];
+        var effectSampleCount = 0;
+
+        var effectTimer = setInterval(function() {
+            var stoppedNow = 0;
+            var sumVNow = 0;
+
+            for (var i = 0; i < self.cars.length; i++) {
+                if (self.cars[i].v < 3) stoppedNow++;
+                sumVNow += self.cars[i].v;
+            }
+
+            var nNow = self.cars.length;
+            var speedRateNow = nNow > 0
+                ? (sumVNow / nNow) / self.maxSpeed
+                : 0;
+
+            // 차량이 없으면 정체 지수는 0 (상단 막대와 같은 정의)
+            var congestionNow = nNow > 0
+                ? Math.min(1, Math.max(0, (stoppedNow / nNow) * 0.7 + (1 - speedRateNow) * 0.6))
+                : 0;
+
+            var latestNow = self.logger && self.logger.buffer.length > 0
+                ? self.logger.buffer[self.logger.buffer.length - 1]
+                : null;
+
+            effectSamples.push({
+                stopped: stoppedNow,
+                congestion: congestionNow,
+                throughput: latestNow ? latestNow.network.throughputPerMin : 0
+            });
+
+            effectSampleCount++;
+
+            document.getElementById("effect-summary").textContent =
+                "AI 적용 효과 측정 중... " + effectSampleCount + "/15초";
+
+            if (effectSampleCount >= 15) {
+                clearInterval(effectTimer);
+
+                var sumStopped = 0;
+                var sumCongestion = 0;
+                var sumThroughput = 0;
+
+                for (var j = 0; j < effectSamples.length; j++) {
+                    sumStopped += effectSamples[j].stopped;
+                    sumCongestion += effectSamples[j].congestion;
+                    sumThroughput += effectSamples[j].throughput;
+                }
+
+                var avgStopped = Math.round(sumStopped / effectSamples.length);
+                var avgCongestion = sumCongestion / effectSamples.length;
+                var avgThroughput = Math.round(sumThroughput / effectSamples.length);
+
+                var beforeThroughput = self.aiBeforeMetrics ? self.aiBeforeMetrics.throughput : 0;
+                var beforeStopped = self.aiBeforeMetrics ? self.aiBeforeMetrics.stopped : 0;
+                var beforeCongestion = self.aiBeforeMetrics ? self.aiBeforeMetrics.congestion : 0;
+
+                document.getElementById("effect-stop-after").textContent =
+                    avgStopped + "대 (15초 평균)";
+
+                document.getElementById("effect-flow-after").textContent =
+                    avgThroughput + "대/분 (15초 평균)";
+
+                document.getElementById("effect-congestion-after").textContent =
+                    beforeCongestion.toFixed(2) + " → " + avgCongestion.toFixed(2);
+
+                // 두 지표를 있는 그대로 말한다. 나빠졌는데 "완화"라고 쓰지 않는다.
+                var flowUp = avgThroughput > beforeThroughput;
+                var congDown = avgCongestion < beforeCongestion - 0.005;
+                var congUp = avgCongestion > beforeCongestion + 0.005;
+                var summary;
+                if (flowUp && congDown) summary = "처리량 증가, 정체 지수 감소";
+                else if (flowUp) summary = "처리량 증가, 정체 지수는 " + (congUp ? "상승" : "변화 없음");
+                else if (congDown) summary = "정체 지수 감소, 처리량은 변화 없음";
+                else summary = "뚜렷한 변화 없음 (적용 후 15초 평균 기준)";
+                document.getElementById("effect-summary").textContent = summary;
+            }
+        }, 1000);
+
+        if (!self.running) {
+            self.renderer.render(self.network, self.jc, self.cam);
+        }
     };
+    
     optSlider.oninput = function() {
         document.getElementById('val-opt-int').textContent = optSlider.value;
         self.optimizeInterval = parseFloat(optSlider.value);
@@ -2115,6 +3055,7 @@ SimController.prototype.reset = function() {
     this.optAcc = 0;
     this.network = new Network(this.gridSize, 100);
     this.jc = new JunctionControl(this.network);
+    this.jc.aiPedGreenSec = null;
     this.pedSys = new PedSystem(this.network, this.jc);
     this.jc.peds = this.pedSys; // Car.update가 jc를 통해 접근
     this.pedSys.spawnRate = parseFloat(document.getElementById('sim-ped-rate').value);
@@ -2122,6 +3063,7 @@ SimController.prototype.reset = function() {
     this.logger.sampleInterval = parseFloat(document.getElementById('sim-sample-int').value);
     this.analyzer = new Analyzer(this.network, this.jc, this.logger);
     this.optimizeInterval = parseFloat(document.getElementById('sim-opt-int').value);
+    this._initDemandSpawn();
     this.cam = {x: 0, y: 0, scale: 1.0};
     window.dispatchEvent(new Event('resize'));
     if (!this.running) this.renderer.render(this.network, this.jc, this.cam);
@@ -2135,8 +3077,9 @@ SimController.prototype._loop = function(ts) {
     // 안정성을 위해 배속이 높을 때는 여러 번 나누어 시뮬레이션
     var steps = this.speedMultiplier;
     var stepDt = effectiveDt / steps;
+    
     for (var i = 0; i < steps; i++) {
-        this._update(stepDt);
+    this._update(stepDt);
     }
     this.renderer.render(this.network, this.jc, this.cam);
     var self = this;
@@ -2144,10 +3087,47 @@ SimController.prototype._loop = function(ts) {
 };
 SimController.prototype._update = function(dt, skipUI) {
     this.simTime += dt;
-    this.spawnAcc += this.spawnRate * dt;
-    while (this.spawnAcc >= 1.0) {
-        this.spawnAcc -= 1.0;
-        if (this.cars.length < this.maxCars) this._spawnCar();
+    // AI 정체 완화 시간이 끝나면 원래 교통량으로 복구
+        if (this.aiControlApplied && this.aiReliefUntil && this.simTime >= this.aiReliefUntil) {
+            this.spawnRate = this.originalSpawnRate || this.spawnRate;
+            document.getElementById('val-spawn').textContent = this.spawnRate;
+            document.getElementById('sim-spawn-rate').value = this.spawnRate;
+            this.aiControlApplied = false;
+            this.jc.aiReliefMode = false;
+        }
+    var stoppedForSpawn = 0;
+    for (var si = 0; si < this.cars.length; si++) {
+        if (this.cars[si].v < 3) stoppedForSpawn++;
+    }
+
+    var stoppedRatio = stoppedForSpawn / Math.max(1, this.cars.length);
+
+    // 장시간 고밀도 상태에서 도로가 완전히 막히는 것 방지
+    var gridlockRisk =
+        this.cars.length >= this.maxCars * 0.8 &&
+        stoppedRatio >= 0.75;
+
+    if (this.demandMode === 'profile') {
+        // 실데이터 프로파일: 접근로별 발생률(차로당 대/초)로 Poisson 도착 생성
+        this._spawnFromProfile(gridlockRisk);
+        if (!skipUI && this.autoHour && this.profile) {
+            this.hourAcc += dt;
+            if (this.hourAcc >= this.secsPerHour) {
+                this.hourAcc -= this.secsPerHour;
+                var hs = this.profile.available_hours;
+                this.applyProfileHour(hs[(hs.indexOf(this.profileHour) + 1) % hs.length]);
+            }
+        }
+    } else {
+        // 수동: 네트워크 전체 발생률(슬라이더)을 누적해 무작위 진입로에 생성 (기존 방식)
+        this.spawnAcc += this.spawnRate * dt;
+        while (this.spawnAcc >= 1.0) {
+            this.spawnAcc -= 1.0;
+
+            if (!gridlockRisk && this.cars.length < this.maxCars) {
+                this._spawnCar();
+            }
+        }
     }
     this.jc.update(dt, this.simTime, this.cycleLength);
     for (var i = this.cars.length - 1; i >= 0; i--) {
@@ -2161,6 +3141,7 @@ SimController.prototype._update = function(dt, skipUI) {
         }
     }
 
+    /*
     // 사고 판정 (차량 겹침 감지 및 사고 처리)
     for (var i = 0; i < this.cars.length; i++) {
         var c1 = this.cars[i];
@@ -2206,7 +3187,7 @@ SimController.prototype._update = function(dt, skipUI) {
                 }
             }
         }
-    }
+    }*/
 
     this.pedSys.update(dt); // 보행자는 A/B 평가에도 포함 (교통에 영향)
     this.sampleAcc += dt;
@@ -2230,26 +3211,223 @@ SimController.prototype._update = function(dt, skipUI) {
     }
     var n = this.cars.length;
     var sr = n > 0 ? (sumV / n) / this.maxSpeed : 0;
+    this._renderDemandTable();
     document.getElementById('stat-cars').textContent = n;
     document.getElementById('stat-peds').textContent = this.pedSys.peds.length;
     document.getElementById('stat-stopped').textContent = stopped;
     document.getElementById('stat-speed').textContent = Math.round(sr * 100) + '%';
     var recent = this.jc.completedTrips.filter(function(t){ return this.simTime - t.endTime <= 60; }.bind(this));
     document.getElementById('stat-throughput').textContent = recent.length;
-    var cong = Math.min(1, Math.max(0, (stopped / Math.max(1, n)) * 0.7 + (1 - sr) * 0.6));
+    // 정체 지수 = 정지 비율×0.7 + (1 − 평균속도 비율)×0.6, 0~1 로 자름. 차량이 없으면 0.
+    // (이전에는 차량 0대일 때 속도 비율 0 으로 계산되어 0.6 이 표시되는 문제가 있었다.)
+    var cong = n > 0
+        ? Math.min(1, Math.max(0, (stopped / n) * 0.7 + (1 - sr) * 0.6))
+        : 0;
     var cBar = document.getElementById('stat-congestion');
     cBar.style.width = (cong * 100) + '%';
-    cBar.style.backgroundColor = cong < 0.25 ? COL_GREEN : cong < 0.55 ? COL_YELLOW : COL_RED;
+    // 색은 항상 같은 기준으로 칠한다. AI 적용 전후에 따라 기준을 바꾸지 않는다.
+    cBar.style.backgroundColor =
+        cong < 0.25 ? COL_GREEN :
+        cong < 0.55 ? COL_YELLOW :
+        COL_RED;
 };
+// 수동 모드: 무작위 진입로에 1대 생성 (기존 동작)
 SimController.prototype._spawnCar = function() {
-    var edge = this.network.getRandomSourceEdge();
-    if (!edge) return;
-    if (edge.cars.length > 0 && edge.cars[0].s < 15) return;
+    return this._spawnCarOn(this.network.getRandomSourceEdge());
+};
+// 지정한 진입 엣지에 1대 생성. 진입로 첫 차가 15px 미만이면 생성하지 못하고 false 를 돌려준다.
+SimController.prototype._spawnCarOn = function(edge) {
+    if (!edge) return false;
+    if (edge.cars.length > 0 && edge.cars[0].s < 15) return false;
     var route = this.network.findRandomRoute(edge);
     if (route.length > 0) {
         this.cars.push(new Car(edge, this.maxSpeed, this.maxSpeed, route, this.simTime));
+        return true;
+    }
+    return false;
+};
+
+// ===== 실데이터 수요 프로파일 모드 (6-3) =====
+// 백엔드 GET /api/traffic/profile 이 준 접근로별 발생률(차로당 대/초)로 N/S/E/W 진입 엣지에 차량을 만든다.
+// 도착 간격은 지수분포(Poisson 도착)이고 시드 고정 rand() 만 쓰므로 A/B 검증의 재현성이 유지된다.
+// 여기서 만드는 것은 "도착"뿐이다. 대기 차량 수(queue)는 신호와 차간 상호작용의 결과로 시뮬레이터가 계산한다.
+var APPROACH_KEYS = ['N', 'S', 'E', 'W'];
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function nextArrivalGap(rate) {
+    if (!(rate > 0)) return Infinity;              // 발생률 0 이면 생성 없음
+    return -Math.log(1 - rand()) / rate;           // 지수분포 (평균 1/rate 초)
+}
+
+SimController.prototype.loadTrafficProfile = async function() {
+    var metaEl = document.getElementById('demand-profile-meta');
+    metaEl.textContent = '프로파일 불러오는 중...';
+    try {
+        var resp = await fetch(API_BASE + '/api/traffic/profile');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        this.profile = await resp.json();
+    } catch (err) {
+        this.profile = null;
+        metaEl.textContent = '프로파일을 불러오지 못했습니다: ' + err.message + ' (FastAPI 서버가 켜져 있는지 확인)';
+        return false;
+    }
+    var m = this.profile.meta;
+    metaEl.textContent = m.site_name + ' · ' + m.date + ' (' + m.weekday + ') · 차로 N' + m.lanes.N +
+        '/S' + m.lanes.S + '/E' + m.lanes.E + '/W' + m.lanes.W + ' · ' + m.approach_naming;
+    var hours = this.profile.available_hours;
+    var slider = document.getElementById('sim-demand-hour');
+    slider.min = Math.min.apply(null, hours);
+    slider.max = Math.max.apply(null, hours);
+    if (hours.indexOf(this.profileHour) < 0) this.profileHour = hours[0];
+    slider.value = this.profileHour;
+    document.getElementById('val-demand-hour').textContent = pad2(this.profileHour);
+    return true;
+};
+
+// 진입 엣지(테두리 → 내부)를 접근로로 분류한다. 3x3 이면 접근로당 1개.
+// 격자가 더 크면 같은 변의 진입로 여러 개가 그 접근로의 수요를 나눠 받는다. 2x2 는 진입 엣지 정의가 달라 지원하지 않는다.
+SimController.prototype.mapApproachEdges = function() {
+    var N = this.network.gridSize, sp = this.network.spacing;
+    var map = { N: [], S: [], E: [], W: [] };
+    for (var i = 0; i < this.network.edges.length; i++) {
+        var e = this.network.edges[i];
+        if (e.isArc || !e.from.isBoundary || e.to.isBoundary) continue;
+        var f = e.from;
+        if (f.y === sp) map.N.push(e);            // 위쪽 테두리에서 남쪽으로 진입 = 북측 접근로
+        else if (f.y === N * sp) map.S.push(e);
+        else if (f.x === N * sp) map.E.push(e);
+        else if (f.x === sp) map.W.push(e);
+    }
+    this.approachEdges = map;
+    return map;
+};
+
+SimController.prototype._initDemandSpawn = function() {
+    this.demandSpawn = {};
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        this.demandSpawn[APPROACH_KEYS[k]] = { rate: 0, nextAt: null, spawned: 0, lost: 0, recent: [], lostRecent: [] };
+    }
+    this.hourAcc = 0;
+    // 접근로 매핑은 모드와 무관하게 만든다 (6-4: 수동 모드에서도 접근로별 대기 상태를 AI 에 보낼 수 있도록). 2x2 는 지원하지 않음.
+    this.approachEdges = this.gridSize >= 3 ? this.mapApproachEdges() : null;
+    if (this.demandMode === 'profile') {
+        this.applyProfileHour(this.profileHour);
     }
 };
+
+SimController.prototype.applyProfileHour = function(hour) {
+    if (!this.profile) return;
+    var entry = null;
+    for (var i = 0; i < this.profile.hours.length; i++) {
+        if (this.profile.hours[i].hour === hour) { entry = this.profile.hours[i]; break; }
+    }
+    if (!entry) return;
+    this.profileHour = hour;
+    this.currentDemand = entry;
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var st = this.demandSpawn[APPROACH_KEYS[k]];
+        st.rate = entry.arrival_rate_per_sec[APPROACH_KEYS[k]] || 0;
+        st.nextAt = null;   // 다음 _update 에서 새 발생률로 다시 뽑는다 (A/B: setSeed 이후에 뽑히도록)
+    }
+    document.getElementById('val-demand-hour').textContent = pad2(hour);
+    document.getElementById('sim-demand-hour').value = hour;
+};
+
+SimController.prototype._spawnFromProfile = function(gridlockRisk) {
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k];
+        var st = this.demandSpawn[a];
+        var edges = this.approachEdges ? this.approachEdges[a] : [];
+        if (st.nextAt === null) st.nextAt = this.simTime + nextArrivalGap(st.rate);
+        var guard = 0;
+        while (this.simTime >= st.nextAt && guard++ < 50) {
+            st.nextAt += nextArrivalGap(st.rate);
+            var ok = false;
+            if (edges.length > 0 && !gridlockRisk && this.cars.length < this.maxCars) {
+                var edge = edges.length === 1 ? edges[0] : edges[Math.floor(rand() * edges.length)];
+                ok = this._spawnCarOn(edge);
+            }
+            if (ok) { st.spawned++; st.recent.push(this.simTime); }
+            else { st.lost++; st.lostRecent.push(this.simTime); }   // 진입로 차단·상한·gridlock 으로 만들지 못한 수요
+        }
+        while (st.recent.length > 0 && this.simTime - st.recent[0] > 60) st.recent.shift();
+        while (st.lostRecent.length > 0 && this.simTime - st.lostRecent[0] > 60) st.lostRecent.shift();
+    }
+};
+
+// ===== 접근로별 현재 상태 (6-4) — 시뮬레이션의 "결과" =====
+// 진입 엣지(테두리 → 교차로) 기준. 3x3 에서는 교차로 접근로 4개와 정확히 일치하고, 더 큰 격자에서는 진입 엣지만 집계한다.
+// queue = 그 엣지에서 속도 3px/s 미만인 차량 수. 입력 수요(volume)와는 다른 값이며 AI 에는 둘을 따로 보낸다.
+SimController.prototype._approachQueue = function(edges) {
+    var q = 0;
+    for (var i = 0; i < edges.length; i++) {
+        for (var j = 0; j < edges[i].cars.length; j++) if (edges[i].cars[j].v < 3) q++;
+    }
+    return q;
+};
+SimController.prototype._approachState = function(windowSec) {
+    if (!this.approachEdges) return null;
+    var SAT = 0.5;   // 포화유출률 (DataLogger/Analyzer 와 동일)
+    var interval = this.logger ? this.logger.sampleInterval : 1;
+    var nSamples = Math.max(1, Math.round(windowSec / interval));
+    var samples = this.logger ? this.logger.buffer.slice(-nSamples) : [];
+    var actualWindow = samples.length * interval;
+    var out = {};
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k], edges = this.approachEdges[a];
+        var queue = 0, waitSum = 0, nCars = 0, arrS = 0, arrL = 0, arrR = 0;
+        for (var i = 0; i < edges.length; i++) {
+            var e = edges[i];
+            for (var j = 0; j < e.cars.length; j++) {
+                if (e.cars[j].v < 3) queue++;
+                waitSum += e.cars[j].waitTime;
+                nCars++;
+            }
+            // 윈도 내 도착 수: DataLogger 샘플의 접근로 통계(엣지 id 키)에서 합산
+            for (var si = 0; si < samples.length; si++) {
+                var ints = samples[si].intersections;
+                for (var ii = 0; ii < ints.length; ii++) {
+                    var ap = ints[ii].approaches[e.id];
+                    if (ap) { arrS += ap.arrS || 0; arrL += ap.arrL || 0; arrR += ap.arrR || 0; }
+                }
+            }
+        }
+        var saturation = 0;
+        if (edges.length > 0 && actualWindow > 0) {
+            var light = this.jc.lights.get(edges[0].to.id);
+            if (light) {
+                var C = 0;
+                for (var pi = 0; pi < light.phases.length; pi++) C += light.phases[pi].duration;
+                var g = light.greenTimes['straight_' + edges[0].dir] || GREEN_MIN;
+                var lam = (arrS + arrR) / actualWindow;
+                if (C > 0) saturation = lam / (SAT * g / C);
+            }
+        }
+        out[a] = {
+            queue: queue,
+            mean_wait_sec: nCars > 0 ? Math.round(waitSum / nCars * 10) / 10 : 0,
+            arrivals_last_window: arrS + arrL + arrR,
+            saturation: Math.round(saturation * 100) / 100
+        };
+    }
+    return { by_approach: out, window_sec: actualWindow };
+};
+
+SimController.prototype._renderDemandTable = function() {
+    if (this.demandMode !== 'profile' || !this.currentDemand || !this.profile) return;
+    var lanes = this.profile.meta.lanes;
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k], st = this.demandSpawn[a];
+        var row = document.getElementById('demand-row-' + a);
+        if (!row) continue;
+        row.cells[0].textContent = APPROACH_LABELS[a] + ' · ' + lanes[a] + '차로';
+        row.cells[1].textContent = this.currentDemand.volume[a];
+        row.cells[2].textContent = st.rate.toFixed(3);
+        row.cells[3].textContent = st.recent.length;
+        row.cells[4].textContent = st.lost;
+        row.cells[5].textContent = this.approachEdges ? this._approachQueue(this.approachEdges[a]) : '-';   // 시뮬레이션 결과
+    }
+};
+var APPROACH_LABELS = { N: 'N 북측', S: 'S 남측', E: 'E 동측', W: 'W 서측' };
 
 // ===== A/B 검증 하네스 =====
 // 도로망·제어 유형·신호 설정은 유지한 채 차량/시간/데이터만 초기화.
@@ -2269,6 +3447,7 @@ SimController.prototype.softReset = function() {
     for (var r = it.next(); !r.done; r = it.next()) { r.value.phaseIdx = 0; r.value.t = 0; }
     this.pedSys.clear();
     this.logger.buffer.length = 0;
+    this._initDemandSpawn();   // 프로파일 모드: 도착 타이머·카운터 초기화 (A/B 두 단계가 같은 시드로 같은 도착을 만들도록)
 };
 SimController.prototype._collectKPI = function(congSum, congN) {
     var trips = this.jc.completedTrips;

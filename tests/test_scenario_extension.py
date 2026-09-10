@@ -17,7 +17,7 @@ APPROACHES = ("N", "S", "E", "W")
 
 @pytest.fixture
 def extended_scenario(frontend_scenario):
-    """Mirror of what (MAIN) cityflow_final.html builds in profile mode after 6-4."""
+    """Mirror of what app/index.html builds in profile mode after 6-4."""
     s = copy.deepcopy(frontend_scenario)
     s["demand"] = {
         "mode": "profile",
