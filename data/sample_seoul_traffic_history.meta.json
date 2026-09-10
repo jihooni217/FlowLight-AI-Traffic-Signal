@@ -1,0 +1,18 @@
+{
+  "csv": "sample_seoul_traffic_history.csv",
+  "encoding": "utf-8-sig",
+  "format": "seoul_traffic_history",
+  "site_id": "DEMO-X",
+  "site_name": "FlowLight 데모 교차로 (합성 예제, 서울시 교통량 이력 정보 컬럼 구조)",
+  "date": "20250514",
+  "flow_type": "유입",
+  "site_to_approach": {
+    "DEMO-N": "N",
+    "DEMO-S": "S",
+    "DEMO-E": "E",
+    "DEMO-W": "W"
+  },
+  "lanes": null,
+  "source": "합성 예제. 컬럼 구조는 서울특별시_교통량 이력 정보(공공데이터포털 15056899, 원천 TOPIS)를 따름. 값은 data/README.md 의 공식으로 생성",
+  "license": "예제 데이터는 이 저장소 라이선스를 따름. 원본 데이터셋은 공공데이터포털 표기상 '이용허락범위 제한 없음'"
+}

@@ -4,12 +4,16 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT_DIR))
 
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 
 
+# Calls the real Upstage Solar API three times. Opt-in only:
+#   RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py
+@pytest.mark.live
 def test_agent_stream_success():
     response = client.get("/api/agent/stream")
 
