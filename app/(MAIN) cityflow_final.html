@@ -1,6 +1,4 @@
 
-cityflow_6.html
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -190,11 +188,19 @@ input[type="range"]:disabled { opacity: 0.35; }
     font-weight: 500;
 }
 
+.panel.advanced summary { cursor: pointer; color: #fff; font-size: 1rem; font-weight: 600; list-style: none; }
+.panel.advanced summary::before { content: '▸ '; color: var(--text-muted); }
+.panel.advanced[open] summary::before { content: '▾ '; }
+.panel.advanced .sub { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); }
+.panel.advanced h3 { font-size: 0.9rem; color: #fff; margin-bottom: 0.5rem; }
+.mode-note { color: var(--text-muted); font-weight: 400; font-size: 0.75rem; }
+.sidebar .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: -0.6rem; margin-bottom: 0.25rem; }
+
 #ai-floating-panel {
     position: absolute;
     top: 1rem;
     left: 1rem;
-    width: 240px;
+    width: 270px;
     background: rgba(17, 17, 17, 0.88);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px;
@@ -216,7 +222,8 @@ input[type="range"]:disabled { opacity: 0.35; }
 <body>
     <div class="container">
         <aside class="sidebar">
-            <h1>CityFlow v2</h1>
+            <h1>FlowLight</h1>
+            <p class="subtitle">CityFlow v2 시뮬레이터 · Solar Pro 4 신호 계획</p>
             <section class="panel controls">
                 <h2>시뮬레이션 제어</h2>
                 <div class="btn-group">
@@ -233,15 +240,17 @@ input[type="range"]:disabled { opacity: 0.35; }
                     </div>
                 </div>
                 <div class="slider-group mt-2">
-                    <label>교통량 (대/초): <span id="val-spawn">3</span></label>
+                    <label>교통량 (대/초): <span id="val-spawn">3</span> <span id="spawn-mode-note" class="mode-note" style="display:none">· 프로파일 모드에서는 사용 안 함</span></label>
                     <input type="range" id="sim-spawn-rate" min="0" max="6" step="1" value="3">
                     <label>보행자 (명/초): <span id="val-ped">0</span></label>
                     <input type="range" id="sim-ped-rate" min="0" max="2" step="1" value="0">
+                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
+                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
                     <label>최대 차량 (대): <span id="val-maxcars">150</span></label>
                     <input type="range" id="sim-max-cars" min="1" max="400" step="1" value="150">
                     <label>최고 속도 (px/s): <span id="val-speed">60</span></label>
                     <input type="range" id="sim-max-speed" min="20" max="120" step="5" value="60">
-                    <label>격자 크기 (NxN): <span id="val-grid">4</span></label>
+                    <label>격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드에서는 3x3 고정</span></label>
                     <input type="range" id="sim-grid-size" min="2" max="6" step="1" value="4">
                 </div>
             </section>
@@ -259,69 +268,77 @@ input[type="range"]:disabled { opacity: 0.35; }
                         <input type="range" id="sim-demand-hour" min="0" max="23" step="1" value="8">
                     </div>
                     <label class="toggle-label mt-2">
-                        <input type="checkbox" id="chk-demand-autohour"> 시간대 자동 진행 (<span id="val-demand-secs">120</span>초/시간)
+                        <input type="checkbox" id="chk-demand-autohour"> 자동 진행 (<span id="val-demand-secs">120</span>초마다 다음 시간대)
                     </label>
                     <table class="demand-table">
-                        <thead><tr><th>접근로</th><th>수요<br>대/시</th><th>차로</th><th>발생률<br>대/초</th><th>진입<br>60초</th><th>손실</th><th>대기<br>대</th></tr></thead>
+                        <thead><tr><th>접근로</th><th>수요<br><small>대/시</small></th><th>발생률<br><small>대/초</small></th><th>진입<br><small>60초</small></th><th>손실</th><th>대기</th></tr></thead>
                         <tbody>
-                            <tr id="demand-row-N"><td>N 북측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-                            <tr id="demand-row-S"><td>S 남측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-                            <tr id="demand-row-E"><td>E 동측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
-                            <tr id="demand-row-W"><td>W 서측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-N"><td>N 북측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-S"><td>S 남측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-E"><td>E 동측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
+                            <tr id="demand-row-W"><td>W 서측</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>
                         </tbody>
                     </table>
                     <p class="hint mt-2">수요(대/시)는 입력값이고 발생률은 차로당 값입니다. 대기 차량 수는 시뮬레이션이 계산한 결과이며 여기 값이 아닙니다.<br>손실 = 진입로가 막혀 만들지 못한 차량 수.</p>
                 </div>
             </section>
 
-            <section class="panel control-types">
-                <h2>교차로 제어 유형</h2>
-                <p class="hint">유형을 선택하고 교차로를 클릭하세요.</p>
-                <div class="radio-group" id="junction-types">
-                    <label><input type="radio" name="jtype" value="signal" checked> 🚦 신호교차로 (한국 4현시)</label>
-                    <label><input type="radio" name="jtype" value="allway_stop"> 🛑 전방향 정지</label>
-                    <label><input type="radio" name="jtype" value="priority"> ⚠️ 우선도로</label>
-                    <label><input type="radio" name="jtype" value="roundabout"> 🔄 회전교차로</label>
-                </div>
-                <div class="slider-group mt-2">
-                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
-                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
-                    <label>신호 연동 오프셋 (s): <span id="val-offset">0</span></label>
-                    <input type="range" id="sim-offset" min="0" max="20" step="1" value="0">
-                    <p class="hint">인접 교차로 간 녹색파(Green Wave) 시차. 0이면 동시 시작.</p>
-                </div>
-            </section>
-
-            <section class="panel data-panel">
-                <h2>데이터 수집</h2>
-                <div class="slider-group">
-                    <label>샘플 간격 (s): <span id="val-sample">1.0</span></label>
-                    <input type="range" id="sim-sample-int" min="0.5" max="5.0" step="0.5" value="1.0">
-                </div>
-                <div class="btn-group mt-2">
-                    <button id="btn-export-json" class="btn outline">JSON 내보내기</button>
-                    <button id="btn-export-csv" class="btn outline">CSV 내보내기</button>
-                </div>
-            </section>
-
             <section class="panel optimize-panel">
-                <h2>신호 최적화</h2>
-                <div class="slider-group">
-                    <label>분석 주기 (s): <span id="val-opt-int">10</span></label>
-                    <input type="range" id="sim-opt-int" min="5" max="60" step="1" value="10">
-                </div>
+                <h2>AI 신호 최적화 (Solar Pro 4)</h2>
+                <p class="hint">현재 교차로 상태를 보내 Agent 3개가 분석 → 계획 → 평가합니다. 판단이 "자동 적용"이면 바로 적용되고, 아니면 아래 버튼으로 적용합니다.</p>
                 <div class="btn-group mt-2">
                     <button id="btn-optimize" class="btn secondary">AI 분석</button>
                     <button id="btn-apply-opt" class="btn success" disabled>권장값 적용</button>
                 </div>
-                <div class="btn-group mt-2">
-                    <button id="btn-ab-test" class="btn primary">A/B 검증 (180s×2, 시드 고정)</button>
-                </div>
-                <div id="ab-status" class="hint mt-2" style="display:none"></div>
-                <label class="toggle-label mt-2">
-                    <input type="checkbox" id="chk-adaptive"> 적응형 신호 자동 적용
-                </label>
             </section>
+
+            <details class="panel advanced">
+                <summary>고급 설정 (교차로 유형 · 데이터 수집 · 내장 Webster 최적화)</summary>
+
+                <div class="sub">
+                    <h3>교차로 제어 유형</h3>
+                    <p class="hint">유형을 선택하고 교차로를 클릭하세요. 데모는 신호교차로 1개로 진행합니다.</p>
+                    <div class="radio-group" id="junction-types">
+                        <label><input type="radio" name="jtype" value="signal" checked> 🚦 신호교차로 (한국 4현시)</label>
+                        <label><input type="radio" name="jtype" value="allway_stop"> 🛑 전방향 정지</label>
+                        <label><input type="radio" name="jtype" value="priority"> ⚠️ 우선도로</label>
+                        <label><input type="radio" name="jtype" value="roundabout"> 🔄 회전교차로</label>
+                    </div>
+                    <div class="slider-group mt-2">
+                        <label>신호 연동 오프셋 (s): <span id="val-offset">0</span></label>
+                        <input type="range" id="sim-offset" min="0" max="20" step="1" value="0">
+                        <p class="hint">인접 교차로 간 녹색파(Green Wave) 시차. 교차로가 여러 개일 때만 의미가 있습니다.</p>
+                    </div>
+                </div>
+
+                <div class="sub">
+                    <h3>데이터 수집</h3>
+                    <div class="slider-group">
+                        <label>샘플 간격 (s): <span id="val-sample">1.0</span></label>
+                        <input type="range" id="sim-sample-int" min="0.5" max="5.0" step="0.5" value="1.0">
+                    </div>
+                    <div class="btn-group mt-2">
+                        <button id="btn-export-json" class="btn outline">JSON 내보내기</button>
+                        <button id="btn-export-csv" class="btn outline">CSV 내보내기</button>
+                    </div>
+                </div>
+
+                <div class="sub">
+                    <h3>내장 Webster 최적화 (LLM 과 무관)</h3>
+                    <p class="hint">도착률로 계산하는 고전적 신호 배분입니다. AI 결과와 비교하는 용도로 남겨 두었습니다.</p>
+                    <div class="slider-group">
+                        <label>분석 주기 (s): <span id="val-opt-int">10</span></label>
+                        <input type="range" id="sim-opt-int" min="5" max="60" step="1" value="10">
+                    </div>
+                    <label class="toggle-label mt-2">
+                        <input type="checkbox" id="chk-adaptive"> Webster 권장값 자동 적용
+                    </label>
+                    <div class="btn-group mt-2">
+                        <button id="btn-ab-test" class="btn primary">A/B 검증 (Webster 권장안, 180s×2, 시드 고정)</button>
+                    </div>
+                    <div id="ab-status" class="hint mt-2" style="display:none"></div>
+                </div>
+            </details>
         </aside>
 
         <main class="main-content">
@@ -329,7 +346,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <div class="stat">차량: <b id="stat-cars">0</b></div>
                 <div class="stat">보행자: <b id="stat-peds">0</b></div>
                 <div class="stat">대기: <b id="stat-stopped">0</b></div>
-                <div class="stat">평균속도: <b id="stat-speed">0%</b></div>
+                <div class="stat">평균속도(최고 대비): <b id="stat-speed">0%</b></div>
                 <div class="stat">통과(1분): <b id="stat-throughput">0</b></div>
                 <div class="stat congestion">
                     정체 지수:
@@ -1370,8 +1387,10 @@ DataLogger.prototype.sample = function(simTime) {
     var n = allCars.length;
     var meanSpeed = n > 0 ? sumSpeed / n : 0;
     var recent = this.jc.completedTrips.filter(function(t){ return simTime - t.endTime <= 60; });
-    var congestion = Math.min(1, Math.max(0,
-        (stoppedCount / Math.max(1, n)) * 0.7 + (1 - meanSpeed / Math.max(1, this.maxSpeed)) * 0.6));
+    // 차량이 없으면 0 (상단 막대·AI 입력과 같은 정의)
+    var congestion = n > 0
+        ? Math.min(1, Math.max(0, (stoppedCount / n) * 0.7 + (1 - meanSpeed / Math.max(1, this.maxSpeed)) * 0.6))
+        : 0;
 
     var edgesStats = [];
     for (var i = 0; i < this.network.edges.length; i++) {
@@ -2195,6 +2214,9 @@ SimController.prototype._initDOM = function() {
             self.demandMode = 'profile';
             profileBox.style.display = 'block';
             spawnSlider.disabled = true;
+            document.getElementById('sim-grid-size').disabled = true;   // 3x3 고정 (접근로 1:1 매핑 유지)
+            document.getElementById('spawn-mode-note').style.display = '';
+            document.getElementById('grid-mode-note').style.display = '';
             // 프로파일은 교차로 1개·접근로 4개를 기술하므로 격자를 3x3 으로 맞춘다 (진입 엣지 4개 = N/S/E/W).
             if (self.gridSize !== 3) {
                 self.gridSize = 3;
@@ -2211,6 +2233,9 @@ SimController.prototype._initDOM = function() {
             self.demandMode = 'manual';
             profileBox.style.display = 'none';
             spawnSlider.disabled = false;
+            document.getElementById('sim-grid-size').disabled = false;
+            document.getElementById('spawn-mode-note').style.display = 'none';
+            document.getElementById('grid-mode-note').style.display = 'none';
         }
         self.reset();
     }
@@ -2412,10 +2437,13 @@ SimController.prototype._initDOM = function() {
                 stopped_cars: stopped
             },
             pedestrians: {
-                waiting_or_crossing: self.pedSys ? self.pedSys.peds.length : 0,
+                // 횡단보도에서 대기 중이거나 건너는 중인 보행자만 센다 (인도를 걷는 보행자는 신호와 무관)
+                waiting_or_crossing: self.pedSys
+                    ? self.pedSys.peds.filter(function(p) { return p.state === 'wait' || p.state === 'cross'; }).length
+                    : 0,
                 vulnerable_count: self.pedSys
                     ? self.pedSys.peds.filter(function(p) {
-                        return p.type && (
+                        return (p.state === 'wait' || p.state === 'cross') && p.type && (
                             p.type.key === "child" ||
                             p.type.key === "elderly" ||
                             p.type.key === "disabled"
@@ -2821,9 +2849,10 @@ SimController.prototype._initDOM = function() {
                 ? (sumVNow / nNow) / self.maxSpeed
                 : 0;
 
-            var congestionNow = Math.min(1, Math.max(0,
-            (stoppedNow / Math.max(1, nNow)) * 0.7 + (1 - speedRateNow) * 0.6
-            ));
+            // 차량이 없으면 정체 지수는 0 (상단 막대와 같은 정의)
+            var congestionNow = nNow > 0
+                ? Math.min(1, Math.max(0, (stoppedNow / nNow) * 0.7 + (1 - speedRateNow) * 0.6))
+                : 0;
 
             var latestNow = self.logger && self.logger.buffer.length > 0
                 ? self.logger.buffer[self.logger.buffer.length - 1]
@@ -2862,24 +2891,24 @@ SimController.prototype._initDOM = function() {
                 var beforeCongestion = self.aiBeforeMetrics ? self.aiBeforeMetrics.congestion : 0;
 
                 document.getElementById("effect-stop-after").textContent =
-                    avgStopped + "대";
+                    avgStopped + "대 (15초 평균)";
 
                 document.getElementById("effect-flow-after").textContent =
-                    avgThroughput + "대/분";
+                    avgThroughput + "대/분 (15초 평균)";
 
                 document.getElementById("effect-congestion-after").textContent =
                     beforeCongestion.toFixed(2) + " → " + avgCongestion.toFixed(2);
 
-                if (avgThroughput > beforeThroughput && avgCongestion < beforeCongestion) {
-                    document.getElementById("effect-summary").textContent =
-                        "처리량 증가 및 정체 완화 확인";
-                } else if (avgThroughput > beforeThroughput) {
-                    document.getElementById("effect-summary").textContent =
-                        "처리량 개선, 정체 완화 관찰 중";
-                } else {
-                    document.getElementById("effect-summary").textContent =
-                        "AI 신호 제어 반영 완료";
-                }
+                // 두 지표를 있는 그대로 말한다. 나빠졌는데 "완화"라고 쓰지 않는다.
+                var flowUp = avgThroughput > beforeThroughput;
+                var congDown = avgCongestion < beforeCongestion - 0.005;
+                var congUp = avgCongestion > beforeCongestion + 0.005;
+                var summary;
+                if (flowUp && congDown) summary = "처리량 증가, 정체 지수 감소";
+                else if (flowUp) summary = "처리량 증가, 정체 지수는 " + (congUp ? "상승" : "변화 없음");
+                else if (congDown) summary = "정체 지수 감소, 처리량은 변화 없음";
+                else summary = "뚜렷한 변화 없음 (적용 후 15초 평균 기준)";
+                document.getElementById("effect-summary").textContent = summary;
             }
         }, 1000);
 
@@ -3137,22 +3166,18 @@ SimController.prototype._update = function(dt, skipUI) {
     document.getElementById('stat-speed').textContent = Math.round(sr * 100) + '%';
     var recent = this.jc.completedTrips.filter(function(t){ return this.simTime - t.endTime <= 60; }.bind(this));
     document.getElementById('stat-throughput').textContent = recent.length;
-    var cong = Math.min(1, Math.max(0, (stopped / Math.max(1, n)) * 0.7 + (1 - sr) * 0.6));
+    // 정체 지수 = 정지 비율×0.7 + (1 − 평균속도 비율)×0.6, 0~1 로 자름. 차량이 없으면 0.
+    // (이전에는 차량 0대일 때 속도 비율 0 으로 계산되어 0.6 이 표시되는 문제가 있었다.)
+    var cong = n > 0
+        ? Math.min(1, Math.max(0, (stopped / n) * 0.7 + (1 - sr) * 0.6))
+        : 0;
     var cBar = document.getElementById('stat-congestion');
     cBar.style.width = (cong * 100) + '%';
-
-    var beforeCong = this.aiBeforeMetrics ? this.aiBeforeMetrics.congestion : null;
-
-    if (beforeCong !== null && cong < beforeCong) {
-    // 실제 정체지수가 AI 적용 전보다 낮아졌을 때만 개선 색상 표시
-    cBar.style.backgroundColor = cong < 0.55 ? COL_GREEN : COL_YELLOW;
-} else {
-        // 개선 전이거나 악화/유지 상태면 기존 기준 유지
-        cBar.style.backgroundColor =
-            cong < 0.25 ? COL_GREEN :
-            cong < 0.55 ? COL_YELLOW :
-            COL_RED;
-    }
+    // 색은 항상 같은 기준으로 칠한다. AI 적용 전후에 따라 기준을 바꾸지 않는다.
+    cBar.style.backgroundColor =
+        cong < 0.25 ? COL_GREEN :
+        cong < 0.55 ? COL_YELLOW :
+        COL_RED;
 };
 // 수동 모드: 무작위 진입로에 1대 생성 (기존 동작)
 SimController.prototype._spawnCar = function() {
@@ -3342,14 +3367,15 @@ SimController.prototype._renderDemandTable = function() {
         var a = APPROACH_KEYS[k], st = this.demandSpawn[a];
         var row = document.getElementById('demand-row-' + a);
         if (!row) continue;
+        row.cells[0].textContent = APPROACH_LABELS[a] + ' · ' + lanes[a] + '차로';
         row.cells[1].textContent = this.currentDemand.volume[a];
-        row.cells[2].textContent = lanes[a];
-        row.cells[3].textContent = st.rate.toFixed(3);
-        row.cells[4].textContent = st.recent.length;
-        row.cells[5].textContent = st.lost;
-        row.cells[6].textContent = this.approachEdges ? this._approachQueue(this.approachEdges[a]) : '-';   // 시뮬레이션 결과
+        row.cells[2].textContent = st.rate.toFixed(3);
+        row.cells[3].textContent = st.recent.length;
+        row.cells[4].textContent = st.lost;
+        row.cells[5].textContent = this.approachEdges ? this._approachQueue(this.approachEdges[a]) : '-';   // 시뮬레이션 결과
     }
 };
+var APPROACH_LABELS = { N: 'N 북측', S: 'S 남측', E: 'E 동측', W: 'W 서측' };
 
 // ===== A/B 검증 하네스 =====
 // 도로망·제어 유형·신호 설정은 유지한 채 차량/시간/데이터만 초기화.
