@@ -10,6 +10,34 @@ client = OpenAI(
     base_url="https://api.upstage.ai/v1"
 )
 
+# Solar 모델 선택.
+# .env 의 UPSTAGE_MODEL 로 덮어쓸 수 있다. 예: "solar-pro3"(롤백), "solar-pro4-260806"(스냅샷 고정).
+# 값이 없거나 비어 있으면 기본값을 쓴다. 호출 시점에 읽으므로 서버 재시작 없이 테스트에서 바꿀 수 있다.
+DEFAULT_SOLAR_MODEL = "solar-pro4"
+
+
+def get_solar_model() -> str:
+    return os.getenv("UPSTAGE_MODEL") or DEFAULT_SOLAR_MODEL
+
+
+# 출력 형식 모드.
+# "json_schema": Upstage structured outputs. 필드명·타입·enum 을 서버가 강제한다 (기본값).
+# "json_object": JSON 문법만 보장하는 기존 방식. 문제 시 .env 에 UPSTAGE_OUTPUT_MODE=json_object 로 즉시 복귀.
+DEFAULT_OUTPUT_MODE = "json_schema"
+OUTPUT_MODES = ("json_schema", "json_object")
+
+
+def get_output_mode() -> str:
+    mode = os.getenv("UPSTAGE_OUTPUT_MODE") or DEFAULT_OUTPUT_MODE
+    return mode if mode in OUTPUT_MODES else DEFAULT_OUTPUT_MODE
+
+
+def build_response_format(output_schema: dict | None) -> dict:
+    """schema 가 없거나 모드가 json_object 이면 기존 json_object, 아니면 strict json_schema."""
+    if output_schema is None or get_output_mode() == "json_object":
+        return {"type": "json_object"}
+    return {"type": "json_schema", "json_schema": output_schema}
+
 mock_scenario = {
     "intersection_id": "intersection-A",
     "tick": 0,
@@ -40,19 +68,32 @@ mock_scenario = {
 }
 
 
-def call_solar_agent(agent_name: str, system_prompt: str, user_input: dict):
+def call_solar_agent(agent_name: str, system_prompt: str, user_input: dict, output_schema: dict | None = None):
     try:
         response = client.chat.completions.create(
-            model="solar-pro3",
+            model=get_solar_model(),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": json.dumps(user_input, ensure_ascii=False)}
             ],
             temperature=0.2,
-            response_format={"type": "json_object"}
+            response_format=build_response_format(output_schema)
         )
 
-        content = response.choices[0].message.content
+        choice = response.choices[0]
+
+        # Upstage 문서: finish_reason 이 "stop" 이 아니면(예: "length") content 가 잘려 있거나
+        # null 이므로 파싱하지 말고 실패로 다뤄야 한다.
+        finish_reason = getattr(choice, "finish_reason", None)
+        if finish_reason != "stop":
+            return {
+                "status": "error",
+                "agent": agent_name,
+                "message": "Solar 응답이 정상 종료되지 않았습니다.",
+                "detail": f"finish_reason={finish_reason}"
+            }
+
+        content = choice.message.content
         return json.loads(content)
 
     except Exception as e:
@@ -257,16 +298,109 @@ plan_evaluation_agent_prompt = """
 """
 
 
+# ---------------------------------------------------------------------------
+# Structured outputs 용 JSON Schema.
+# 각 프롬프트의 "출력 형식" 블록과 1:1 로 대응한다. 필드명은 프롬프트와 동일하며,
+# 프롬프트가 산문으로만 적어 둔 타입(정수)과 허용값(enum)을 서버가 강제하도록 만든다.
+# Upstage 제약: root 는 object, 모든 property 를 required 에 포함, 모든 object 에
+# additionalProperties: false, strict: true. 지원 타입만 사용 (minimum/maximum 등은 쓰지 않음).
+# ---------------------------------------------------------------------------
+_LEVEL_ENUM = ["낮음", "보통", "높음"]
+
+TRAFFIC_ANALYSIS_SCHEMA = {
+    "name": "traffic_analysis",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string", "description": "현재 차량 수, 정지 차량 수, 혼잡도, 보행자 수를 근거로 한 요약"},
+            "traffic_level": {"type": "string", "enum": _LEVEL_ENUM},
+            "main_congestion_direction": {"type": "string", "description": "방향 정보가 없으면 '전체' 또는 '없음'"},
+            "pedestrian_issue": {"type": "boolean"},
+            "vulnerable_user_detected": {"type": "boolean"},
+            "risk_level": {"type": "string", "enum": _LEVEL_ENUM},
+        },
+        "required": [
+            "summary", "traffic_level", "main_congestion_direction",
+            "pedestrian_issue", "vulnerable_user_detected", "risk_level",
+        ],
+        "additionalProperties": False,
+    },
+}
+
+SIGNAL_PLAN_SCHEMA = {
+    "name": "signal_plan",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "plan_id": {"type": "string"},
+            "next_signals": {
+                "type": "object",
+                "properties": {
+                    "north_south": {"type": "string", "enum": ["RED", "GREEN"]},
+                    "east_west": {"type": "string", "enum": ["RED", "GREEN"]},
+                    "pedestrian": {"type": "string", "enum": ["RED", "GREEN"]},
+                },
+                "required": ["north_south", "east_west", "pedestrian"],
+                "additionalProperties": False,
+            },
+            "durations": {
+                "type": "object",
+                "properties": {
+                    "north_south_green_sec": {"type": "integer", "description": "현재 차량/정지차량/혼잡도에 따라 계산한 정수(초)"},
+                    "east_west_green_sec": {"type": "integer", "description": "현재 차량/정지차량/혼잡도에 따라 계산한 정수(초)"},
+                    "pedestrian_green_sec": {"type": "integer", "description": "보행자 수에 따라 계산한 정수(초)"},
+                },
+                "required": ["north_south_green_sec", "east_west_green_sec", "pedestrian_green_sec"],
+                "additionalProperties": False,
+            },
+            "priority": {"type": "string", "enum": ["VEHICLE", "PEDESTRIAN", "BALANCED"]},
+            "explanation": {"type": "string", "description": "왜 이 신호 시간을 선택했는지 입력값 기반으로 설명"},
+        },
+        "required": ["plan_id", "next_signals", "durations", "priority", "explanation"],
+        "additionalProperties": False,
+    },
+}
+
+PLAN_EVALUATION_SCHEMA = {
+    "name": "plan_evaluation",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "total_score": {"type": "integer", "description": "0~100 사이의 정수"},
+            "scores": {
+                "type": "object",
+                "properties": {
+                    "vehicle": {"type": "integer"},
+                    "pedestrian": {"type": "integer"},
+                    "vulnerable_user": {"type": "integer"},
+                    "safety": {"type": "integer"},
+                    "efficiency": {"type": "integer"},
+                },
+                "required": ["vehicle", "pedestrian", "vulnerable_user", "safety", "efficiency"],
+                "additionalProperties": False,
+            },
+            "decision_recommendation": {"type": "string", "enum": ["자동 적용", "운영자 승인 필요", "재계획 필요"]},
+            "reason": {"type": "string", "description": "현재 상태와 신호 계획을 평가한 이유"},
+        },
+        "required": ["total_score", "scores", "decision_recommendation", "reason"],
+        "additionalProperties": False,
+    },
+}
+
+
 def traffic_situation_agent(state: dict):
-    return call_solar_agent("Traffic Situation Agent", traffic_situation_agent_prompt, state)
+    return call_solar_agent("Traffic Situation Agent", traffic_situation_agent_prompt, state, TRAFFIC_ANALYSIS_SCHEMA)
 
 
 def signal_planning_agent(context: dict):
-    return call_solar_agent("Signal Planning Agent", signal_planning_agent_prompt, context)
+    return call_solar_agent("Signal Planning Agent", signal_planning_agent_prompt, context, SIGNAL_PLAN_SCHEMA)
 
 
 def plan_evaluation_agent(context: dict):
-    return call_solar_agent("Plan Evaluation Agent", plan_evaluation_agent_prompt, context)
+    return call_solar_agent("Plan Evaluation Agent", plan_evaluation_agent_prompt, context, PLAN_EVALUATION_SCHEMA)
 
 
 def is_error(result: dict):
