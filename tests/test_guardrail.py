@@ -129,15 +129,27 @@ class TestCorrectFinalDecision:
         assert ev["decision_recommendation"] == "재계획 필요"
         assert "6초 미만" in ev["reason"]
 
-    def test_no_pedestrians_heavy_queue_forces_auto_apply(self):
-        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=25), _plan(12, 8, 0), _eval("재계획 필요"))
+    def test_no_pedestrians_heavy_queue_high_congestion_forces_auto_apply(self):
+        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=25, congestion=0.9), _plan(12, 8, 0), _eval("재계획 필요"))
         assert ev["decision_recommendation"] == "자동 적용"
         assert "자동 적용으로 보정" in ev["reason"]
 
     def test_stopped_cars_below_20_does_not_force_auto_apply(self):
-        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=19), _plan(12, 8, 0), _eval("운영자 승인 필요"))
+        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=19, congestion=0.9), _plan(12, 8, 0), _eval("운영자 승인 필요"))
         assert ev["decision_recommendation"] == "운영자 승인 필요"
         assert ev["reason"] == "원본 사유."
+
+    def test_heavy_queue_but_low_congestion_does_not_force_auto_apply(self):
+        """Stage 5: the backend rule now mirrors the prompt's precondition
+        (congestion >= 0.7). Before, it ignored congestion and could override a
+        '운영자 승인 필요' verdict the prompt rules would have produced."""
+        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=25, congestion=0.5), _plan(12, 8, 0), _eval("운영자 승인 필요"))
+        assert ev["decision_recommendation"] == "운영자 승인 필요"
+        assert ev["reason"] == "원본 사유."
+
+    def test_congestion_exactly_0_7_counts_as_high(self):
+        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=20, congestion=0.7), _plan(12, 8, 0), _eval("운영자 승인 필요"))
+        assert ev["decision_recommendation"] == "자동 적용"
 
     def test_no_rule_matches_leaves_evaluation_untouched(self):
         ev_in = _eval("운영자 승인 필요")
@@ -146,7 +158,7 @@ class TestCorrectFinalDecision:
         assert ev == snapshot
 
     def test_cycle_rule_takes_precedence_over_auto_apply_rule(self):
-        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=30), _plan(15, 10, 0), _eval("자동 적용"))
+        ev = correct_final_decision(_state(cycle=20, peds=0, stopped=30, congestion=0.9), _plan(15, 10, 0), _eval("자동 적용"))
         assert ev["decision_recommendation"] == "재계획 필요"
 
     def test_mutates_and_returns_same_evaluation_object(self):

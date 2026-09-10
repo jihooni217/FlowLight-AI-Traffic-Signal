@@ -308,10 +308,20 @@ input[type="range"] { width: 100%; accent-color: var(--primary); }
                 <canvas id="sim-canvas"></canvas>
                 <div id="ai-apply-banner" class="hidden">
                     ✅ AI 신호 제어 적용 완료<br>
-                    <span id="ai-banner-detail">남북 12초 / 동서 8초 / 보행자 0초</span>
+                    <span id="ai-banner-detail">-</span>
                 </div>
 
                 <div id="ai-floating-panel">
+                    <div id="ai-progress-panel" class="hint"
+                         style="line-height:1.6;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:.6rem;margin-bottom:.6rem;">
+                        <b style="color:#fff;">AI 분석 진행</b><br>
+                        <span class="ai-step" data-step="analysis">○ 1. 교통 상황 분석</span><br>
+                        <span class="ai-step" data-step="planning">○ 2. 신호 계획 생성</span><br>
+                        <span class="ai-step" data-step="guardrail">○ 3. Guardrail 검증</span><br>
+                        <span class="ai-step" data-step="evaluation">○ 4. 계획 평가</span><br>
+                        <span class="ai-step" data-step="decision">○ 5. 최종 의사결정</span>
+                    </div>
+
                     <div id="ai-status-panel" class="hint">
                         <b style="color:#fff;">AI 제어 상태</b><br>
                         상태: <span id="ai-state">대기 중</span><br>
@@ -2201,10 +2211,61 @@ SimController.prototype._initDOM = function() {
     var chkAdapt = document.getElementById('chk-adaptive');
     var optSlider = document.getElementById('sim-opt-int');
 
+    // ===== AI 분석 진행 상태 표시 =====
+    // SSE 단계 메시지에 따라 좌측 패널의 5단계(교통 상황 분석 → 신호 계획 → Guardrail → 계획 평가 → 최종 의사결정)를 갱신한다.
+    var AI_STEP_LABELS = {
+        analysis:   '1. 교통 상황 분석',
+        planning:   '2. 신호 계획 생성',
+        guardrail:  '3. Guardrail 검증',
+        evaluation: '4. 계획 평가',
+        decision:   '5. 최종 의사결정'
+    };
+    var AI_STEP_STYLE = {
+        idle:   { mark: '○', color: '#999' },
+        active: { mark: '◐', color: '#3b82f6' },
+        done:   { mark: '●', color: '#10b981' },
+        error:  { mark: '✕', color: '#ef4444' }
+    };
+    function setAIStep(key, state, note) {
+        var el = document.querySelector('.ai-step[data-step="' + key + '"]');
+        if (!el) return;
+        var st = AI_STEP_STYLE[state] || AI_STEP_STYLE.idle;
+        el.style.color = st.color;
+        el.textContent = st.mark + ' ' + AI_STEP_LABELS[key] + (note ? ' · ' + note : '');
+    }
+    function resetAISteps() {
+        for (var k in AI_STEP_LABELS) setAIStep(k, 'idle');
+    }
+    function fmtDurations(d) {
+        if (!d) return '-';
+        return '남북 ' + d.north_south_green_sec + '초 / 동서 ' + d.east_west_green_sec + '초 / 보행자 ' + d.pedestrian_green_sec + '초';
+    }
+    function yesNo(v) { return v === true ? '있음' : v === false ? '없음' : String(v); }
+
     btnOpt.onclick = async function() {
         var lt = document.getElementById('log-text');
         lt.textContent = 'AI 에이전트 분석을 시작합니다...\n\n';
         document.getElementById('log-overlay').classList.remove('hidden');
+
+        // 진행 표시 초기화. 단계별 소요 시간은 SSE 메시지 도착 시각 기준이다.
+        resetAISteps();
+        document.getElementById('ai-state').textContent = "분석 중";
+        self.lastGuardrail = null;
+        var activeStep = null;
+        var stepStartedAt = 0;
+        function startAIStep(key) {
+            finishAIStep();
+            activeStep = key;
+            stepStartedAt = performance.now();
+            setAIStep(key, 'active', '진행 중');
+            document.getElementById('ai-state').textContent = "분석 중: " + AI_STEP_LABELS[key];
+        }
+        function finishAIStep(note) {
+            if (!activeStep) return;
+            var secs = ((performance.now() - stepStartedAt) / 1000).toFixed(1) + 's';
+            setAIStep(activeStep, 'done', note ? note + ' · ' + secs : secs);
+            activeStep = null;
+        }
 
         // AI 적용 전 성능 저장
         var beforeStopped = 0;
@@ -2324,12 +2385,22 @@ SimController.prototype._initDOM = function() {
 
                         if (data.message.includes("교통 상황 분석")) {
                             agentLabel = "[Agent 1] Traffic Situation Agent\n";
+                            startAIStep('analysis');
                         } else if (data.message.includes("신호 계획 생성")) {
                             agentLabel = "[Agent 2] Signal Planning Agent\n";
+                            startAIStep('planning');
                         } else if (data.message.includes("Guardrail")) {
                             agentLabel = "[Guardrail] Safety Rule Check\n";
+                            finishAIStep();
+                            // 백엔드가 보정 전(before)/후(durations) 값을 보내면 보정 여부를 판정한다.
+                            var gBefore = data.before || null;
+                            var gAfter = data.durations || null;
+                            var gCorrected = !!(gBefore && gAfter && JSON.stringify(gBefore) !== JSON.stringify(gAfter));
+                            self.lastGuardrail = { before: gBefore, after: gAfter, corrected: gCorrected };
+                            setAIStep('guardrail', 'done', gCorrected ? '보정됨' : '보정 없음');
                         } else if (data.message.includes("계획 평가")) {
                             agentLabel = "[Agent 3] Plan Evaluation Agent\n";
+                            startAIStep('evaluation');
                         }
 
                         if (agentLabel) {
@@ -2337,9 +2408,17 @@ SimController.prototype._initDOM = function() {
                         }
 
                         lt.textContent += "[진행] " + data.message + "\n";
+
+                        if (data.step === "guardrail" && self.lastGuardrail) {
+                            lt.textContent += self.lastGuardrail.corrected
+                                ? "[Guardrail] 보정됨: " + fmtDurations(self.lastGuardrail.before) + " → " + fmtDurations(self.lastGuardrail.after) + "\n"
+                                : "[Guardrail] 보정 없음: " + fmtDurations(self.lastGuardrail.after) + "\n";
+                        }
                     }
 
                     if (eventName === "done") {
+                        finishAIStep();
+
                         var input = data.input_state;
                         var analysis = data.traffic_analysis;
                         var plan = data.signal_plan;
@@ -2356,86 +2435,54 @@ SimController.prototype._initDOM = function() {
                             congestionValue >= 0.7 ? "매우 높음" :
                             congestionValue >= 0.3 ? "보통" :
                             "낮음";
+                        var scores = evalResult.scores || {};
+                        var g = self.lastGuardrail;
 
                         lt.textContent += "\n==============================\n";
                         lt.textContent += " FlowLight AI 분석 결과\n";
                         lt.textContent += "==============================\n\n";
 
-                        lt.textContent += "[교통 상황]\n";
-                        lt.textContent += "• 차량 수: " + input.queues.total_cars + "대\n";
-                        lt.textContent += "• 정지 차량: " + input.queues.stopped_cars + "대\n";
-                        lt.textContent += "• 보행자: " + input.pedestrians.waiting_or_crossing + "명\n";
-                        lt.textContent += "• 혼잡도: " + congestionText + " (" + congestionValue.toFixed(2) + ")\n\n";
+                        // 아래 문장들은 모두 Agent 가 실제로 반환한 값(summary / explanation / reason)이다.
+                        lt.textContent += "[Agent 1 · 교통 상황 분석]\n";
+                        lt.textContent += "• 입력: 차량 " + input.queues.total_cars + "대, 정지 " + input.queues.stopped_cars + "대, 보행자 " +
+                            input.pedestrians.waiting_or_crossing + "명, 혼잡도 " + congestionText + " (" + congestionValue.toFixed(2) + ")\n";
+                        lt.textContent += "• 요약: " + (analysis.summary || "-") + "\n";
+                        lt.textContent += "• 교통 수준: " + analysis.traffic_level + " / 위험도: " + analysis.risk_level +
+                            " / 주요 혼잡 방향: " + analysis.main_congestion_direction + "\n";
+                        lt.textContent += "• 보행자 이슈: " + yesNo(analysis.pedestrian_issue) +
+                            " / 교통약자 감지: " + yesNo(analysis.vulnerable_user_detected) + "\n\n";
 
-                        lt.textContent += "[AI 신호 제어안]\n";
+                        lt.textContent += "[Agent 2 · 신호 계획]\n";
                         lt.textContent += "• 우선순위: " + priorityText + "\n";
                         lt.textContent += "• 남북 신호: " + d.north_south_green_sec + "초\n";
                         lt.textContent += "• 동서 신호: " + d.east_west_green_sec + "초\n";
                         lt.textContent += "• 보행자 요청: " + (d.pedestrian_green_sec === 0 ? "없음" : d.pedestrian_green_sec + "초") + "\n";
-                        lt.textContent += "• 전체 주기: " + input.signals.cycle_sec + "초\n\n";
+                        lt.textContent += "• 전체 주기: " + input.signals.cycle_sec + "초\n";
+                        lt.textContent += "• 계획 근거: " + (plan.explanation || "-") + "\n\n";
 
-                        lt.textContent += "[AI 판단 근거]\n";
-
-                        if (input.pedestrians.waiting_or_crossing === 0) {
-
-                            lt.textContent +=
-                                "• 보행자가 없어 차량 흐름을 우선하도록 신호를 조정했습니다.\n";
-
-                        } else if (input.pedestrians.waiting_or_crossing >= 10) {
-
-                            lt.textContent +=
-                                "• 보행자가 많아 차량과 보행자를 균형 있게 고려하도록 신호를 조정했습니다.\n";
-
+                        lt.textContent += "[Guardrail 검증]\n";
+                        if (g && g.corrected) {
+                            lt.textContent += "• 보정됨: " + fmtDurations(g.before) + " → " + fmtDurations(g.after) + "\n";
+                            lt.textContent += "• 규칙: 차량 녹색 최소 8초, 보행자가 있으면 보행 녹색 최소 6초, 합계는 주기 " + input.signals.cycle_sec + "초 이내\n\n";
+                        } else if (g) {
+                            lt.textContent += "• 보정 없음: " + fmtDurations(g.after) + " (최소 녹색 시간과 주기 " + input.signals.cycle_sec + "초 조건을 모두 만족)\n\n";
                         } else {
-
-                            lt.textContent +=
-                                "• 차량과 보행자 상황을 함께 고려하여 신호를 조정했습니다.\n";
-
+                            lt.textContent += "• Guardrail 결과를 수신하지 못했습니다.\n\n";
                         }
 
-                        lt.textContent +=
-                            "• 최종 신호시간 : 남북 " +
-                            d.north_south_green_sec +
-                            "초 / 동서 " +
-                            d.east_west_green_sec +
-                            "초 / 보행자 " +
-                            d.pedestrian_green_sec +
-                            "초\n";
-
-                        lt.textContent +=
-                           "• Guardrail 검증 : 전체 주기 " +
-                            input.signals.cycle_sec +
-                            "초 이내로 안전하게 조정했습니다.\n\n";
-
-                        var finalReason = "";
-
-                        if (data.final_decision === "자동 적용") {
-                            finalReason =
-                                "보행자가 없고 차량 혼잡도가 높아 차량 우선 제어가 적절합니다. " +
-                                "Guardrail 검증 결과 전체 주기 " + input.signals.cycle_sec +
-                                "초를 초과하지 않아 자동 적용했습니다.";
-                        } else if (data.final_decision === "운영자 승인 필요") {
-                            finalReason =
-                                "보행자 수가 많거나 안전 검토가 필요한 상황입니다. " +
-                                "최종 신호 시간은 전체 주기 " + input.signals.cycle_sec +
-                                "초 이내로 조정되었지만, 자동 적용 대신 운영자 확인이 필요합니다.";
-                        } else {
-                            finalReason =
-                                "현재 신호안이 안전 기준 또는 운영 기준을 충분히 만족하지 못해 재계획이 필요합니다.";
-                        }
-
-                        lt.textContent += "[평가 결과]\n";
-                        lt.textContent += "• 총점: " + evalResult.total_score + "점\n";
-                        lt.textContent += "• 최종 판단: " + data.final_decision + "\n";
-                        lt.textContent += "• 판단 이유: " + finalReason + "\n\n";
+                        lt.textContent += "[Agent 3 · 계획 평가]\n";
+                        lt.textContent += "• 총점: " + evalResult.total_score + "점 (차량 " + scores.vehicle + " / 보행자 " + scores.pedestrian +
+                            " / 교통약자 " + scores.vulnerable_user + " / 안전 " + scores.safety + " / 효율 " + scores.efficiency + ")\n";
+                        lt.textContent += "• 평가 이유: " + (evalResult.reason || "-") + "\n";
+                        lt.textContent += "• 최종 판단: " + data.final_decision + "\n\n";
 
                         if (data.final_decision === "자동 적용") {
                             lt.textContent += "\n[자동 적용 예정]\n";
                             lt.textContent += "평가 결과가 자동 적용으로 판단되어 신호 제어안을 반영합니다.\n";
                         } else {
                             lt.textContent += "\n[자동 적용 보류]\n";
-                            lt.textContent += "평가 결과: " + data.final_decision + "\n";
-                            lt.textContent += "안전 검토가 필요하여 자동 적용하지 않았습니다.\n";
+                            lt.textContent += "평가 결과가 '" + data.final_decision + "'이므로 자동 적용하지 않습니다.\n";
+                            lt.textContent += "필요하면 [권장값 적용] 버튼으로 수동 적용할 수 있습니다.\n";
                         }
 
                         lt.textContent += "\n==============================\n";
@@ -2444,6 +2491,22 @@ SimController.prototype._initDOM = function() {
                         lt.textContent += JSON.stringify(data, null, 2);
 
                         lt.scrollTop = lt.scrollHeight;
+
+                        // 적용 시 패널이 실제 판단/우선순위를 표시할 수 있도록 결과를 보관한다.
+                        self.lastAIResult = {
+                            decision: data.final_decision,
+                            priority: plan.priority,
+                            priorityText: priorityText,
+                            totalScore: evalResult.total_score
+                        };
+                        setAIStep('decision', 'done', data.final_decision);
+                        document.getElementById('ai-state').textContent = "분석 완료";
+                        document.getElementById('ai-decision').textContent = data.final_decision;
+                        document.getElementById('ai-priority').textContent = priorityText;
+                        document.getElementById('ai-ns').textContent = d.north_south_green_sec + "초 (권장)";
+                        document.getElementById('ai-ew').textContent = d.east_west_green_sec + "초 (권장)";
+                        document.getElementById('ai-ped').textContent =
+                            d.pedestrian_green_sec === 0 ? "없음" : d.pedestrian_green_sec + "초 (권장)";
 
                         self.recommendedSignalPlan = d;
                         btnApply.disabled = false;
@@ -2456,12 +2519,16 @@ SimController.prototype._initDOM = function() {
                     }
 
                     if (eventName === "error") {
+                        if (activeStep) { setAIStep(activeStep, 'error', '실패'); activeStep = null; }
+                        document.getElementById('ai-state').textContent = "분석 실패";
                         lt.textContent += "\n[오류]\n";
                         lt.textContent += JSON.stringify(data, null, 2);
                     }
                 }
             }
         } catch (err) {
+            if (activeStep) { setAIStep(activeStep, 'error', '연결 실패'); activeStep = null; }
+            document.getElementById('ai-state').textContent = "서버 연결 실패";
             lt.textContent += "\n[오류] FastAPI 서버 연결 실패\n";
             lt.textContent += err.message;
         }
@@ -2544,7 +2611,13 @@ SimController.prototype._initDOM = function() {
             banner.classList.add("hidden");
         }, 6000);
 
-        document.getElementById("ai-apply-state").textContent = "자동 적용 완료";
+        // 실제 AI 결과(최종 판단/우선순위)를 표시한다. 자동 적용이 아니면 운영자가 수동 적용한 것이다.
+        var aiResult = self.lastAIResult || {};
+        var applyStateText = aiResult.decision === "자동 적용"
+            ? "자동 적용 완료"
+            : "수동 적용 완료" + (aiResult.decision ? " (" + aiResult.decision + ")" : "");
+
+        document.getElementById("ai-apply-state").textContent = applyStateText;
         document.getElementById("ai-apply-count").textContent = appliedCount + "개";
         document.getElementById("ai-vehicle-control").textContent =
             "남북 " + plan.north_south_green_sec + "초 / 동서 " + plan.east_west_green_sec + "초";
@@ -2555,14 +2628,18 @@ SimController.prototype._initDOM = function() {
                     ? "교통약자 감지 → 보행자 " + plan.pedestrian_green_sec + "초 확보"
                     : "보행자 " + plan.pedestrian_green_sec + "초 확보";
         document.getElementById("ai-guardrail").textContent =
-            "최소 신호 시간 및 주기 초과 검증 완료";
-        
+            self.lastGuardrail
+                ? (self.lastGuardrail.corrected
+                    ? "보정됨: " + fmtDurations(self.lastGuardrail.before) + " → " + fmtDurations(self.lastGuardrail.after)
+                    : "보정 없음 (최소 신호 시간·주기 검증 통과)")
+                : "최소 신호 시간 및 주기 초과 검증 완료";
+
         document.getElementById("effect-summary").textContent =
             "AI 신호 제어 반영 완료";
 
-        document.getElementById('ai-state').textContent = "자동 적용 완료";
-        document.getElementById('ai-decision').textContent = "자동 적용";
-        document.getElementById('ai-priority').textContent = "차량 우선";
+        document.getElementById('ai-state').textContent = applyStateText;
+        document.getElementById('ai-decision').textContent = aiResult.decision || "-";
+        document.getElementById('ai-priority').textContent = aiResult.priorityText || "-";
         document.getElementById('ai-ns').textContent = plan.north_south_green_sec + "초";
         document.getElementById('ai-ew').textContent = plan.east_west_green_sec + "초";
         document.getElementById('ai-ped').textContent =

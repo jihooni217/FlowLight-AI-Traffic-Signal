@@ -76,19 +76,47 @@ class TestPostStreamHappyPath:
             "east_west_green_sec": 8,
             "pedestrian_green_sec": 0,
         }
+        # Stage 5: the pre-guardrail values travel with the event so the UI can show the correction
+        assert guard["before"] == {
+            "north_south_green_sec": 3,
+            "east_west_green_sec": 2,
+            "pedestrian_green_sec": 5,
+        }
         # the corrected plan is what reaches the evaluator and the final payload
         assert fake_solar.user_payload(2)["signal_plan"]["durations"] == guard["durations"]
         assert events[-1][1]["signal_plan"]["durations"] == guard["durations"]
 
+    def test_guardrail_event_before_equals_after_when_no_correction_needed(self, client, fake_solar, frontend_scenario):
+        fake_solar.queue(analysis_ok(), plan_ok(ns=12, ew=8, ped=0), eval_ok())
+        events = _post(client, frontend_scenario)
+        guard = events[3][1]
+        assert guard["before"] == guard["durations"] == {
+            "north_south_green_sec": 12,
+            "east_west_green_sec": 8,
+            "pedestrian_green_sec": 0,
+        }
+
     def test_backend_correction_can_override_llm_decision(self, client, fake_solar, frontend_scenario):
         scenario = dict(frontend_scenario)
-        scenario["queues"] = {"total_cars": 30, "stopped_cars": 25}  # >= 20 stopped, 0 pedestrians
+        scenario["queues"] = {"total_cars": 30, "stopped_cars": 25}  # >= 20 stopped, 0 pedestrians, congestion 0.894
         fake_solar.queue(analysis_ok(), plan_ok(ns=12, ew=8, ped=0), eval_ok("운영자 승인 필요"))
         events = _post(client, scenario)
 
         done = events[-1][1]
         assert done["final_decision"] == "자동 적용"
         assert "자동 적용으로 보정" in done["evaluation"]["reason"]
+
+    def test_backend_correction_respects_low_congestion(self, client, fake_solar, frontend_scenario):
+        # Stage 5: heavy queue alone no longer forces auto-apply; congestion must also be >= 0.7 (as in the prompt)
+        scenario = dict(frontend_scenario)
+        scenario["queues"] = {"total_cars": 30, "stopped_cars": 25}
+        scenario["metrics"] = {"congestion": 0.45, "throughput_per_min": 125}
+        fake_solar.queue(analysis_ok(), plan_ok(ns=12, ew=8, ped=0), eval_ok("운영자 승인 필요"))
+        events = _post(client, scenario)
+
+        done = events[-1][1]
+        assert done["final_decision"] == "운영자 승인 필요"
+        assert "백엔드 검증 결과" not in done["evaluation"]["reason"]
 
     def test_decision_from_llm_is_kept_when_no_rule_fires(self, client, fake_solar, frontend_scenario):
         fake_solar.queue(analysis_ok(), plan_ok(), eval_ok("재계획 필요"))

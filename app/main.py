@@ -53,7 +53,9 @@ def correct_final_decision(state: dict, signal_plan: dict, evaluation: dict):
         evaluation["reason"] += " 백엔드 검증 결과, 보행자가 존재하지만 보행자 신호 시간이 6초 미만이므로 재계획 필요로 보정했습니다."
         return evaluation
 
-    if pedestrian_count == 0 and stopped_cars >= 20 and ped == 0:
+    # 프롬프트의 자동 적용 선결 조건과 동일하게 맞춘다: 보행자 0명, 정지 20대 이상, 혼잡도 0.7 이상, 보행자 신호 0초.
+    # (이전에는 congestion 을 읽기만 하고 조건에 쓰지 않아 프롬프트보다 느슨했다.)
+    if pedestrian_count == 0 and stopped_cars >= 20 and congestion >= 0.7 and ped == 0:
         evaluation["decision_recommendation"] = "자동 적용"
         evaluation["reason"] += " 백엔드 검증 결과, 보행자가 없고 차량 혼잡이 높아 자동 적용으로 보정했습니다."
         return evaluation
@@ -91,6 +93,7 @@ def stream_agent():
             cycle_sec = mock_scenario.get("signals", {}).get("cycle_sec", 40)
             pedestrian_count = mock_scenario.get("pedestrians", {}).get("waiting_or_crossing", 0)
 
+            before_durations = dict(signal_plan.get("durations", {}))
             signal_plan = apply_guardrail(
                 signal_plan,
                 cycle_sec=cycle_sec,
@@ -100,7 +103,8 @@ def stream_agent():
             yield format_sse("message", {
                 "step": "guardrail",
                 "message": "최소 신호 시간 Guardrail 적용 완료",
-                "durations": signal_plan["durations"]
+                "durations": signal_plan["durations"],
+                "before": before_durations
             })
 
             yield format_sse("message", {"step": 3, "message": "계획 평가 시작"})
@@ -162,6 +166,9 @@ def stream_agent_with_state(state: dict = Body(...)):
             cycle_sec = state.get("signals", {}).get("cycle_sec", 40)
             pedestrian_count = state.get("pedestrians", {}).get("waiting_or_crossing", 0)
 
+            # 프론트가 보정 여부를 표시할 수 있도록 Guardrail 적용 전 값을 함께 보낸다.
+            # (apply_guardrail 은 같은 dict 를 제자리 수정하므로 복사해 둔다.)
+            before_durations = dict(signal_plan.get("durations", {}))
             signal_plan = apply_guardrail(
                 signal_plan,
                 cycle_sec=cycle_sec,
@@ -171,7 +178,8 @@ def stream_agent_with_state(state: dict = Body(...)):
             yield format_sse("message", {
                 "step": "guardrail",
                 "message": "최소 신호 시간 Guardrail 적용 완료",
-                "durations": signal_plan["durations"]
+                "durations": signal_plan["durations"],
+                "before": before_durations
             })
 
             yield format_sse("message", {"step": 4, "message": "계획 평가 시작"})
