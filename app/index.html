@@ -435,7 +435,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <span class="l-item"><span class="color-box" style="background:#ef4444"></span>정체</span>
                 |
                 <span class="l-item">🟢직진·우회전</span>
-                <span class="l-item">🟣좌회전 신호</span>
+                <span class="l-item"><span class="color-box" style="background:#22c55e;border-radius:50%"></span>좌회전 신호 (녹색 화살표 ←)</span>
                 <span class="l-item">🟡황색</span>
                 <span class="l-item">🔴적색(우회전가능·보행자양보)</span>
                 |
@@ -493,7 +493,7 @@ var GREEN_MIN = 2;
 var COL_GREEN = '#22c55e';
 var COL_YELLOW = '#eab308';
 var COL_RED = '#ef4444';
-var COL_LEFT_ARROW = '#a855f7';
+var COL_LEFT_ARROW = '#22c55e';   // 한국 4색 신호등의 좌회전 등은 녹색 화살표 (보라색 아님)
 var API_BASE = 'http://127.0.0.1:8000';   // FastAPI 백엔드 (Agent 스트림, 교통 수요 프로파일)
 
 // ===== 보행자 상수 =====
@@ -723,10 +723,16 @@ TrafficLight.prototype.buildPhases = function(totalCycle) {
     this.greenTimes[sk] = sg;
     this.greenTimes[lk] = lg;
 
+    // 선행 좌회전: 선두 차가 좌회전이고 뒤에 직진 차가 막혀 있으면 좌회전 현시를 먼저 켠다 (감응 모드에서 설정)
+    var leading = !!(this.leadingLeft && this.leadingLeft[d]) && lg > 0;
+    if (leading) {
+        this.phases.push({dir:d, type:'left_arrow', duration:lg});
+        this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
+    }
     this.phases.push({dir:d, type:'straight_right', duration:sg});
     this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
 
-    if (lg > 0) {
+    if (lg > 0 && !leading) {
         this.phases.push({dir:d, type:'left_arrow', duration:lg});
         this.phases.push({dir:d, type:'yellow', duration:this.YELLOW});
     }
@@ -777,13 +783,71 @@ TrafficLight.prototype.applyGreens = function(ng, cycle) {
     // 새 duration이 기존 경과보다 짧아졌으면 위상 끝으로 맞춰 자연스럽게 다음으로 넘어가게 함
     this.t = Math.min(curT, Math.max(0, this.phases[idx].duration - 0.001));
 };
+// 현재 위상 위치를 다른 신호등과 같게 맞춘 뒤 seconds 만큼 앞으로 돌린다 (녹색파: 교차로 간 시차).
+TrafficLight.prototype.alignTo = function(ref, seconds) {
+    if (this.phases.length <= 1) return;
+    // 기준 신호등의 "주기 시작 후 경과 시간"을 초 단위로 옮긴다. (감응 모드에서는 신호등마다 현시 수가 달라
+    // 위상 번호를 그대로 복사하면 범위를 벗어난다.)
+    var refPos = ref.t;
+    for (var i = 0; i < ref.phaseIdx && i < ref.phases.length; i++) refPos += ref.phases[i].duration;
+    var cycleLen = 0;
+    for (var j = 0; j < this.phases.length; j++) cycleLen += this.phases[j].duration;
+    this.phaseIdx = 0; this.t = 0;
+    var skip = cycleLen > 0 ? (refPos + seconds) % cycleLen : 0;
+    while (skip > 0) {
+        var dur = this.phases[this.phaseIdx].duration;
+        if (skip >= dur - this.t) { skip -= (dur - this.t); this.t = 0; this.phaseIdx = (this.phaseIdx + 1) % this.phases.length; }
+        else { this.t += skip; skip = 0; }
+    }
+};
 TrafficLight.prototype.update = function(dt) {
     if (this.phases.length <= 1) return;
     this.t += dt;
     while (this.t >= this.phases[this.phaseIdx].duration) {
         this.t -= this.phases[this.phaseIdx].duration;
         this.phaseIdx = (this.phaseIdx + 1) % this.phases.length;
+        // 주기가 한 바퀴 돌 때 감응 모드면 다음 주기의 현시를 현재 대기 상태로 다시 짠다
+        if (this.phaseIdx === 0 && this.actuated) this.reactuate();
     }
+};
+// ===== 감응 모드 (AI 계획 적용 후) =====
+// AI 계획은 축별 차량 녹색 합계와 보행 녹색 길이라는 "예산"을 준다. 실제 교통 신호처럼 매 주기 현장을 보고,
+//  - 좌회전: 그 축의 좌회전 대기 비율만큼 좌회전 현시를 나눈다. 대기가 없으면 생략(직진에 전부), 선두가 좌회전이면 선행 좌회전.
+//  - 보행: 이 교차로 횡단보도에 아무도 없으면 보행 현시를 생략한다. 있으면 계획 길이(최소 6초), 교통약자가 있으면 최소 10초.
+TrafficLight.prototype.setActuated = function(cfg) {
+    // cfg = { axisTotal:{NS,EW}, pedPlan, leftDemand:fn(dir)->{total,left,headLeft}, pedDemand:fn()->{waiting,vulnerable} }
+    this.actuated = cfg;
+    this.leadingLeft = {};
+    this.reactuate();
+};
+TrafficLight.prototype.reactuate = function() {
+    var cfg = this.actuated; if (!cfg) return;
+    var ng = {}; this.leadingLeft = {}; this.lastActuation = {};
+    for (var i = 0; i < this.directions.length; i++) {
+        var d = this.directions[i], total = cfg.axisTotal[d] || 0;
+        var dem = cfg.leftDemand ? cfg.leftDemand(this.node, d) : {total: 0, left: 0, headLeft: false};
+        var left = 0;
+        // 좌회전 현시는 좌회전 대기가 쌓였을 때만 넣는다 (감응식 좌회전). 한두 대는 겸용 신호의 비보호 좌회전으로 빠지므로
+        // 그때마다 직진을 멈추는 전용 현시를 켜면 오히려 처리량이 준다 (검증에서 확인). 선두가 좌회전이면 선행으로 켠다.
+        var needLeft = dem.left >= (cfg.leftMinQueue || 2) || (dem.headLeft && dem.left >= 1 && dem.total >= 4);
+        if (needLeft && total >= GREEN_MIN * 2) {
+            var share = Math.min(0.4, Math.max(0.2, dem.left / Math.max(1, dem.total)));
+            left = Math.max(GREEN_MIN, Math.round(total * share));
+            left = Math.min(left, total - GREEN_MIN);
+        }
+        ng['straight_' + d] = total - left;
+        ng['left_' + d] = left;
+        this.leadingLeft[d] = dem.headLeft && left > 0;
+        this.lastActuation[d] = {left: left, straight: total - left, leading: this.leadingLeft[d], demandLeft: dem.left, demandTotal: dem.total};
+    }
+    var pd = cfg.pedDemand ? cfg.pedDemand(this.node) : {waiting: 0, vulnerable: 0};
+    var ped = 0;
+    if (pd.waiting > 0) ped = Math.max(pd.vulnerable > 0 ? 10 : 6, cfg.pedPlan || 0);
+    ng.ped = ped;
+    this.lastActuation.ped = {sec: ped, waiting: pd.waiting, vulnerable: pd.vulnerable};
+    for (var k in ng) this.greenTimes[k] = ng[k];
+    this.buildPhases(this.totalCycle);
+    if (this.phaseIdx >= this.phases.length) this.phaseIdx = 0;
 };
 TrafficLight.prototype.allows = function(edgeDir, turnType) {
     if (this.phases.length <= 1) return 'green';
@@ -793,6 +857,9 @@ TrafficLight.prototype.allows = function(edgeDir, turnType) {
     if (p.type === 'yellow') return turnType === 'right' ? 'yield_right' : 'red';
     if (p.type === 'straight_right') {
         if (p.dir === edgeDir) {
+            // 보호·비보호 겸용 좌회전: 이 시뮬레이터는 방향당 차로가 하나라 좌회전 전용 차로가 없다.
+            // 실제 도로에서도 좌회전 차로가 없는 교차로는 겸용 신호(직진 녹색 때 비보호 좌회전 + 좌회전 화살표 때 보호 좌회전)를 쓴다.
+            // 직진 때 좌회전을 막으면 선두 좌회전 차 한 대가 차로 전체를 막아 격자가 마비된다 (검증에서 확인).
             if (turnType === 'straight' || turnType === 'right' || turnType === 'left') return 'green';
             return 'red';
         }
@@ -1248,15 +1315,12 @@ PedSystem.prototype._buildCW = function(node) {
     return list;
 };
 PedSystem.prototype.pedGreen = function(cw) {
-    if (this.jc.aiPedGreenSec !== null && Number(this.jc.aiPedGreenSec) === 0) {
-        return { green:false, remain:0, totalGreen:0 };
-    }
-
     var light = this.jc.lights.get(cw.nodeId);
     if (!light) return { green:false, remain:0, totalGreen:0 };
 
     var p = light.phases[light.phaseIdx];
-    // AI 계획 적용 후: 보행 전용 현시(ped_green)에서만 녹색. 계획의 N초가 그대로 보행 녹색 길이가 된다.
+    // AI 계획 적용 후: 보행 전용 현시(ped_green)에서만 녹색. 감응 모드가 매 주기 대기 인원을 보고
+    // 현시를 넣거나 생략하므로, 현시가 없는 주기에는 보행 신호가 계속 적색이다.
     if (this.jc.aiPedGreenSec !== null) {
         var pg = !!(p && p.type === 'ped_green');
         return { green: pg, remain: pg ? (p.duration - light.t) : 0, totalGreen: pg ? p.duration : 0 };
@@ -1850,9 +1914,10 @@ Renderer.prototype.render = function(network, jc, cam) {
                     var isGreen = sig.green;
                     var remainVal = 0;
 
-                    if (jc.aiPedGreenSec !== null && Number(jc.aiPedGreenSec) === 0) {
-                        // AI 적용 후: 보행자 신호는 빨간불/0초 고정
-                        // 지도 위 0 표시는 너무 많아져서 숨김
+                    var lightForCw = jc.lights.get(cw.nodeId);
+                    var hasPedPhase = !!(lightForCw && lightForCw.phases.some(function(ph){ return ph.type === 'ped_green'; }));
+                    if (jc.aiPedGreenSec !== null && !hasPedPhase) {
+                        // AI 적용 후 감응 모드: 이 주기에 보행 현시가 없으면(대기 없음) 카운트다운을 표시하지 않는다
                         textStr = "";
                         remainVal = 0;
                     } else if (isGreen && sig.remain > 0) {
@@ -1980,7 +2045,10 @@ Renderer.prototype.render = function(network, jc, cam) {
                 
                 ctx.fillStyle = cR; ctx.beginPath(); ctx.arc(0, -6, 1.5, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle = cY; ctx.beginPath(); ctx.arc(0, -2, 1.5, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = cL; ctx.beginPath(); ctx.arc(0,  2, 1.5, 0, Math.PI*2); ctx.fill();
+                // 좌회전 등: 한국 4색 신호등처럼 녹색 화살표(←). 진행 방향이 +x 이므로 운전자의 왼쪽은 -y 쪽이다.
+                ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(0, 2, 1.5, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = cL; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(0, 3.3); ctx.lineTo(0, 0.9); ctx.moveTo(-0.9, 1.8); ctx.lineTo(0, 0.9); ctx.lineTo(0.9, 1.8); ctx.stroke();
                 ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(0,  6, 1.5, 0, Math.PI*2); ctx.fill();
                 
                 // 실제 신호 남은 시간 표시
@@ -2682,7 +2750,7 @@ SimController.prototype._initDOM = function() {
                         lt.textContent += "[Guardrail 검증]\n";
                         if (g && g.corrected) {
                             lt.textContent += "• 보정됨: " + fmtDurations(g.before) + " → " + fmtDurations(g.after) + "\n";
-                            lt.textContent += "• 규칙: 차량 녹색 최소 8초, 보행자가 있으면 보행 녹색 최소 6초, 합계는 주기 " + input.signals.cycle_sec + "초 이내\n\n";
+                            lt.textContent += "• 규칙: 차량 녹색 최소 8초, 보행자가 있으면 보행 녹색 최소 6초(교통약자 있으면 10초), 합계는 주기 " + input.signals.cycle_sec + "초 이내\n\n";
                         } else if (g) {
                             lt.textContent += "• 보정 없음: " + fmtDurations(g.after) + " (최소 녹색 시간과 주기 " + input.signals.cycle_sec + "초 조건을 모두 만족)\n\n";
                         } else {
@@ -2718,6 +2786,9 @@ SimController.prototype._initDOM = function() {
                             priorityText: priorityText,
                             totalScore: evalResult.total_score
                         };
+                        // 녹색파 연동에 쓴다: Agent 1 의 주요 혼잡 방향과 접근로별 상태
+                        self.lastTrafficAnalysis = analysis;
+                        self.lastInputState = input;
                         setAIStep('decision', 'done', data.final_decision);
                         document.getElementById('ai-state').textContent = "분석 완료";
                         document.getElementById('ai-decision').textContent = data.final_decision;
@@ -2817,10 +2888,17 @@ SimController.prototype._initDOM = function() {
         console.log("lights =", self.jc.lights);
         console.log("lights size =", self.jc.lights.size);
 
+        // 한국식 4현시 유지: AI 가 준 방향별 녹색을 직진 70% / 좌회전 30% 로 나눈다 (기본 신호와 같은 비율).
+        // 합계는 계획값 그대로라 "남북 + 동서 + 보행 ≤ 주기" 규칙이 유지된다. 좌회전 현시가 있으면 직진 신호 때 좌회전은 금지된다.
+        var nsTotal = Number(plan.north_south_green_sec), ewTotal = Number(plan.east_west_green_sec);
+        var nsStraight = Math.max(GREEN_MIN, Math.round(nsTotal * 0.7)), ewStraight = Math.max(GREEN_MIN, Math.round(ewTotal * 0.7));
+        nsLeft = Math.max(0, nsTotal - nsStraight);
+        ewLeft = Math.max(0, ewTotal - ewStraight);
+
         var ng = {
-            straight_NS: plan.north_south_green_sec,
+            straight_NS: nsStraight,
             left_NS: nsLeft,
-            straight_EW: plan.east_west_green_sec,
+            straight_EW: ewStraight,
             left_EW: ewLeft,
             ped: Number(plan.pedestrian_green_sec) || 0   // 보행 전용 현시 길이 (0 이면 현시 없음)
         };
@@ -2836,6 +2914,50 @@ SimController.prototype._initDOM = function() {
             appliedCount++;
             if (!actualCycle) actualCycle = r.value.phases.reduce(function(a, p) { return a + p.duration; }, 0);
         }
+
+        // 감응 모드 (AI 적용 후에만): 매 주기 현장을 보고 좌회전·보행 현시를 넣거나 생략한다.
+        //  - 좌회전 대기가 없으면 좌회전 현시 생략, 선두 차가 좌회전이고 뒤가 막혀 있으면 선행 좌회전
+        //  - 이 교차로 횡단보도에 아무도 없으면 보행 현시 생략, 있으면 계획 길이(최소 6초), 교통약자면 최소 10초
+        var leftDemand = function(node, dir) {
+            var total = 0, left = 0, headS = -1, headTurn = null;
+            for (var i = 0; i < node.incoming.length; i++) {
+                var e = node.incoming[i];
+                if (e.dir !== dir || e.isArc) continue;
+                for (var k = 0; k < e.cars.length; k++) {
+                    var c = e.cars[k], ne = c.getNextEdge();
+                    if (!ne) continue;
+                    var tt = getTurnType(e, ne);
+                    total++;
+                    if (tt === 'left') left++;
+                    if (c.s > headS) { headS = c.s; headTurn = tt; }
+                }
+            }
+            return { total: total, left: left, headLeft: headTurn === 'left' && total > 1 };
+        };
+        var pedDemand = function(node) {
+            var w = 0, v = 0;
+            for (var i = 0; i < self.pedSys.peds.length; i++) {
+                var p = self.pedSys.peds[i];
+                if ((p.state === 'wait' || p.state === 'cross') && p.cw && p.cw.nodeId === node.id) {
+                    w++;
+                    if (p.type && (p.type.key === 'child' || p.type.key === 'elderly' || p.type.key === 'disabled')) v++;
+                }
+            }
+            return { waiting: w, vulnerable: v };
+        };
+        var iter2 = self.jc.lights.values();
+        for (var r2 = iter2.next(); !r2.done; r2 = iter2.next()) {
+            r2.value.setActuated({
+                axisTotal: { NS: nsTotal, EW: ewTotal },
+                pedPlan: Number(plan.pedestrian_green_sec) || 0,
+                leftDemand: leftDemand,
+                pedDemand: pedDemand
+            });
+        }
+
+        // 녹색파 연동: Agent 1 이 짚은 주요 혼잡 방향을 따라 교차로마다 시작 시점을 어긋나게 둔다.
+        // 오프셋 = 교차로 간 거리 ÷ 최고 속도. 진행 방향은 접근로별 대기가 큰 쪽(N vs S, E vs W)에서 반대쪽으로.
+        var waveInfo = self._applyGreenWave();
 
         console.log("적용 교차로 수:", appliedCount);
         alert("AI 권장안 적용 완료: " + appliedCount + "개 교차로");
@@ -2863,13 +2985,15 @@ SimController.prototype._initDOM = function() {
         document.getElementById("ai-apply-state").textContent = applyStateText;
         document.getElementById("ai-apply-count").textContent = appliedCount + "개";
         document.getElementById("ai-vehicle-control").textContent =
-            "남북 " + plan.north_south_green_sec + "초 / 동서 " + plan.east_west_green_sec + "초";
+            "남북 " + plan.north_south_green_sec + "초 (직진 " + nsStraight + " + 좌회전 " + nsLeft + ") / 동서 " + plan.east_west_green_sec + "초 (직진 " + ewStraight + " + 좌회전 " + ewLeft + ")" +
+            (waveInfo ? " · 녹색파 " + waveInfo.label : "");
         document.getElementById("ai-ped-control").textContent =
-            plan.pedestrian_green_sec === 0
-                ? "보행자 요청 없음 → 빨간불 고정"
+            (plan.pedestrian_green_sec === 0
+                ? "지금 보행자 없음 → 보행 현시 생략"
                 : vulnerableCount > 0
                     ? "교통약자 감지 → 보행자 " + plan.pedestrian_green_sec + "초 확보"
-                    : "보행자 " + plan.pedestrian_green_sec + "초 확보";
+                    : "보행자 " + plan.pedestrian_green_sec + "초 확보")
+            + " · 감응: 매 주기 횡단보도를 보고 없으면 생략, 교통약자면 10초 이상";
         document.getElementById("ai-guardrail").textContent =
             self.lastGuardrail
                 ? (self.lastGuardrail.corrected
@@ -2896,8 +3020,9 @@ SimController.prototype._initDOM = function() {
 
         lt.textContent += "\n\n===== AI 권장안 적용 완료 =====\n";
         lt.textContent += "적용 교차로 수: " + appliedCount + "개\n";
-        lt.textContent += "남북 직진: " + plan.north_south_green_sec + "초\n";
-        lt.textContent += "동서 직진: " + plan.east_west_green_sec + "초\n";
+        lt.textContent += "남북 차량 녹색: " + plan.north_south_green_sec + "초 (직진 " + nsStraight + "초 + 좌회전 " + nsLeft + "초)\n";
+        lt.textContent += "동서 차량 녹색: " + plan.east_west_green_sec + "초 (직진 " + ewStraight + "초 + 좌회전 " + ewLeft + "초)\n";
+        lt.textContent += "녹색파 연동: " + (waveInfo ? waveInfo.label : "없음 (교차로 1개 또는 혼잡 방향 없음)") + "\n";
         lt.textContent += "보행자 요청: " + (plan.pedestrian_green_sec === 0 ? "없음 (보행 현시 생략)" : plan.pedestrian_green_sec + "초 (보행 전용 현시)") + "\n";
         lt.textContent += "적용된 전체 주기: " + Math.round(actualCycle || cycle) + "초 (차량 녹색 + 보행 현시 + 황색·전적색)\n";
 
@@ -3458,6 +3583,29 @@ var APPROACH_LABELS = { N: 'N 북측', S: 'S 남측', E: 'E 동측', W: 'W 서�
 // ===== A/B 검증 하네스 =====
 // 도로망·제어 유형·신호 설정은 유지한 채 차량/시간/데이터만 초기화.
 // (reset()은 네트워크를 새로 만들어 사용자가 지정한 교차로 유형이 날아가므로 별도 구현)
+// 녹색파 연동: Agent 1 의 주요 혼잡 방향(남북/동서 또는 N/S/E/W)을 따라 신호등 시작 시점을 어긋나게 둔다.
+// 반환값은 표시용 {label, axis, perBlockSec} 이고, 교차로가 1개이거나 방향 정보가 없으면 null.
+SimController.prototype._applyGreenWave = function() {
+    var lights = Array.from(this.jc.lights.values());
+    if (lights.length < 2) return null;
+    var dir = this.lastTrafficAnalysis && this.lastTrafficAnalysis.main_congestion_direction ? String(this.lastTrafficAnalysis.main_congestion_direction) : '';
+    var axis = null, forward = 1;   // forward: 진행 방향 (NS 축: +1 = 남쪽으로, EW 축: +1 = 동쪽으로)
+    var ba = this.lastInputState && this.lastInputState.queues && this.lastInputState.queues.by_approach;
+    var q = function(k) { return ba && ba[k] ? Number(ba[k].queue) || 0 : 0; };
+    if (/남북|^N$|^S$/.test(dir)) { axis = 'NS'; forward = (dir === 'S' || q('S') > q('N')) ? -1 : 1; }        // N: 북에서 남으로
+    else if (/동서|^E$|^W$/.test(dir)) { axis = 'EW'; forward = (dir === 'W' || q('W') > q('E')) ? 1 : -1; }   // E: 동에서 서로 진입
+    if (!axis) return null;
+    var perBlock = this.network.spacing / this.maxSpeed;   // 교차로 간 주행 시간 (초)
+    var ref = lights[0];
+    var coord = function(l) { return axis === 'NS' ? l.node.y : l.node.x; };
+    var vals = lights.map(coord), start = forward > 0 ? Math.min.apply(null, vals) : Math.max.apply(null, vals);
+    for (var i = 0; i < lights.length; i++) {
+        var off = Math.abs(coord(lights[i]) - start) / this.network.spacing * perBlock;
+        lights[i].alignTo(ref, off);
+    }
+    var label = (axis === 'NS' ? (forward > 0 ? '남북 축 남행' : '남북 축 북행') : (forward > 0 ? '동서 축 동행' : '동서 축 서행')) + ', 교차로 간 ' + perBlock.toFixed(1) + '초';
+    return { label: label, axis: axis, perBlockSec: perBlock };
+};
 SimController.prototype.softReset = function() {
     this.simTime = 0; this.spawnAcc = 0; this.sampleAcc = 0; this.optAcc = 0;
     this.cars = [];
