@@ -48,6 +48,7 @@ def correct_final_decision(state: dict, signal_plan: dict, evaluation: dict):
 
     cycle_sec = int(state.get("signals", {}).get("cycle_sec", 40))
     pedestrian_count = int(state.get("pedestrians", {}).get("waiting_or_crossing", 0))
+    vulnerable_count = int(state.get("pedestrians", {}).get("vulnerable_count", 0))
     stopped_cars = int(state.get("queues", {}).get("stopped_cars", 0))
     congestion = float(state.get("metrics", {}).get("congestion", 0))
 
@@ -61,6 +62,12 @@ def correct_final_decision(state: dict, signal_plan: dict, evaluation: dict):
     if pedestrian_count >= 1 and ped < 6:
         evaluation["decision_recommendation"] = "재계획 필요"
         evaluation["reason"] += " 백엔드 검증 결과, 보행자가 존재하지만 보행자 신호 시간이 6초 미만이므로 재계획 필요로 보정했습니다."
+        return evaluation
+
+    # 교통약자(어린이·노약자·휠체어)는 횡단이 느리므로 10초 미만이면 재계획. Guardrail 이 10초로 올리므로 보통은 걸리지 않는다.
+    if vulnerable_count >= 1 and ped < 10:
+        evaluation["decision_recommendation"] = "재계획 필요"
+        evaluation["reason"] += " 백엔드 검증 결과, 교통약자가 있는데 보행자 신호 시간이 10초 미만이므로 재계획 필요로 보정했습니다."
         return evaluation
 
     # 프롬프트의 자동 적용 선결 조건과 동일하게 맞춘다: 보행자 0명, 정지 20대 이상, 혼잡도 0.7 이상, 보행자 신호 0초.
@@ -166,12 +173,14 @@ def stream_agent():
 
             cycle_sec = mock_scenario.get("signals", {}).get("cycle_sec", 40)
             pedestrian_count = mock_scenario.get("pedestrians", {}).get("waiting_or_crossing", 0)
+            vulnerable_count = mock_scenario.get("pedestrians", {}).get("vulnerable_count", 0)
 
             before_durations = dict(signal_plan.get("durations", {}))
             signal_plan = apply_guardrail(
                 signal_plan,
                 cycle_sec=cycle_sec,
-                pedestrian_count=pedestrian_count
+                pedestrian_count=pedestrian_count,
+                vulnerable_count=vulnerable_count
             )
 
             yield format_sse("message", {
@@ -239,6 +248,7 @@ def stream_agent_with_state(state: dict = Body(...)):
 
             cycle_sec = state.get("signals", {}).get("cycle_sec", 40)
             pedestrian_count = state.get("pedestrians", {}).get("waiting_or_crossing", 0)
+            vulnerable_count = state.get("pedestrians", {}).get("vulnerable_count", 0)
 
             # 프론트가 보정 여부를 표시할 수 있도록 Guardrail 적용 전 값을 함께 보낸다.
             # (apply_guardrail 은 같은 dict 를 제자리 수정하므로 복사해 둔다.)
@@ -246,7 +256,8 @@ def stream_agent_with_state(state: dict = Body(...)):
             signal_plan = apply_guardrail(
                 signal_plan,
                 cycle_sec=cycle_sec,
-                pedestrian_count=pedestrian_count
+                pedestrian_count=pedestrian_count,
+                vulnerable_count=vulnerable_count
             )
 
             yield format_sse("message", {

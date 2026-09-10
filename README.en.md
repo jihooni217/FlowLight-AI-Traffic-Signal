@@ -31,6 +31,7 @@ From the first-run guide to the real-data profile, the AI analysis and the appli
 # 📌 About the project
 
 FlowLight replaces a fixed-time signal with **three LLM agents** that read the traffic situation, plan the green times and then grade their own plan.
+It started from two ideas: **skip the pedestrian phase when nobody is at the crosswalk so vehicles keep moving, and give children, the elderly and wheelchair users more crossing time when they are.**
 Every LLM answer is forced into a fixed shape with **Structured Outputs (JSON Schema)**, passes through a rule-based **Guardrail**, and only then reaches the simulator.
 FastAPI streams each step over SSE (Server-Sent Events), so you can watch the decision being made.
 
@@ -130,7 +131,8 @@ FlowLight is a **multi-agent workflow**: analyse the situation, plan the signal,
 
 ## 🤖 Signal Planning Agent (Agent 2)
 - Plans north-south and east-west vehicle green plus pedestrian green, in whole seconds
-- With per-approach state, gives more green to the axis with the larger queue and saturation and cites the numbers in `explanation`
+- No pedestrians → pedestrian green 0 s. Children, elderly or wheelchair users present (`vulnerable_count`) → pedestrian green 10 s or more
+- With per-approach state, gives more green to the axis with the larger queue and saturation, and does not starve an approach whose mean wait exceeds twice the cycle even if it holds few cars. Cites the numbers in `explanation`
 - Output: `durations` (three integers), `priority` (VEHICLE / PEDESTRIAN / BALANCED), `next_signals`, `explanation`
 
 ## ✅ Plan Evaluation Agent (Agent 3)
@@ -139,15 +141,22 @@ FlowLight is a **multi-agent workflow**: analyse the situation, plan the signal,
 - Output: `total_score`, `scores`, `decision_recommendation`, `reason`
 
 ## 🛡 Guardrail (rule based, enforced in code)
-- Vehicle green at least 8 s. Pedestrian green at least 6 s when pedestrians are present, otherwise 0 s
-- If the sum exceeds the cycle (`cycle_sec`), the times are redistributed proportionally
+- Vehicle green at least 8 s
+- Pedestrian green: nobody waiting 0 s / pedestrians present at least 6 s / vulnerable pedestrians present at least 10 s
+- If the sum exceeds the cycle (`cycle_sec`), only the vehicle times are redistributed proportionally
 - The backend sends both the original and the corrected values, shown as "corrected: 14/6/0 → 12/8/0"
 
 ## 🧭 Final decision correction (backend)
 These rules override the LLM's decision. They mirror the auto-apply preconditions in the prompt.
 1. Green sum exceeds the cycle → `재계획 필요` (re-plan)
 2. Pedestrians present but pedestrian green under 6 s → `재계획 필요` (re-plan)
-3. No pedestrians · 20 or more stopped cars · congestion 0.7 or higher · pedestrian green 0 s → `자동 적용` (auto apply)
+3. Vulnerable pedestrians present but pedestrian green under 10 s → `재계획 필요` (re-plan)
+4. No pedestrians · 20 or more stopped cars · congestion 0.7 or higher · pedestrian green 0 s → `자동 적용` (auto apply)
+
+## 🚶 How the pedestrian green is applied
+The plan's pedestrian green of N seconds becomes a **pedestrian-only phase** in the simulator. One cycle runs north-south vehicle green → east-west vehicle green → every vehicle stopped and every crosswalk green for N seconds.
+When N is 0 the phase does not exist and the whole cycle goes to vehicles. So "skip the pedestrian signal when nobody waits" and "extend it for vulnerable users" are visible on screen, not only in the numbers.
+Before an AI plan is applied, the default signal still shows pedestrian green alongside the cross-direction vehicle green, as before.
 
 ## 📡 SSE streaming
 `POST /api/agent/stream` sends these events in order.
@@ -164,6 +173,7 @@ These rules override the LLM's decision. They mirror the auto-apply precondition
 - **Demand input modes**
   - Manual: a network-wide veh/s slider spawns cars at random entry edges
   - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles
+- The plan's pedestrian green is applied as a pedestrian-only phase (skipped at 0 s). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
 - A five-step usage guide appears on first launch and can be reopened from the sidebar
 - Intersection type, data export, and the built-in Webster optimiser with a seeded A/B harness (independent of the LLM) live under the collapsed "Advanced settings" section
@@ -193,6 +203,7 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 | Input with per-approach state, `json_schema` | main direction "north-south", plan 14/6/0 → Guardrail corrected to 12/8/0, score 88, auto apply, 24.6 s total |
 | Run from the profile-mode UI (9 cars, 2 queued on N, saturation 1.2) | main direction "N", plan 12/8/0, score 82, operator approval → applied manually, congestion index 0.61 → 0.35 |
 | Manual mode 4x4, 49 cars, 33 stopped (the split state of the before/after GIFs) | plan 12/8/0, no Guardrail correction, score 88, auto apply → stopped 34 → 21 after 30 s |
+| Manual mode 4x4, cycle 30 s, 18 cars, 2 pedestrians at the crosswalk including an elderly person | Agent 1 flags a vulnerable user, plan 12/8/10 ("one vulnerable pedestrian, so 10 s for crossing speed"), no Guardrail correction, score 82, operator approval → 10 s pedestrian-only phase after applying |
 
 Reasoning stayed off (`reasoning_effort` not sent, 0 reasoning tokens). Response times depend on the network.
 Cases where the Guardrail actually corrected a real Solar Pro 4 plan:
@@ -237,7 +248,7 @@ FlowLight-AI-Traffic-Signal
 │   └── sample_seoul_traffic_history.meta.json
 ├── tests                           # 215 tests (214 mocked + 1 live, live is opt-in)
 ├── docs
-│   ├── screens/                    # current UI screens (guide, main, profile mode, progress, report, applied, advanced)
+│   ├── screens/                    # current UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
 │   ├── system_architecture.png, data_flow.png, ai_decision_process.png, guardrail_cases.png
 │   ├── flowlight_before_ai.gif, flowlight_after_ai.gif, experiment_results.png   # previous-version experiment
@@ -295,7 +306,8 @@ Open `app/index.html` directly in a browser. It calls the backend at `http://127
 2. Press **Play** to start the simulation. 4x speed is comfortable to watch.
 3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak.
 4. Press **AI analysis**. The left panel shows the five steps as they run, and the report shows each agent's real output, the Guardrail correction and the evaluation reasoning.
-5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 seconds the before/after effect is shown.
+5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 simulated seconds the before/after effect is shown.
+6. To see the pedestrian side, raise the **pedestrians (per second)** slider to 1. Analyse while a child, an elderly person or a wheelchair user is waiting at a crosswalk: the pedestrian green comes back as 10 s or more, and after applying you see a pedestrian-only phase with every car stopped. With nobody waiting it comes back as 0 s and the phase disappears.
 
 ---
 
@@ -407,6 +419,16 @@ The `summary` / `explanation` / `reason` returned by the agents and the Guardrai
 
 ![Applied banner and result panel](docs/screens/applied.png)
 
+## With vulnerable pedestrians: the pedestrian-only phase
+
+A real run analysed while an elderly person was waiting at the crosswalk. Agent 1 flagged a vulnerable user, and Agent 2 returned 12/8/10 with the reasoning "one vulnerable pedestrian, so 10 seconds for crossing speed". After applying, a phase appears in which every car stops and every crosswalk is green for 10 seconds. With nobody at the crosswalk the same phase comes back as 0 s and disappears.
+
+| Report: vulnerable-user detection and plan reasoning | Applied-result panel |
+|---|---|
+| ![Pedestrian report](docs/screens/ped_report.png) | ![Applied panel](docs/screens/ped_panel.png) |
+
+![Pedestrian-only phase: all vehicles stopped, all crosswalks green](docs/screens/ped_phase.png)
+
 ## Advanced settings
 
 Intersection type, data export and the built-in Webster optimiser are tucked into a collapsible section.
@@ -436,7 +458,8 @@ Problem statement, agent design, architecture, experiment results and retrospect
 # ⚠️ Known limitations
 
 - The simulator is a pixel-scale custom implementation. Ratios such as the saturation flow (1800 veh/h/lane) match reality, but absolute speeds and distances do not.
-- Pedestrian green is not applied as a real phase duration (0 s only turns the pedestrian signal off). After applying a plan the real cycle is the sum of vehicle greens plus 6 s.
+- After applying a plan the real cycle is vehicle greens + pedestrian phase + amber and all-red (3 s per direction, 1 s after the pedestrian phase), so it is longer than the input `cycle_sec`. Pedestrians who arrive after a 0 s pedestrian green was applied wait until the next AI analysis.
+- The AI plan carries no protected left-turn phase, so after applying it left turns become permissive during the through green.
 - In manual mode, applying an AI plan still halves the spawn rate for 120 s as a relief measure. This is disabled in profile mode.
 - The sample data is a **synthetic example** that follows the column layout of the real dataset. Steps for swapping in real data are in `data/README.md`.
 - Even real peak-hour demand produces modest queues on a single 3x3 intersection. A congestion multiplier (`demo_scale`) and turn ratios (`turn_ratio`) are not implemented yet.

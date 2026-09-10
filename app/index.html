@@ -733,6 +733,13 @@ TrafficLight.prototype.buildPhases = function(totalCycle) {
 
     this.phases.push({dir:'ALL', type:'all_red', duration:this.ALL_RED});
 }
+    // 보행 전용 현시: AI 계획의 pedestrian_green_sec 를 그대로 쓴다. 모든 차량 적색, 모든 횡단보도 녹색.
+    // 0 이면 현시 자체가 없어서 주기 전체가 차량에 간다 (보행자가 없을 때 보행 신호를 건너뛰는 원래 취지).
+    var pg = this.greenTimes.ped || 0;
+    if (pg > 0) {
+        this.phases.push({dir:'ALL', type:'ped_green', duration:pg});
+        this.phases.push({dir:'ALL', type:'all_red', duration:this.ALL_RED});
+    }
 };
 TrafficLight.prototype.updateCycle = function(newCycle) {
     var dirs = this.directions, n = dirs.length;
@@ -744,7 +751,11 @@ TrafficLight.prototype.updateCycle = function(newCycle) {
     var newEff = Math.max(n * GREEN_MIN * 2, newCycle - overhead);
     var ratio = oldSum > 0 ? newEff / oldSum : 1;
     var ng = {};
-    for (var i = 0; i < keys.length; i++) ng[keys[i]] = Math.max(GREEN_MIN, this.greenTimes[keys[i]] * ratio);
+    for (var i = 0; i < keys.length; i++) {
+        // 보행 전용 현시 길이는 AI 계획값 그대로 둔다 (주기 슬라이더로 비례 조정하지 않음)
+        if (keys[i] === 'ped') { ng.ped = this.greenTimes.ped; continue; }
+        ng[keys[i]] = Math.max(GREEN_MIN, this.greenTimes[keys[i]] * ratio);
+    }
     this.greenTimes = ng;
     this.phaseIdx = 0; this.t = 0;
     this.buildPhases(newCycle);
@@ -777,6 +788,7 @@ TrafficLight.prototype.update = function(dt) {
 TrafficLight.prototype.allows = function(edgeDir, turnType) {
     if (this.phases.length <= 1) return 'green';
     var p = this.phases[this.phaseIdx];
+    if (p.type === 'ped_green') return 'red';   // 보행 전용 현시: 우회전 포함 모든 차량 정지
     if (p.type === 'all_red') return turnType === 'right' ? 'yield_right' : 'red';
     if (p.type === 'yellow') return turnType === 'right' ? 'yield_right' : 'red';
     if (p.type === 'straight_right') {
@@ -1244,6 +1256,12 @@ PedSystem.prototype.pedGreen = function(cw) {
     if (!light) return { green:false, remain:0, totalGreen:0 };
 
     var p = light.phases[light.phaseIdx];
+    // AI 계획 적용 후: 보행 전용 현시(ped_green)에서만 녹색. 계획의 N초가 그대로 보행 녹색 길이가 된다.
+    if (this.jc.aiPedGreenSec !== null) {
+        var pg = !!(p && p.type === 'ped_green');
+        return { green: pg, remain: pg ? (p.duration - light.t) : 0, totalGreen: pg ? p.duration : 0 };
+    }
+    // AI 적용 전(기본 신호): 교차 방향 차량 녹색과 나란히 켜진다.
     var g = !!(p && p.type === 'straight_right' && p.dir !== cw.dirRoad);
     var remain = g ? (p.duration - light.t) : 0;
 
@@ -1847,10 +1865,11 @@ Renderer.prototype.render = function(network, jc, cam) {
                         if (light && light.phases.length > 1) {
                             var redRemain = light.phases[light.phaseIdx].duration - light.t;
                             var pi = light.phaseIdx;
+                            var aiPedMode = jc.aiPedGreenSec !== null;   // AI 적용 후엔 보행 전용 현시를 기다린다
                             for (var scan = 0; scan < light.phases.length; scan++) {
                                 pi = (pi + 1) % light.phases.length;
                                 var ph = light.phases[pi];
-                                if (ph.type === 'straight_right' && ph.dir !== cw.dirRoad) break;
+                                if (aiPedMode ? ph.type === 'ped_green' : (ph.type === 'straight_right' && ph.dir !== cw.dirRoad)) break;
                                 redRemain += ph.duration;
                             }
                             textStr = Math.ceil(redRemain).toString();
@@ -2802,17 +2821,20 @@ SimController.prototype._initDOM = function() {
             straight_NS: plan.north_south_green_sec,
             left_NS: nsLeft,
             straight_EW: plan.east_west_green_sec,
-            left_EW: ewLeft
+            left_EW: ewLeft,
+            ped: Number(plan.pedestrian_green_sec) || 0   // 보행 전용 현시 길이 (0 이면 현시 없음)
         };
 
         var cycle = self.cycleLength;
 
         var appliedCount = 0;
+        var actualCycle = 0;
 
         var iter = self.jc.lights.values();
         for (var r = iter.next(); !r.done; r = iter.next()) {
             r.value.applyGreens(ng, cycle);
             appliedCount++;
+            if (!actualCycle) actualCycle = r.value.phases.reduce(function(a, p) { return a + p.duration; }, 0);
         }
 
         console.log("적용 교차로 수:", appliedCount);
@@ -2876,18 +2898,22 @@ SimController.prototype._initDOM = function() {
         lt.textContent += "적용 교차로 수: " + appliedCount + "개\n";
         lt.textContent += "남북 직진: " + plan.north_south_green_sec + "초\n";
         lt.textContent += "동서 직진: " + plan.east_west_green_sec + "초\n";
-        lt.textContent += "보행자 요청: " + (plan.pedestrian_green_sec === 0 ? "없음" : plan.pedestrian_green_sec + "초") + "\n";
-        lt.textContent += "적용된 전체 주기: " + Math.round(cycle) + "초\n";
+        lt.textContent += "보행자 요청: " + (plan.pedestrian_green_sec === 0 ? "없음 (보행 현시 생략)" : plan.pedestrian_green_sec + "초 (보행 전용 현시)") + "\n";
+        lt.textContent += "적용된 전체 주기: " + Math.round(actualCycle || cycle) + "초 (차량 녹색 + 보행 현시 + 황색·전적색)\n";
 
         lt.scrollTop = lt.scrollHeight;
 
         btnApply.disabled = true;
 
-        // AI 적용 효과: 15초 동안 평균값으로 측정
+        // AI 적용 효과: 시뮬레이션 시간 15초 동안 1초마다 표본을 모아 평균낸다.
+        // 실제 시계가 아니라 simTime 기준이라 배속을 걸면 그만큼 빨리 끝나고, 일시정지 중에는 멈춘다.
         var effectSamples = [];
         var effectSampleCount = 0;
+        var effectLastSimT = self.simTime;
 
         var effectTimer = setInterval(function() {
+            if (self.simTime - effectLastSimT < 1) return;
+            effectLastSimT += 1;
             var stoppedNow = 0;
             var sumVNow = 0;
 
@@ -2962,7 +2988,7 @@ SimController.prototype._initDOM = function() {
                 else summary = "뚜렷한 변화 없음 (적용 후 15초 평균 기준)";
                 document.getElementById("effect-summary").textContent = summary;
             }
-        }, 1000);
+        }, 100);
 
         if (!self.running) {
             self.renderer.render(self.network, self.jc, self.cam);
