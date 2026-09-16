@@ -74,6 +74,16 @@ class TestPedestrianAndFairnessRules:
         assert "mean_wait_sec" in p and "2배" in p
         assert "계속 기다리게 두지 않는다" in p
 
+    def test_agent2_allocates_by_saturation_first(self):
+        # 포화도는 차로 수와 현재 녹색 배분을 반영하므로 대기 수보다 우선한다 (다차로 도로에서 검증)
+        p = signal_planning_agent_prompt
+        assert "1차 기준은 saturation" in p and "보조 기준" in p
+        assert "차로 수" in p and "lanes" in p
+
+    def test_agent1_direction_uses_saturation_first(self):
+        p = traffic_situation_agent_prompt
+        assert "saturation(포화도)이 가장 큰 접근로" in p
+
     def test_agent3_penalises_short_green_for_vulnerable(self):
         p = plan_evaluation_agent_prompt
         assert "vulnerable_count" in p and "10초 미만이면 감점" in p

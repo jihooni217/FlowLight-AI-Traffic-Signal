@@ -45,23 +45,24 @@ The repository is being turned into an official Upstage demo and tutorial. Two r
 
 ## 📊 Before and after AI
 
-The same seed builds the same state, then **fixed-time signals** and **the plan Solar Pro 4 produced** each run for 60 seconds (the GIFs show every second frame). The only difference between the two runs is the signals.
+In real-data profile mode the same seed builds the same state, then **fixed-time signals** and **the plan Solar Pro 4 produced** each run for 60 seconds (the GIFs show every second frame). The only difference between the two runs is the signals.
 
-| Before AI (fixed signal) | After AI (NS 12 s / EW 8 s / pedestrian 0 s) |
+| Before AI (fixed signal, both axes equal) | After AI (NS 12 s / EW 18 s / pedestrian 0 s) |
 |----------|---------|
 | <img src="docs/flowlight_before_ai.gif" width="100%"> | <img src="docs/flowlight_after_ai.gif" width="100%"> |
 
 | Metric (60 s window) | Fixed Signal | FlowLight AI | Change |
 |:--------|-------------:|-------------:|------------:|
-| 🚦 Throughput (last minute, at 60 s) | **121** | **131** | **⬆ 8.3%** |
-| 🚗 Stopped vehicles (60 s mean) | **33.9** | **31.3** | **⬇ 7.7%** |
-| 📈 Congestion index (60 s mean) | **0.91** | **0.92** | no change |
+| 🚦 Throughput (last minute, at 60 s) | **100** | **98** | no difference |
+| 🚗 Stopped vehicles (60 s mean) | **21.3** | **21.4** | no difference |
+| 📈 Congestion index (60 s mean) | **0.944** | **0.955** | no difference |
 
-- Setup: manual mode, 4x4 grid, 5 veh/s, seed 20260702. At the split (120 s warm-up): 49 cars, 33 stopped, congestion 0.94. The network is saturated, so the congestion index stays around 0.9 either way.
-- That state was sent to the real Solar Pro 4: Agent 1 main direction "north-south", plan 12 s north-south / 8 s east-west / 0 s pedestrian, no Guardrail correction, score 88, final decision auto apply.
-- The plan is applied the way a real signal system would: each direction's green is split 70 % through / 30 % left to keep the four-phase cycle, a north-south green wave (1.7 s offset per block) is set, and every cycle the left-turn and pedestrian phases are added or skipped from actual demand. This gives a smaller gain than a naive two-phase apply did (stopped 34 → 21 back then), but a result closer to a real intersection.
-- In manual mode, applying a plan normally halves the inflow for 120 s. That relief was switched off right after applying so both runs saw identical demand.
-- The method matches the built-in A/B check under Advanced settings: same seed, fixed 1/30 s step, same warm-up, then branch.
+- Setup: real-data profile at 08:00, lanes as in the data (3 north-south, 2 east-west), congestion multiplier ×3, cycle 30 s, seed 20260702. At the split (120 s warm-up): 35 cars, 30 stopped, congestion 1.0. Saturation per approach was E 2.86 · W 2.29 · N 1.57 · S 1.00, with queues N 8 · S 10 · E 6 · W 6.
+- That state was sent to the real Solar Pro 4: Agent 1 main direction "east-west", plan 12 s north-south / 18 s east-west / 0 s pedestrian, no Guardrail correction, score 88, final decision auto apply. The plan gives more green to the more saturated east-west axis.
+- The result is effectively the same as the fixed signal. All three differences sit inside the noise of a single seed, so we claim neither an improvement nor a loss. Demand on the two axes of this intersection is not far apart, so a fixed signal that splits 30 s in half is already close to optimal; the AI plan moved green to east-west and gained there what it lost on north-south. The difference shows up when demand is skewed to one axis or the pedestrian situation changes. With balanced demand it comes out like this.
+- The plan is applied the way a real signal system would: each direction's green is split 70 % through / 30 % left to keep the four-phase cycle (with two or more lanes the left turn is protected, from a dedicated lane), an east-west green wave is set, and every cycle the left-turn and pedestrian phases are added or skipped from actual demand.
+- The method matches the built-in A/B check under Advanced settings: same seed, fixed 1/30 s step, same warm-up, then branch. Profile mode has no inflow relief after applying, so both runs see identical demand.
+- The earlier experiment (manual mode, 4x4, one lane, 5 veh/s, 2026-09-10) measured the same way gave throughput 121 → 131 and stopped vehicles 33.9 → 31.3. It is kept in the verification log below.
 
 ---
 
@@ -126,13 +127,13 @@ FlowLight is a **multi-agent workflow**: analyse the situation, plan the signal,
 
 ## 🚗 Traffic Situation Agent (Agent 1)
 - Judges traffic level and risk from vehicle count, stopped vehicles, congestion and pedestrians
-- When `queues.by_approach` is present, picks the **main congested direction** (N/S/E/W or the axis) from per-approach queue and saturation
+- When `queues.by_approach` is present, picks the approach with the highest saturation as the **main congested direction** (N/S/E/W or the axis); queue length is secondary
 - Output: `summary`, `traffic_level`, `main_congestion_direction`, `pedestrian_issue`, `vulnerable_user_detected`, `risk_level`
 
 ## 🤖 Signal Planning Agent (Agent 2)
 - Plans north-south and east-west vehicle green plus pedestrian green, in whole seconds
 - No pedestrians → pedestrian green 0 s. Children, elderly or wheelchair users present (`vulnerable_count`) → pedestrian green 10 s or more
-- With per-approach state, gives more green to the axis with the larger queue and saturation, and does not starve an approach whose mean wait exceeds twice the cycle even if it holds few cars. Cites the numbers in `explanation`
+- With per-approach state, compares the **saturation sum** of the north-south axis (N+S) and the east-west axis (E+W) first and gives more green to the larger one. Queue length is secondary and lane counts (`lanes`) are taken into account. Does not starve an approach whose mean wait exceeds twice the cycle even if it holds few cars. Cites the numbers in `explanation`
 - Output: `durations` (three integers), `priority` (VEHICLE / PEDESTRIAN / BALANCED), `next_signals`, `explanation`
 
 ## ✅ Plan Evaluation Agent (Agent 3)
@@ -155,14 +156,15 @@ These rules override the LLM's decision. They mirror the auto-apply precondition
 
 ## 🚦 The plan is applied like a real signal system
 The AI plan (NS N s / EW M s / pedestrian P s) is a budget; the simulator runs it the way a real intersection would.
-- **Korean four-phase cycle kept**: each direction's green is split 70 % through / 30 % left. The left-turn lamp is the green arrow of a four-lamp signal head. With a single lane per direction there is no left-turn pocket, so left turns are protected-permissive (permitted during the through green, protected during the arrow).
+- **Korean four-phase cycle kept**: each direction's green is split 70 % through / 30 % left. The left-turn lamp is the green arrow of a four-lamp signal head.
+- **Lanes and left turns**: each direction has 1 to 3 lanes (default 2), and profile mode uses the lane counts from the data. With two or more lanes the leftmost lane is a dedicated left-turn lane and only protected left turns are allowed (no left turn during the through green, as in the Korean Road Traffic Act enforcement rules, attached table 2). A single-lane road has no such lane, so left turns are protected-permissive (permitted during the through green, protected during the arrow). Cars pick the lane for their turn on entry, and the rightmost lane carries right turns.
 - **Green wave**: intersection start times are offset along the main congested direction reported by Agent 1. Offset = block length ÷ top speed. No offset with a single intersection.
-- **Actuated phases (only after an AI plan is applied)**: every cycle, each intersection looks at its own crosswalks and approaches.
-  - Nobody at the crosswalk → the pedestrian phase is skipped that cycle and the time goes to vehicles. Somebody waiting → the planned length (at least 6 s), and at least 10 s when a child, elderly or wheelchair user is there. Even a 0 s plan turns into a phase once someone arrives.
-  - Two or more cars waiting to turn left → a left-turn phase is added; if the lead car is a left-turner blocking the lane, the arrow comes first (leading left). No left demand → no left phase.
+- **Actuated phases (only after an AI plan is applied)**: every cycle, each intersection looks at its own crosswalks and approaches and redistributes time within the cycle budget the plan gave it.
+  - Pedestrians: a child, elderly or wheelchair user at the crosswalk → a pedestrian-only phase of at least 10 s; five or more pedestrians waiting → at least 6 s (the planned value if larger). Other pedestrians cross alongside the parallel through green, as with the default signal, and with nobody waiting the phase is skipped and the time goes to vehicles. Even a 0 s plan turns into a phase once a vulnerable user arrives.
+  - Left turns: two or more cars waiting to turn left → a left-turn phase is added; if the lead car is a left-turner blocking the lane, the arrow comes first (leading left). No left demand → no left phase.
 - **Pedestrian-only phase**: every vehicle stops and every crosswalk turns green. Right turns are barred while the pedestrian signal is green, and a right turn on red yields to pedestrians.
 
-Before a plan is applied, the default signal is a fixed timetable (four phases, pedestrian green alongside the cross-direction vehicle green).
+Before a plan is applied, the default signal is a fixed timetable (four phases, the green left after amber and all-red split evenly between the two axes, pedestrian green alongside the cross-direction vehicle green).
 
 ## 📡 SSE streaming
 `POST /api/agent/stream` sends these events in order.
@@ -175,10 +177,12 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
 | `error` | `{status: "error", agent, message, detail}` (stream ends) |
 
 ## 🖥 Simulator (browser)
-- Korean-style four-phase signals, protected left turns, amber and all-red, four pedestrian types with crosswalk yielding, four intersection control types, green-wave offsets
+- Korean-style four-phase signals, left-turn phases, amber and all-red, four pedestrian types with crosswalk yielding, four intersection control types, green-wave offsets
+- 1 to 3 lanes per direction (default 2, slider). With two or more lanes: a dedicated left-turn lane, protected left turns and per-lane car following. Default cycle 30 s
 - **Demand input modes**
   - Manual: a network-wide veh/s slider spawns cars at random entry edges
-  - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles
+  - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, lane counts from the data (3 north-south, 2 east-west), hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles
+  - Congestion multiplier (×1 to 5, demo only): real peak demand leaves a single intersection fairly quiet, so this slider scales the size of the demand while keeping the ratio between directions. Spawn rate = per-lane arrival rate × lanes × multiplier. It is sent to the agents as `demand.demo_scale` so they know it is a demo multiplier
 - The AI plan is applied with the four-phase cycle, a green wave and actuated phases (see above). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
 - A five-step usage guide appears on first launch and can be reopened from the sidebar
@@ -200,7 +204,7 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 </p>
 </details>
 
-## Live API verification (solar-pro4-260806, 2026-09-10)
+## Live API verification (solar-pro4-260806, 2026-09-10 to 09-17)
 
 | Condition | Result |
 |---|---|
@@ -208,8 +212,9 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 | Legacy input, `json_schema` | 3/3 runs 200 · `stop`, schema compliant, same result, 15.1 s total |
 | Input with per-approach state, `json_schema` | main direction "north-south", plan 14/6/0 → Guardrail corrected to 12/8/0, score 88, auto apply, 24.6 s total |
 | Run from the profile-mode UI (9 cars, 2 queued on N, saturation 1.2) | main direction "N", plan 12/8/0, score 82, operator approval → applied manually, congestion index 0.61 → 0.35 (measured with the earlier two-phase apply) |
-| Manual mode 4x4, 49 cars, 33 stopped (the split state of the before/after GIFs) | main direction "north-south", plan 12/8/0, no Guardrail correction, score 88, auto apply → applied as a real signal system, throughput 121 → 131 after 60 s |
+| Manual mode 4x4, one lane, 49 cars, 33 stopped (the split state of the earlier before/after comparison) | main direction "north-south", plan 12/8/0, no Guardrail correction, score 88, auto apply → applied as a real signal system, throughput 121 → 131 after 60 s |
 | Manual mode 4x4, cycle 30 s, 18 cars, 2 pedestrians at the crosswalk including an elderly person | Agent 1 flags a vulnerable user, plan 12/8/10 ("one vulnerable pedestrian, so 10 s for crossing speed"), no Guardrail correction, score 82, operator approval → 10 s pedestrian-only phase after applying |
+| Profile mode 08:00, lanes from the data, multiplier ×3, 35 cars, 30 stopped (the split state of the current before/after GIFs, 09-17) | main direction "east-west" (saturation E 2.86 · W 2.29), plan 12/18/0, no Guardrail correction, score 88, auto apply → throughput 100 → 98 after 60 s, stopped 21.3 → 21.4. No difference from the fixed signal |
 
 Reasoning stayed off (`reasoning_effort` not sent, 0 reasoning tokens). Response times depend on the network.
 Cases where the Guardrail actually corrected a real Solar Pro 4 plan:
@@ -252,12 +257,13 @@ FlowLight-AI-Traffic-Signal
 │   ├── README.md                   # data source, column mapping, synthetic sample formula, replacement steps
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 215 tests (214 mocked + 1 live, live is opt-in)
+├── tests                           # 231 tests (230 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # current UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
 │   ├── system_architecture.png, data_flow.png, ai_decision_process.png, guardrail_cases.png
-│   ├── flowlight_before_ai.gif, flowlight_after_ai.gif, experiment_results.png   # previous-version experiment
+│   ├── flowlight_before_ai.gif, flowlight_after_ai.gif   # before/after comparison (current version)
+│   ├── experiment_results.png      # previous-version experiment
 │   └── FlowLight_Final_Presentation.pdf
 ├── LICENSE                         # MIT
 ├── .env.example
@@ -310,7 +316,7 @@ Open `app/index.html` directly in a browser. It calls the backend at `http://127
 
 1. On first launch a five-step **usage guide** appears. Read it and press "Start". The sidebar button reopens it any time.
 2. Press **Play** to start the simulation. 4x speed is comfortable to watch.
-3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak.
+3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. Real demand leaves the screen fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection.
 4. Press **AI analysis**. The left panel shows the five steps as they run, and the report shows each agent's real output, the Guardrail correction and the evaluation reasoning.
 5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 simulated seconds the before/after effect is shown.
 6. To see the pedestrian side, raise the **pedestrians (per second)** slider to 1. Analyse while a child, an elderly person or a wheelchair user is waiting at a crosswalk: the pedestrian green comes back as 10 s or more, and after applying you see a pedestrian-only phase with every car stopped. With nobody waiting it comes back as 0 s and the phase disappears.
@@ -334,14 +340,14 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 {
   "intersection_id": "simulation-current",
   "tick": 412,
-  "signals": {"cycle_sec": 20},
+  "signals": {"cycle_sec": 30},
   "queues": {
     "total_cars": 28, "stopped_cars": 19,
     "by_approach": {
-      "N": {"queue": 9, "mean_wait_sec": 14.2, "arrivals_last_window": 31, "saturation": 0.83},
-      "S": {"queue": 7, "mean_wait_sec": 11.0, "arrivals_last_window": 28, "saturation": 0.75},
-      "E": {"queue": 2, "mean_wait_sec": 3.1,  "arrivals_last_window": 12, "saturation": 0.31},
-      "W": {"queue": 1, "mean_wait_sec": 2.4,  "arrivals_last_window": 10, "saturation": 0.27}
+      "N": {"queue": 9, "mean_wait_sec": 14.2, "arrivals_last_window": 31, "saturation": 0.83, "lanes": 3},
+      "S": {"queue": 7, "mean_wait_sec": 11.0, "arrivals_last_window": 28, "saturation": 0.75, "lanes": 3},
+      "E": {"queue": 2, "mean_wait_sec": 3.1,  "arrivals_last_window": 12, "saturation": 0.31, "lanes": 2},
+      "W": {"queue": 1, "mean_wait_sec": 2.4,  "arrivals_last_window": 10, "saturation": 0.27, "lanes": 2}
     }
   },
   "pedestrians": {"waiting_or_crossing": 0, "vulnerable_count": 0},
@@ -353,12 +359,14 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
     "volume_per_hour": {"N": 842, "S": 790, "E": 610, "W": 655},
     "lanes": {"N": 3, "S": 3, "E": 2, "W": 2},
     "arrival_rate_per_sec": {"N": 0.077963, "S": 0.073148, "E": 0.084722, "W": 0.090972},
+    "demo_scale": 1,
     "lost_demand_last_60s": {"N": 0, "S": 0, "E": 0, "W": 0}
   }
 }
 ```
 
 - `demand` is input, `queues` is output. The prompts spell this out, and there is no `queue` key anywhere inside `demand`.
+- `demo_scale` is the demo congestion multiplier. The actual spawn rate is `arrival_rate_per_sec × lanes × demo_scale`, and when a multiplier is set the `note` field says so, so the agents do not mistake the demand for real values.
 - Approach naming: `N` means vehicles **entering from the north and heading south**.
 
 ---
@@ -369,7 +377,7 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 python -m pytest -q
 ```
 
-- The default run never calls the Solar API (the client is mocked). Currently 214 pass and 1 is skipped as live.
+- The default run never calls the Solar API (the client is mocked). Currently 230 pass and 1 is skipped as live.
 - The live API test is opt-in.
 
 ```bash
@@ -382,7 +390,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_stream_mocked.py` | SSE event order and payloads, request shape, error paths, CORS |
 | `test_agents_config.py` | Model selection, request parameters, `finish_reason` handling |
 | `test_output_schemas.py` | Upstage schema constraints, prompt consistency, negative cases |
-| `test_prompts.py` | Demand vs state wording and per-approach instructions |
+| `test_prompts.py` | Demand vs state wording, per-approach instructions, pedestrian / vulnerable-user / fairness / saturation-first rules |
 | `test_traffic_data.py` | CSV normalisation, validation, veh/h → veh/s conversion |
 | `test_traffic_profile_api.py` | Profile endpoint |
 | `test_scenario_extension.py` | Extended input passing through the backend |
@@ -427,7 +435,7 @@ The `summary` / `explanation` / `reason` returned by the agents and the Guardrai
 
 ## With vulnerable pedestrians: the pedestrian-only phase
 
-A real run analysed while an elderly person was waiting at the crosswalk. Agent 1 flagged a vulnerable user, and Agent 2 returned 12/8/10 with the reasoning "one vulnerable pedestrian, so 10 seconds for crossing speed". After applying, a phase appears in which every car stops and every crosswalk is green for 10 seconds. From then on the actuated signal checks the crosswalks every cycle: it skips the phase at an intersection where nobody waits and brings the 10 seconds back when a vulnerable user arrives.
+A real run analysed while an elderly person was waiting at the crosswalk. Agent 1 flagged a vulnerable user, and Agent 2 returned 12/8/10 with the reasoning "one vulnerable pedestrian, so 10 seconds for crossing speed". After applying, a phase appears in which every car stops and every crosswalk is green for 10 seconds. From then on the actuated signal checks the crosswalks every cycle: the exclusive phase is used only where a vulnerable user or a crowd is waiting, other pedestrians cross alongside the parallel through green, and with nobody waiting the phase is skipped. The screens below were re-captured on a two-lane road.
 
 | Report: vulnerable-user detection and plan reasoning | Applied-result panel |
 |---|---|
@@ -464,12 +472,14 @@ Problem statement, agent design, architecture, experiment results and retrospect
 # ⚠️ Known limitations
 
 - The simulator is a pixel-scale custom implementation. Ratios such as the saturation flow (1800 veh/h/lane) match reality, but absolute speeds and distances do not.
-- The time axis is compressed: cycles of 20 to 30 s (real ones are 100 to 180 s), 2 s amber, 1.7 s green-wave offset per block. Ratios are realistic, absolute values are not. After applying a plan the real cycle is vehicle greens + left-turn and pedestrian phases + amber and all-red, so it is longer than the input `cycle_sec`.
-- One lane per direction, so no left-turn pocket. Left turns are protected-permissive and the actuated left phase only appears with two or more cars waiting. A protected-only left (no left during through green) gridlocks this layout and was rejected.
+- The time axis is compressed: default cycle 30 s (real ones are 100 to 180 s), 2 s amber, 1.7 s green-wave offset per block. Ratios are realistic, absolute values are not. After applying a plan the real cycle is vehicle greens + left-turn and pedestrian phases + amber and all-red, so it is longer than the input `cycle_sec`.
+- At most three lanes, and always exactly one left-turn lane. Cars choose the lane for their turn on entry and never change lanes mid-block, so through traffic does not move over even when the left-turn lane is empty. On single-lane roads a protected-only left (no left during the through green) gridlocks the grid, so those roads use protected-permissive left turns.
+- More lanes raise throughput but also raise queues and the congestion index, because every lane admits cars while intersection capacity is set by the signal.
+- With balanced demand the AI plan comes out about the same as the fixed signal; the comparison above is an example. The difference appears when demand is skewed to one axis or the pedestrian situation changes.
 - When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are on the roadmap.
 - In manual mode, applying an AI plan still halves the spawn rate for 120 s as a relief measure. This is disabled in profile mode.
 - The sample data is a **synthetic example** that follows the column layout of the real dataset. Steps for swapping in real data are in `data/README.md`.
-- Even real peak-hour demand produces modest queues on a single 3x3 intersection. A congestion multiplier (`demo_scale`) and turn ratios (`turn_ratio`) are not implemented yet.
+- The congestion multiplier (`demo_scale`) is a demo device. The agent input carries a `note` saying the demand is scaled. Turn ratios (`turn_ratio`) are not read from data yet; the simulator picks turns at random.
 
 ---
 
@@ -477,7 +487,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 
 | Area | Description |
 |------------------|-------------|
-| **Real Traffic Data** | Wire up a real public data file, turn ratios (`turn_ratio`), congestion multiplier (`demo_scale`) |
+| **Real Traffic Data** | Wire up a real public data file, turn ratios (`turn_ratio`) |
 | **Demo Packaging** | Serve the frontend statically to simplify setup |
 | **Signal Fidelity** | Apply pedestrian phases for real and align the displayed cycle |
 | **Roundabout Scenario** | Roundabout flow and priority rules |

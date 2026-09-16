@@ -145,8 +145,8 @@ def weekday_from_date(yyyymmdd: str) -> str:
 def volume_to_arrival_rate(volume_per_hour, lanes=1) -> float:
     """시간당 교통량을 차로당 초당 도착률로 바꾼다.
 
-    시뮬레이터는 방향당 1차로이므로 차로당 값을 넣어야 포화유출률(0.5대/초 = 1800대/시/차로)과
-    스케일이 맞는다. 예: 842대/시, 3차로 → 842 / 3 / 3600 ≈ 0.078 대/초.
+    시뮬레이터는 차로당 발생률에 차로 수를 곱해 차를 만들므로 차로당 값이어야 포화유출률
+    (0.5대/초 = 1800대/시/차로)과 스케일이 맞는다. 예: 842대/시, 3차로 → 842 / 3 / 3600 ≈ 0.078 대/초.
     """
     volume = validate_volume(volume_per_hour)
     n_lanes = validate_lanes(lanes)

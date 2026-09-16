@@ -253,14 +253,17 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <input type="range" id="sim-spawn-rate" min="0" max="6" step="1" value="3">
                     <label>보행자 (명/초): <span id="val-ped">0</span></label>
                     <input type="range" id="sim-ped-rate" min="0" max="2" step="1" value="0">
-                    <label>신호 주기 (s): <span id="val-cycle">20</span></label>
-                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="20">
+                    <label>신호 주기 (s): <span id="val-cycle">30</span></label>
+                    <input type="range" id="sim-cycle" min="10" max="120" step="2" value="30">
                     <label>최대 차량 (대): <span id="val-maxcars">150</span></label>
                     <input type="range" id="sim-max-cars" min="1" max="400" step="1" value="150">
                     <label>최고 속도 (px/s): <span id="val-speed">60</span></label>
                     <input type="range" id="sim-max-speed" min="20" max="120" step="5" value="60">
                     <label>격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 3x3 고정</span></label>
                     <input type="range" id="sim-grid-size" min="2" max="6" step="1" value="4">
+                    <label>차로 수 (방향당): <span id="val-lanes">2</span> <span id="lanes-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 데이터의 차로 수 사용</span></label>
+                    <input type="range" id="sim-lanes" min="1" max="3" step="1" value="2">
+                    <div class="hint">2차로 이상이면 맨 왼쪽이 좌회전 전용 차로가 되어 보호 좌회전이 성립합니다.</div>
                 </div>
             </section>
 
@@ -279,6 +282,11 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <label class="toggle-label mt-2">
                         <input type="checkbox" id="chk-demand-autohour"> <span>시간대 자동 진행 (<span id="val-demand-secs">120</span>초마다)</span>
                     </label>
+                    <div class="slider-group mt-2">
+                        <label>혼잡 배율 (데모용): ×<span id="val-demand-scale">1</span></label>
+                        <input type="range" id="sim-demand-scale" min="1" max="5" step="1" value="1">
+                        <div class="hint">시간 축이 압축된 시뮬레이터에서 첨두 상황을 보이게 하는 배율입니다. 접근로별 비율은 데이터 그대로이고, 배율은 Agent 입력에 <code>demo_scale</code> 로 함께 보냅니다.</div>
+                    </div>
                     <table class="demand-table">
                         <thead><tr><th>접근로</th><th>수요<br><small>대/시</small></th><th>발생률<br><small>대/초</small></th><th>진입<br><small>60초</small></th><th>손실</th><th>대기</th></tr></thead>
                         <tbody>
@@ -489,6 +497,7 @@ var MIN_GAP = 5;
 var DECEL = 120;
 var ACCEL = 70;
 var CAR_LEN = 10;
+var LANE_W = 7;        // 다차로 도로의 차로 폭(px). 1차로 도로는 예전 그대로 12px 차로 하나.
 var GREEN_MIN = 2;
 var COL_GREEN = '#22c55e';
 var COL_YELLOW = '#eab308';
@@ -551,17 +560,19 @@ function Node(id, x, y, isBoundary) {
     this.outgoing = [];
 }
 
-function Edge(id, from, to, laneOff) {
+function Edge(id, from, to, laneOff, lanes) {
     if (laneOff === undefined) laneOff = 6;
     this.id = id;
     this.from = from;
     this.to = to;
-    this.cars = [];
+    this.cars = [];            // 모든 차로의 차량 (s 오름차순). 집계·그리기·양보 판정이 읽는다.
     this.flowCount = 0;
     var dx = to.x - from.x; var dy = to.y - from.y;
     this.len = Math.sqrt(dx*dx + dy*dy);
     this.ux = dx / this.len; this.uy = dy / this.len;
     var nx = -this.uy, ny = this.ux;
+    this.nx = nx; this.ny = ny;    // 진행 방향의 오른쪽 법선 (우측통행: 차로는 중앙선 오른쪽에 놓인다)
+    this.laneOff = laneOff;
     this.ax = from.x + nx * laneOff; this.ay = from.y + ny * laneOff;
     this.bx = to.x + nx * laneOff; this.by = to.y + ny * laneOff;
     this.dir = (Math.abs(this.ux) > Math.abs(this.uy)) ? 'EW' : 'NS';
@@ -570,13 +581,53 @@ function Edge(id, from, to, laneOff) {
     this.isArc = false;
     // 도착 기반 수요 측정: 이 엣지에 "진입한" 차량 수 (이동류별, 샘플마다 리셋)
     this.arr = { straight: 0, left: 0, right: 0 };
+    this.setLanes(lanes || 1);
 }
+// ===== 차로 (다차로 도로) =====
+// 차로 0 이 중앙선 쪽(맨 왼쪽)이고 lanes-1 이 갓길 쪽이다. 2차로 이상이면 차로 0 은 좌회전 전용 차로로 쓰고,
+// 직진은 나머지 차로, 우회전은 맨 오른쪽 차로를 쓴다. 차로 변경은 하지 않고 도로에 들어올 때 회전 의도로 차로를 정한다.
+Edge.prototype.setLanes = function(n) {
+    this.lanes = Math.max(1, n | 0);
+    this.laneW = this.lanes === 1 ? 12 : LANE_W;          // 1차로는 예전 기하(폭 12, 중심 오프셋 6) 그대로
+    this.laneCars = [];
+    for (var k = 0; k < this.lanes; k++) this.laneCars.push([]);
+    this.cars = [];
+};
+Edge.prototype.roadHalf = function() { return this.lanes * this.laneW; };   // 한쪽 방향 도로 폭 (중앙선 → 갓길)
+Edge.prototype.laneOffset = function(k) {
+    return this.lanes === 1 ? this.laneOff : (this.laneW / 2 + k * this.laneW);
+};
+Edge.prototype.carX = function(car) { return this.from.x + this.nx * this.laneOffset(car.lane || 0) + this.ux * car.s; };
+Edge.prototype.carY = function(car) { return this.from.y + this.ny * this.laneOffset(car.lane || 0) + this.uy * car.s; };
+function _byS(a, b) { return a.s - b.s; }
+Edge.prototype.addCar = function(car, lane) {
+    car.lane = Math.min(Math.max(0, lane | 0), this.lanes - 1);
+    this.laneCars[car.lane].push(car); this.laneCars[car.lane].sort(_byS);
+    this.cars.push(car); this.cars.sort(_byS);
+};
+Edge.prototype.removeCar = function(car) {
+    var i = this.cars.indexOf(car); if (i > -1) this.cars.splice(i, 1);
+    var l = this.laneCars[car.lane || 0]; if (l) { var j = l.indexOf(car); if (j > -1) l.splice(j, 1); }
+};
+Edge.prototype.clearCars = function() {
+    this.cars.length = 0;
+    for (var k = 0; k < this.laneCars.length; k++) this.laneCars[k].length = 0;
+};
+// 이 도로에 들어올 때 쓸 차로: 다음 회전이 좌회전이면 0, 우회전이면 맨 오른쪽, 직진은 차로 1~lanes-1 중 하나.
+Edge.prototype.laneFor = function(turnType) {
+    var L = this.lanes;
+    if (L === 1) return 0;
+    if (turnType === 'left') return 0;
+    if (turnType === 'right') return L - 1;
+    return 1 + Math.floor(rand() * (L - 1));
+};
 
-function Network(gridSize, spacing) {
+function Network(gridSize, spacing, lanes) {
     this.nodes = [];
     this.edges = [];
     this.gridSize = gridSize;
     this.spacing = spacing;
+    this.defaultLanes = lanes || 1;
     this._build();
 }
 Network.prototype._build = function() {
@@ -601,7 +652,7 @@ Network.prototype._build = function() {
             node.legs = nb.length;
             for (var k = 0; k < nb.length; k++) {
                 var nxt = nb[k];
-                var edge = new Edge(node.id+'>'+nxt.id, node, nxt);
+                var edge = new Edge(node.id+'>'+nxt.id, node, nxt, undefined, this.defaultLanes);
                 this.edges.push(edge);
                 node.outgoing.push(edge);
                 nxt.incoming.push(edge);
@@ -823,8 +874,23 @@ TrafficLight.prototype.setActuated = function(cfg) {
 TrafficLight.prototype.reactuate = function() {
     var cfg = this.actuated; if (!cfg) return;
     var ng = {}; this.leadingLeft = {}; this.lastActuation = {};
+    this._cycleCount = (this._cycleCount || 0) + 1;
+    // 보행 현시 먼저 정한다. 계획에 없던 보행 현시(계획 0초)를 넣을 때는 차량 예산에서 시간을 떼어 온다.
+    // 계획 합계(남북+동서+보행)가 이 신호등의 주기 예산이고, 감응은 그 안에서 배분만 바꾼다.
+    var pd = cfg.pedDemand ? cfg.pedDemand(this.node) : {waiting: 0, vulnerable: 0};
+    // 보행 전용 현시(모든 차량 정지)는 교통약자가 있거나 보행자가 많이(5명 이상) 모였을 때만 넣는다.
+    // 그 밖의 보행자는 기본 신호처럼 나란한 직진 녹색과 함께 건넌다(병행 보행, 차량 시간 손실 없음).
+    // 교통약자 최소 10초, 그 외 최소 6초, 계획값이 더 크면 계획값.
+    var ped = 0;
+    if (pd.vulnerable > 0) ped = Math.max(10, cfg.pedPlan || 0);
+    else if (pd.waiting >= 5) ped = Math.max(6, cfg.pedPlan || 0);
+    if (ped > 0) this._lastPedCycle = this._cycleCount;
+    var vehPlan = 0; for (var di = 0; di < this.directions.length; di++) vehPlan += cfg.axisTotal[this.directions[di]] || 0;
+    var budget = vehPlan + (cfg.pedPlan || 0);
+    var vehBudget = Math.max(GREEN_MIN * 2 * this.directions.length, budget - ped);
+    var scale = vehPlan > 0 ? Math.min(1, vehBudget / vehPlan) : 1;
     for (var i = 0; i < this.directions.length; i++) {
-        var d = this.directions[i], total = cfg.axisTotal[d] || 0;
+        var d = this.directions[i], total = Math.max(GREEN_MIN * 2, Math.round((cfg.axisTotal[d] || 0) * scale));
         var dem = cfg.leftDemand ? cfg.leftDemand(this.node, d) : {total: 0, left: 0, headLeft: false};
         var left = 0;
         // 좌회전 현시는 좌회전 대기가 쌓였을 때만 넣는다 (감응식 좌회전). 한두 대는 겸용 신호의 비보호 좌회전으로 빠지므로
@@ -840,16 +906,13 @@ TrafficLight.prototype.reactuate = function() {
         this.leadingLeft[d] = dem.headLeft && left > 0;
         this.lastActuation[d] = {left: left, straight: total - left, leading: this.leadingLeft[d], demandLeft: dem.left, demandTotal: dem.total};
     }
-    var pd = cfg.pedDemand ? cfg.pedDemand(this.node) : {waiting: 0, vulnerable: 0};
-    var ped = 0;
-    if (pd.waiting > 0) ped = Math.max(pd.vulnerable > 0 ? 10 : 6, cfg.pedPlan || 0);
     ng.ped = ped;
-    this.lastActuation.ped = {sec: ped, waiting: pd.waiting, vulnerable: pd.vulnerable};
+    this.lastActuation.ped = {sec: ped, waiting: pd.waiting, vulnerable: pd.vulnerable, vehScale: +scale.toFixed(2)};
     for (var k in ng) this.greenTimes[k] = ng[k];
     this.buildPhases(this.totalCycle);
     if (this.phaseIdx >= this.phases.length) this.phaseIdx = 0;
 };
-TrafficLight.prototype.allows = function(edgeDir, turnType) {
+TrafficLight.prototype.allows = function(edgeDir, turnType, lanes) {
     if (this.phases.length <= 1) return 'green';
     var p = this.phases[this.phaseIdx];
     if (p.type === 'ped_green') return 'red';   // 보행 전용 현시: 우회전 포함 모든 차량 정지
@@ -857,10 +920,14 @@ TrafficLight.prototype.allows = function(edgeDir, turnType) {
     if (p.type === 'yellow') return turnType === 'right' ? 'yield_right' : 'red';
     if (p.type === 'straight_right') {
         if (p.dir === edgeDir) {
-            // 보호·비보호 겸용 좌회전: 이 시뮬레이터는 방향당 차로가 하나라 좌회전 전용 차로가 없다.
-            // 실제 도로에서도 좌회전 차로가 없는 교차로는 겸용 신호(직진 녹색 때 비보호 좌회전 + 좌회전 화살표 때 보호 좌회전)를 쓴다.
-            // 직진 때 좌회전을 막으면 선두 좌회전 차 한 대가 차로 전체를 막아 격자가 마비된다 (검증에서 확인).
-            if (turnType === 'straight' || turnType === 'right' || turnType === 'left') return 'green';
+            if (turnType === 'straight' || turnType === 'right') return 'green';
+            if (turnType === 'left') {
+                // 좌회전 전용 차로가 있고(2차로 이상) 이 주기에 좌회전 화살표 현시가 있으면 보호 좌회전만 허용
+                // (직진 녹색 때 좌회전 금지, 도로교통법 시행규칙 별표 2). 좌회전 차로가 없는 1차로 도로나
+                // 감응이 좌회전 현시를 생략한 주기에는 비보호 겸용 좌회전(직진 녹색 때 좌회전 가능)으로 본다.
+                var protectedOnly = (lanes || 1) >= 2 && (this.greenTimes['left_' + edgeDir] || 0) > 0;
+                return protectedOnly ? 'red' : 'green';
+            }
             return 'red';
         }
         return turnType === 'right' ? 'yield_right' : 'red';
@@ -873,7 +940,7 @@ TrafficLight.prototype.allows = function(edgeDir, turnType) {
 };
 
 // ===== Car =====
-function Car(edge, v, maxSpeed, route, spawnTime) {
+function Car(edge, v, maxSpeed, route, spawnTime, lane) {
     this.edge = edge;
     this.s = 0;
     this.v = v;
@@ -884,12 +951,19 @@ function Car(edge, v, maxSpeed, route, spawnTime) {
     this.waitTime = 0;
     this.color = COL_GREEN;
     this.wasCommitted = false;
-    edge.cars.unshift(this);
-    edge.cars.sort(function(a,b){ return a.s - b.s; });
+    edge.addCar(this, lane === undefined ? edge.laneFor(getTurnType(edge, this.getNextEdge())) : lane);
+    this._planNextLane();
     recordArrival(this, edge);
 }
 Car.prototype.getNextEdge = function() {
     return (this.routeIndex + 1 < this.route.length) ? this.route[this.routeIndex + 1] : null;
+};
+// 다음 도로에서 쓸 차로를 미리 정해 둔다 (진입 여유 판정과 실제 진입이 같은 차로를 보도록)
+Car.prototype._planNextLane = function() {
+    var ne = this.getNextEdge();
+    if (!ne) { this.nextLane = 0; return; }
+    var nne = (this.routeIndex + 2 < this.route.length) ? this.route[this.routeIndex + 2] : null;
+    this.nextLane = ne.laneFor(getTurnType(ne, nne));
 };
 Car.prototype.update = function(dt, simTime, jc) {
     if (this.crashed) {
@@ -900,15 +974,16 @@ Car.prototype.update = function(dt, simTime, jc) {
         return;
     }
     var d = Infinity;
-    var myIdx = this.edge.cars.indexOf(this);
+    var laneList = this.edge.laneCars[this.lane || 0] || this.edge.cars;   // 같은 차로의 차만 앞차로 본다
+    var myIdx = laneList.indexOf(this);
     var endS = this.edge.len;
     if (this.edge.to.control === 'roundabout' && !this.edge.isArc) {
         endS = Math.max(0, this.edge.len - 18);
     }
-    
+
     // 앞차 추종 (있으면)
-    if (myIdx < this.edge.cars.length - 1) {
-        d = (this.edge.cars[myIdx + 1].s - CAR_LEN) - this.s;
+    if (myIdx < laneList.length - 1) {
+        d = (laneList[myIdx + 1].s - CAR_LEN) - this.s;
     }
     // 교차로 진입 판정 — 큐 선두뿐 아니라 "모든 미허가 차량"에 정지선 규칙 적용.
     // 선두에만 적용하면 앞차가 통과하는 동안 뒤차가 추종만으로 정지선을 넘어버리고,
@@ -936,11 +1011,12 @@ Car.prototype.update = function(dt, simTime, jc) {
                 this.wasCommitted = true;
                 jc.onEnterIntersection(this, this.edge.to);
             }
-            // 선두 차량만 다음 엣지 큐 후미와의 간격을 본다 (뒤차는 앞차 추종으로 충분)
-            if (myIdx === this.edge.cars.length - 1) {
+            // 차로 선두 차량만 다음 엣지(들어갈 차로) 큐 후미와의 간격을 본다 (뒤차는 앞차 추종으로 충분)
+            if (myIdx === laneList.length - 1) {
                 var ne = this.getNextEdge();
-                if (ne && ne.cars.length > 0) {
-                    var dq = (endS - this.s) + (ne.cars[0].s - CAR_LEN);
+                var nl = ne ? (ne.laneCars[this.nextLane || 0] || ne.cars) : null;
+                if (nl && nl.length > 0) {
+                    var dq = (endS - this.s) + (nl[0].s - CAR_LEN);
                     if (dq < d) d = dq;
                 }
             }
@@ -971,8 +1047,7 @@ Car.prototype.update = function(dt, simTime, jc) {
 };
 Car.prototype._transition = function(simTime, jc, endS) {
     this.edge.flowCount++;
-    var idx = this.edge.cars.indexOf(this);
-    if (idx > -1) this.edge.cars.splice(idx, 1);
+    this.edge.removeCar(this);
     var node = this.edge.to;
     var wasRoundaboutIn = (node.control === 'roundabout' && !this.edge.isArc);
     if (wasRoundaboutIn) {
@@ -994,8 +1069,9 @@ Car.prototype._transition = function(simTime, jc, endS) {
         this.s += 18;
     }
     this.wasCommitted = false;
-    this.edge.cars.unshift(this);
-    this.edge.cars.sort(function(a,b){ return a.s - b.s; });
+    // 회전교차로 호(arc)가 경로에 끼워졌으면 미리 정한 차로가 다른 엣지 기준일 수 있다 → 호는 1차로
+    this.edge.addCar(this, this.edge.isArc ? 0 : (this.nextLane || 0));
+    this._planNextLane();
     recordArrival(this, this.edge);
 };
 
@@ -1073,7 +1149,7 @@ JunctionControl.prototype.junctionAllows = function(car, edge) {
         if (!light) return true;
         var nextEdge = car.getNextEdge();
         var turnType = getTurnType(edge, nextEdge);
-        var result = light.allows(edge.dir, turnType);
+        var result = light.allows(edge.dir, turnType, edge.lanes);
         if (result === 'green') return true;
         if (result === 'yield_right') {
             var CRIT = 35; // 우회전 충돌 방지를 위해 양보 필요 거리 연장
@@ -1163,9 +1239,10 @@ JunctionControl.prototype.nextEdgeHasSpace = function(car) {
         need = CAR_LEN + MIN_GAP + 2;
     }
 
-    if (ne.cars.length === 0) return true;
+    var target = ne.laneCars[car.nextLane || 0] || ne.cars;   // 들어갈 차로의 맨 뒤 차와의 여유
+    if (target.length === 0) return true;
 
-    return ne.cars[0].s >= need;
+    return target[0].s >= need;
 };
 JunctionControl.prototype.onEnterIntersection = function(car, node) {
     if (!node || node.isBoundary) return;
@@ -1309,6 +1386,7 @@ PedSystem.prototype._buildCW = function(node) {
             nodeId: node.id, nbId: e.from.id, dirRoad: e.dir,
             cx: node.x + tx*CW_DIST, cy: node.y + ty*CW_DIST,
             tx: tx, ty: ty, px: px, py: py,
+            half: Math.max(CW_HALF, roadWidthOf(e) / 2 + 2),   // 횡단보도 절반 길이 = 도로 폭의 절반 (다차로면 길어진다)
             edgeIn: e, edgeOut: outE // 이 도로의 양방향 엣지 (차량 점유 검사용)
         });
     }
@@ -1319,13 +1397,13 @@ PedSystem.prototype.pedGreen = function(cw) {
     if (!light) return { green:false, remain:0, totalGreen:0 };
 
     var p = light.phases[light.phaseIdx];
-    // AI 계획 적용 후: 보행 전용 현시(ped_green)에서만 녹색. 감응 모드가 매 주기 대기 인원을 보고
-    // 현시를 넣거나 생략하므로, 현시가 없는 주기에는 보행 신호가 계속 적색이다.
-    if (this.jc.aiPedGreenSec !== null) {
+    // AI 계획 적용 후: 이 주기에 보행 전용 현시(ped_green)가 있으면(교통약자·다수 보행자) 그 현시에서만 녹색이고,
+    // 없으면 기본 신호처럼 교차 방향 차량 녹색과 나란히 건넌다(병행 보행). 감응이 매 주기 대기 상태를 보고 결정한다.
+    if (this.jc.aiPedGreenSec !== null && light.phases.some(function(ph){ return ph.type === 'ped_green'; })) {
         var pg = !!(p && p.type === 'ped_green');
         return { green: pg, remain: pg ? (p.duration - light.t) : 0, totalGreen: pg ? p.duration : 0 };
     }
-    // AI 적용 전(기본 신호): 교차 방향 차량 녹색과 나란히 켜진다.
+    // 기본 신호 / 병행 보행: 교차 방향 차량 녹색과 나란히 켜진다.
     var g = !!(p && p.type === 'straight_right' && p.dir !== cw.dirRoad);
     var remain = g ? (p.duration - light.t) : 0;
 
@@ -1473,7 +1551,7 @@ PedSystem.prototype.update = function(dt) {
             var sig = this.pedGreen(pd.cw);
             if (sig.green && sig.remain > CW_CLEAR && this.zoneClear(pd.cw)) pd.state = 'cross';
         } else {
-            pd.prog += (pd.type.speed * pd.speedMod) * dt / (CW_HALF * 2);
+            pd.prog += (pd.type.speed * pd.speedMod) * dt / (pd.cw.half * 2);   // 횡단 길이는 도로 폭에 따라 다르다
             if (pd.prog >= 1) { this.peds.splice(i, 1); this.completed++; }
         }
     }
@@ -1561,7 +1639,10 @@ DataLogger.prototype.sample = function(simTime) {
                 var lamL = a.arrL / this.sampleInterval;
                 var gS = light.greenTimes['straight_'+dir] || GREEN_MIN;
                 var gL = light.greenTimes['left_'+dir] || GREEN_MIN;
-                var xS = lamS / (SAT_FLOW * gS / Cactual);
+                var eLanes = 1;
+                for (var ei2 = 0; ei2 < nd.incoming.length; ei2++) if (nd.incoming[ei2].id === aKey) eLanes = nd.incoming[ei2].lanes;
+                var thruL = eLanes >= 2 ? eLanes - 1 : 1;   // 직진·우회전 차로 수 (좌회전 전용 차로 제외)
+                var xS = lamS / (SAT_FLOW * thruL * gS / Cactual);
                 var xL = lamL / (SAT_FLOW * gL / Cactual);
                 if (xS > maxSat) maxSat = xS;
                 if (xL > maxSat) maxSat = xL;
@@ -1817,6 +1898,19 @@ function Renderer(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
 }
+// 도로(양방향) 폭: 두 방향 엣지의 차로 폭 합. 반대 방향 엣지를 찾지 못하면 같은 폭으로 본다.
+function roadWidthOf(e) {
+    var back = null;
+    for (var i = 0; i < e.from.incoming.length; i++) { if (e.from.incoming[i].from === e.to) { back = e.from.incoming[i]; break; } }
+    var h1 = e.roadHalf(), h2 = back ? back.roadHalf() : h1;
+    return Math.max(h1 + h2, 24);
+}
+// 교차로 상자 크기: 만나는 도로 중 가장 넓은 것
+function nodeHalfOf(nd) {
+    var h = 12.5;
+    for (var i = 0; i < nd.incoming.length; i++) { var e = nd.incoming[i]; if (!e.isArc) h = Math.max(h, roadWidthOf(e) / 2); }
+    return h;
+}
 Renderer.prototype.render = function(network, jc, cam) {
     var ctx = this.ctx;
     ctx.save();
@@ -1835,20 +1929,34 @@ Renderer.prototype.render = function(network, jc, cam) {
     for (var i = 0; i < network.edges.length; i++) {
         var e = network.edges[i];
         if (e.isArc || e.from.id > e.to.id) continue;
-        ctx.lineWidth = 41; // 도로 25 + 양옆 8픽셀 인도
+        ctx.lineWidth = roadWidthOf(e) + 16; // 도로 + 양옆 8픽셀 인도
         ctx.lineCap = 'round'; // 교차로에서 둥글게 이어짐
         ctx.strokeStyle = '#6b7280'; // 밝은 회색
         ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
     }
-    
-    // 도로: 인도 위에 차량이 다니는 슬래브(폭 25)
+
+    // 도로: 인도 위에 차량이 다니는 슬래브 (폭 = 양방향 차로 폭의 합, 1차로면 예전처럼 약 25)
     ctx.lineCap = 'butt'; // 도로는 인도 위에서 직각으로 끊김
     for (var i = 0; i < network.edges.length; i++) {
         var e = network.edges[i];
         if (e.isArc || e.from.id > e.to.id) continue;
-        ctx.lineWidth = 25; ctx.strokeStyle = '#3d434d';
+        ctx.lineWidth = roadWidthOf(e); ctx.strokeStyle = '#3d434d';
         ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
     }
+    // 차로 구분선 (흰 점선): 2차로 이상인 방향에만, 차로 사이에 그린다
+    ctx.lineWidth = 0.8; ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.setLineDash([4,6]);
+    for (var i = 0; i < network.edges.length; i++) {
+        var e = network.edges[i];
+        if (e.isArc || e.lanes < 2) continue;
+        for (var k = 1; k < e.lanes; k++) {
+            var off = k * e.laneW;
+            ctx.beginPath();
+            ctx.moveTo(e.from.x + e.nx * off + e.ux * 30, e.from.y + e.ny * off + e.uy * 30);
+            ctx.lineTo(e.to.x + e.nx * off - e.ux * 30, e.to.y + e.ny * off - e.uy * 30);
+            ctx.stroke();
+        }
+    }
+    ctx.setLineDash([]);
     for (var i = 0; i < network.edges.length; i++) {
         var e = network.edges[i];
         if (e.isArc || e.from.id > e.to.id) continue;
@@ -1888,15 +1996,16 @@ Renderer.prototype.render = function(network, jc, cam) {
                 ctx.translate(cw.cx, cw.cy);
                 ctx.rotate(Math.atan2(cw.ty, cw.tx));
                 ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                for (var k = -2; k <= 2; k++) ctx.fillRect(-3.5, k*5 - 1.5, 7, 3);
+                // 얼룩말 무늬: 도로 폭(cw.half*2)을 5px 간격으로 채운다
+                for (var k = -cw.half + 2.5; k <= cw.half - 2.5; k += 5) ctx.fillRect(-3.5, k - 1.5, 7, 3);
                 ctx.restore();
                 // 보행자 신호기: 양쪽 보도에 2등식(적/녹) 신호등. 녹색 잔여 < CW_CLEAR 이면 점멸.
                 var sig = jc.peds.pedGreen(cw);
                 var greenLamp = sig.green && (sig.remain >= CW_CLEAR || blinkOn);
                 for (var sd = -1; sd <= 1; sd += 2) {
                     // 신호기가 교차로 모서리에서 완전히 분리되도록 밖으로 더 밀고 크기를 줄임
-                    var sx = cw.cx + cw.tx * 12 + cw.px*sd*(CW_HALF+10);
-                    var sy = cw.cy + cw.ty * 12 + cw.py*sd*(CW_HALF+10);
+                    var sx = cw.cx + cw.tx * 12 + cw.px*sd*(cw.half+10);
+                    var sy = cw.cy + cw.ty * 12 + cw.py*sd*(cw.half+10);
                     ctx.save();
                     ctx.translate(sx, sy);
                     ctx.rotate(Math.atan2(cw.py, cw.px));
@@ -1914,13 +2023,7 @@ Renderer.prototype.render = function(network, jc, cam) {
                     var isGreen = sig.green;
                     var remainVal = 0;
 
-                    var lightForCw = jc.lights.get(cw.nodeId);
-                    var hasPedPhase = !!(lightForCw && lightForCw.phases.some(function(ph){ return ph.type === 'ped_green'; }));
-                    if (jc.aiPedGreenSec !== null && !hasPedPhase) {
-                        // AI 적용 후 감응 모드: 이 주기에 보행 현시가 없으면(대기 없음) 카운트다운을 표시하지 않는다
-                        textStr = "";
-                        remainVal = 0;
-                    } else if (isGreen && sig.remain > 0) {
+                    if (isGreen && sig.remain > 0) {
                         // AI 적용 전 또는 보행자 신호가 살아있는 경우: 초록불 남은 시간 표시
                         textStr = Math.ceil(sig.remain).toString();
                         remainVal = sig.remain;
@@ -1930,7 +2033,7 @@ Renderer.prototype.render = function(network, jc, cam) {
                         if (light && light.phases.length > 1) {
                             var redRemain = light.phases[light.phaseIdx].duration - light.t;
                             var pi = light.phaseIdx;
-                            var aiPedMode = jc.aiPedGreenSec !== null;   // AI 적용 후엔 보행 전용 현시를 기다린다
+                            var aiPedMode = light.phases.some(function(ph){ return ph.type === 'ped_green'; });   // 전용 현시가 있는 주기면 그것을 기다린다
                             for (var scan = 0; scan < light.phases.length; scan++) {
                                 pi = (pi + 1) % light.phases.length;
                                 var ph = light.phases[pi];
@@ -2014,7 +2117,8 @@ Renderer.prototype.render = function(network, jc, cam) {
         if (nd.control === 'roundabout') continue;
         
         ctx.fillStyle = '#333';
-        ctx.fillRect(nd.x-12.5, nd.y-12.5, 25, 25);
+        var nh = nodeHalfOf(nd);
+        ctx.fillRect(nd.x - nh, nd.y - nh, nh * 2, nh * 2);
 
         // 경계 노드는 제어가 없으므로(무조건 통과) 신호등을 그리지 않는다 — 장식 신호 방지
         if (nd.isBoundary) continue;
@@ -2102,7 +2206,7 @@ Renderer.prototype.render = function(network, jc, cam) {
         var e = network.edges[i];
         for (var j = 0; j < e.cars.length; j++) {
             var c = e.cars[j];
-            var px = e.ax + e.ux * c.s, py = e.ay + e.uy * c.s;
+            var px = e.carX(c), py = e.carY(c);   // 차로별 위치
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(Math.atan2(e.uy, e.ux));
@@ -2167,16 +2271,16 @@ Renderer.prototype.render = function(network, jc, cam) {
             var cw = pd.cw, x, y;
             if (pd.state === 'walk_sidewalk') {
                 var e = pd.edge;
-                var off = pd.side * 17.5; // 인도 중앙
+                var off = pd.side * (roadWidthOf(e) / 2 + 5); // 인도 중앙 (도로 가장자리 + 5)
                 x = e.from.x + e.ux * pd.s - e.uy * off + e.ux * pd.jit;
                 y = e.from.y + e.uy * pd.s + e.ux * off + e.uy * pd.jit;
             } else if (pd.state === 'wait') {
                 var cw = pd.cw;
-                x = cw.cx + cw.px * pd.side * (CW_HALF + 4) + cw.tx * pd.jit;
-                y = cw.cy + cw.py * pd.side * (CW_HALF + 4) + cw.ty * pd.jit;
+                x = cw.cx + cw.px * pd.side * (cw.half + 4) + cw.tx * pd.jit;
+                y = cw.cy + cw.py * pd.side * (cw.half + 4) + cw.ty * pd.jit;
             } else {
                 var cw = pd.cw;
-                var off = pd.side * (CW_HALF - pd.prog * CW_HALF * 2);
+                var off = pd.side * (cw.half - pd.prog * cw.half * 2);
                 x = cw.cx + cw.px * off + cw.tx * pd.jit * 0.5;
                 y = cw.cy + cw.py * off + cw.ty * pd.jit * 0.5;
             }
@@ -2234,8 +2338,9 @@ function SimController() {
     this.spawnRate = 3.0;
     this.maxCars = 150;
     this.maxSpeed = 60;
-    this.cycleLength = 20;
+    this.cycleLength = 30;      // 기본 주기 30초 (20초는 황색·전적색 오버헤드가 절반이라 2차로 이상 도로에는 너무 짧다)
     this.gridSize = 4;
+    this.laneCount = 2;         // 방향당 차로 수 (수동 모드 슬라이더). 프로파일 모드는 데이터의 차로 수를 쓴다.
     this.spawnAcc = 0;
     this.sampleAcc = 0;
     this.optAcc = 0;
@@ -2258,6 +2363,7 @@ function SimController() {
     this.approachEdges = null;    // {N:[edge], S:[edge], E:[edge], W:[edge]}
     this.demandSpawn = {};        // 접근로별 발생률·다음 도착 시각·진입/손실 카운터
     this.autoHour = false;
+    this.demoScale = 1;           // 실데이터 모드 혼잡 배율 (데모용). 방향별 비율은 데이터 그대로, 크기만 곱한다.
     this.secsPerHour = 120;       // 시간대 자동 진행 시 시간대 하나가 지속되는 시뮬레이션 초
     this.hourAcc = 0;
     this._initDOM();
@@ -2320,6 +2426,10 @@ SimController.prototype._initDOM = function() {
     bindSlider('sim-max-speed','maxSpeed','val-speed');
     bindSlider('sim-cycle','cycleLength','val-cycle');
     bindSlider('sim-grid-size','gridSize','val-grid');
+    // 차로 수: 놓을 때 적용 (격자 크기와 같은 방식, 네트워크 재생성)
+    var laneSlider = document.getElementById('sim-lanes');
+    laneSlider.oninput = function() { document.getElementById('val-lanes').textContent = laneSlider.value; };
+    laneSlider.onchange = function() { self.laneCount = parseInt(laneSlider.value, 10); self.reset(); };
 
     // ===== 교통 수요 입력 모드 (6-3) =====
     var spawnSlider = document.getElementById('sim-spawn-rate');
@@ -2340,8 +2450,10 @@ SimController.prototype._initDOM = function() {
             profileBox.style.display = 'block';
             spawnSlider.disabled = true;
             document.getElementById('sim-grid-size').disabled = true;   // 3x3 고정 (접근로 1:1 매핑 유지)
+            document.getElementById('sim-lanes').disabled = true;       // 차로 수는 데이터(메타의 lanes)를 따른다
             document.getElementById('spawn-mode-note').style.display = '';
             document.getElementById('grid-mode-note').style.display = '';
+            document.getElementById('lanes-mode-note').style.display = '';
             // 프로파일은 교차로 1개·접근로 4개를 기술하므로 격자를 3x3 으로 맞춘다 (진입 엣지 4개 = N/S/E/W).
             if (self.gridSize !== 3) {
                 self.gridSize = 3;
@@ -2359,8 +2471,10 @@ SimController.prototype._initDOM = function() {
             profileBox.style.display = 'none';
             spawnSlider.disabled = false;
             document.getElementById('sim-grid-size').disabled = false;
+            document.getElementById('sim-lanes').disabled = false;
             document.getElementById('spawn-mode-note').style.display = 'none';
             document.getElementById('grid-mode-note').style.display = 'none';
+            document.getElementById('lanes-mode-note').style.display = 'none';
         }
         self.reset();
     }
@@ -2374,6 +2488,13 @@ SimController.prototype._initDOM = function() {
         self.hourAcc = 0;
     };
     autoHourChk.onchange = function() { self.autoHour = autoHourChk.checked; self.hourAcc = 0; };
+    var scaleSlider = document.getElementById('sim-demand-scale');
+    scaleSlider.oninput = function() {
+        self.demoScale = parseInt(scaleSlider.value, 10) || 1;
+        document.getElementById('val-demand-scale').textContent = self.demoScale;
+        // 다음 도착 시각을 새 발생률로 다시 뽑는다
+        if (self.demandSpawn) for (var k in self.demandSpawn) self.demandSpawn[k].nextAt = null;
+    };
     document.getElementById('val-demand-secs').textContent = self.secsPerHour;
 
     // 확대/축소 (휠)
@@ -2603,8 +2724,9 @@ SimController.prototype._initDOM = function() {
                 volume_per_hour: self.currentDemand.volume,
                 lanes: self.profile.meta.lanes,
                 arrival_rate_per_sec: self.currentDemand.arrival_rate_per_sec,
+                demo_scale: self.demoScale,
                 lost_demand_last_60s: lostWin,
-                note: self.profile.meta.note
+                note: self.profile.meta.note + (self.demoScale > 1 ? " demo_scale 은 데모용 혼잡 배율로, 실제 생성률은 arrival_rate_per_sec × 차로 수 × demo_scale 이다." : "")
             };
         } else {
             scenario.demand = {
@@ -2993,11 +3115,11 @@ SimController.prototype._initDOM = function() {
             (waveInfo ? " · 녹색파 " + waveInfo.label : "");
         document.getElementById("ai-ped-control").textContent =
             (plan.pedestrian_green_sec === 0
-                ? "지금 보행자 없음 → 보행 현시 생략"
+                ? "지금 보행자 없음 → 전용 현시 생략 (오면 직진 녹색과 병행 횡단)"
                 : vulnerableCount > 0
-                    ? "교통약자 감지 → 보행자 " + plan.pedestrian_green_sec + "초 확보"
+                    ? "교통약자 감지 → 보행 전용 현시 " + plan.pedestrian_green_sec + "초 확보"
                     : "보행자 " + plan.pedestrian_green_sec + "초 확보")
-            + " · 감응: 매 주기 횡단보도를 보고 없으면 생략, 교통약자면 10초 이상";
+            + " · 감응: 교통약자·다수 보행자면 전용 현시(교통약자 10초 이상), 그 외는 병행 횡단";
         document.getElementById("ai-guardrail").textContent =
             self.lastGuardrail
                 ? (self.lastGuardrail.corrected
@@ -3208,7 +3330,7 @@ SimController.prototype.reset = function() {
     this.spawnAcc = 0;
     this.sampleAcc = 0;
     this.optAcc = 0;
-    this.network = new Network(this.gridSize, 100);
+    this.network = new Network(this.gridSize, 100, this.laneCount || 2);
     this.jc = new JunctionControl(this.network);
     this.jc.aiPedGreenSec = null;
     this.pedSys = new PedSystem(this.network, this.jc);
@@ -3285,13 +3407,16 @@ SimController.prototype._update = function(dt, skipUI) {
         }
     }
     this.jc.update(dt, this.simTime, this.cycleLength);
+    // 차로별 차량 목록을 s 순으로 유지한다 (앞차 판정이 목록 순서에 의존). 추월이 없어도 진입 순서·잔여 거리 때문에 어긋날 수 있다.
+    for (var ei = 0; ei < this.network.edges.length; ei++) {
+        var lc = this.network.edges[ei].laneCars;
+        for (var li = 0; li < lc.length; li++) if (lc[li].length > 1) lc[li].sort(_byS);
+        if (this.network.edges[ei].cars.length > 1) this.network.edges[ei].cars.sort(_byS);
+    }
     for (var i = this.cars.length - 1; i >= 0; i--) {
         var status = this.cars[i].update(dt, this.simTime, this.jc);
         if (status === 'removed' || this.cars[i].routeIndex >= this.cars[i].route.length) {
-            if (status === 'removed') {
-                var idx = this.cars[i].edge.cars.indexOf(this.cars[i]);
-                if (idx > -1) this.cars[i].edge.cars.splice(idx, 1);
-            }
+            if (status === 'removed') this.cars[i].edge.removeCar(this.cars[i]);
             this.cars.splice(i, 1);
         }
     }
@@ -3393,13 +3518,14 @@ SimController.prototype._spawnCar = function() {
 // 지정한 진입 엣지에 1대 생성. 진입로 첫 차가 15px 미만이면 생성하지 못하고 false 를 돌려준다.
 SimController.prototype._spawnCarOn = function(edge) {
     if (!edge) return false;
-    if (edge.cars.length > 0 && edge.cars[0].s < 15) return false;
     var route = this.network.findRandomRoute(edge);
-    if (route.length > 0) {
-        this.cars.push(new Car(edge, this.maxSpeed, this.maxSpeed, route, this.simTime));
-        return true;
-    }
-    return false;
+    if (route.length === 0) return false;
+    // 회전 의도로 차로를 정한 뒤, 그 차로의 맨 뒤 차가 15px 미만이면 생성하지 못한다 (손실 수요로 집계)
+    var lane = edge.laneFor(getTurnType(edge, route.length > 1 ? route[1] : null));
+    var l = edge.laneCars[lane];
+    if (l.length > 0 && l[0].s < 15) return false;
+    this.cars.push(new Car(edge, this.maxSpeed, this.maxSpeed, route, this.simTime, lane));
+    return true;
 };
 
 // ===== 실데이터 수요 프로파일 모드 (6-3) =====
@@ -3465,7 +3591,28 @@ SimController.prototype._initDemandSpawn = function() {
     // 접근로 매핑은 모드와 무관하게 만든다 (6-4: 수동 모드에서도 접근로별 대기 상태를 AI 에 보낼 수 있도록). 2x2 는 지원하지 않음.
     this.approachEdges = this.gridSize >= 3 ? this.mapApproachEdges() : null;
     if (this.demandMode === 'profile') {
+        this._applyProfileLanes();
         this.applyProfileHour(this.profileHour);
+    }
+};
+
+// 실데이터 모드: 접근로별 차로 수(메타의 lanes, 예: 북 3·남 3·동 2·서 2)를 진입 엣지와 그 반대 방향 엣지에 적용한다.
+// 수요 발생률은 차로당 값이므로 실제 생성률은 rate × 차로 수가 된다 (842대/시 = 3차로 × 0.078대/초 × 3600).
+SimController.prototype._applyProfileLanes = function() {
+    if (!this.profile || !this.profile.meta || !this.profile.meta.lanes || !this.approachEdges) return;
+    var lanes = this.profile.meta.lanes;
+    for (var k = 0; k < APPROACH_KEYS.length; k++) {
+        var a = APPROACH_KEYS[k], n = parseInt(lanes[a], 10);
+        if (!(n >= 1)) continue;
+        var edges = this.approachEdges[a];
+        for (var i = 0; i < edges.length; i++) {
+            var e = edges[i];
+            if (e.cars.length === 0) e.setLanes(Math.min(3, n));
+            for (var j = 0; j < this.network.edges.length; j++) {   // 반대 방향(진출) 엣지도 같은 폭
+                var r = this.network.edges[j];
+                if (r.from === e.to && r.to === e.from && r.cars.length === 0) r.setLanes(Math.min(3, n));
+            }
+        }
     }
 };
 
@@ -3492,10 +3639,13 @@ SimController.prototype._spawnFromProfile = function(gridlockRisk) {
         var a = APPROACH_KEYS[k];
         var st = this.demandSpawn[a];
         var edges = this.approachEdges ? this.approachEdges[a] : [];
-        if (st.nextAt === null) st.nextAt = this.simTime + nextArrivalGap(st.rate);
+        // 발생률은 차로당 값 → 차로 수를 곱한 값이 접근로 전체 도착률. 데모용 혼잡 배율은 여기서만 곱한다.
+        var laneN = edges.length > 0 ? edges[0].lanes : 1;
+        var rateTotal = st.rate * laneN * (this.demoScale || 1);
+        if (st.nextAt === null) st.nextAt = this.simTime + nextArrivalGap(rateTotal);
         var guard = 0;
         while (this.simTime >= st.nextAt && guard++ < 50) {
-            st.nextAt += nextArrivalGap(st.rate);
+            st.nextAt += nextArrivalGap(rateTotal);
             var ok = false;
             if (edges.length > 0 && !gridlockRisk && this.cars.length < this.maxCars) {
                 var edge = edges.length === 1 ? edges[0] : edges[Math.floor(rand() * edges.length)];
@@ -3554,14 +3704,17 @@ SimController.prototype._approachState = function(windowSec) {
                 for (var pi = 0; pi < light.phases.length; pi++) C += light.phases[pi].duration;
                 var g = light.greenTimes['straight_' + edges[0].dir] || GREEN_MIN;
                 var lam = (arrS + arrR) / actualWindow;
-                if (C > 0) saturation = lam / (SAT * g / C);
+                // 포화유출률은 차로당 값 → 직진·우회전이 쓰는 차로 수(좌회전 전용 차로 제외)를 곱한다
+                var thruLanes = edges[0].lanes >= 2 ? edges[0].lanes - 1 : 1;
+                if (C > 0) saturation = lam / (SAT * thruLanes * g / C);
             }
         }
         out[a] = {
             queue: queue,
             mean_wait_sec: nCars > 0 ? Math.round(waitSum / nCars * 10) / 10 : 0,
             arrivals_last_window: arrS + arrL + arrR,
-            saturation: Math.round(saturation * 100) / 100
+            saturation: Math.round(saturation * 100) / 100,
+            lanes: edges.length > 0 ? edges[0].lanes : 1   // 접근로 차로 수 (Agent 가 처리 능력을 알 수 있게)
         };
     }
     return { by_approach: out, window_sec: actualWindow };
@@ -3576,7 +3729,7 @@ SimController.prototype._renderDemandTable = function() {
         if (!row) continue;
         row.cells[0].textContent = APPROACH_LABELS[a] + ' · ' + lanes[a] + '차로';
         row.cells[1].textContent = this.currentDemand.volume[a];
-        row.cells[2].textContent = st.rate.toFixed(3);
+        row.cells[2].textContent = st.rate.toFixed(3) + (this.demoScale > 1 ? '×' + this.demoScale : '');
         row.cells[3].textContent = st.recent.length;
         row.cells[4].textContent = st.lost;
         row.cells[5].textContent = this.approachEdges ? this._approachQueue(this.approachEdges[a]) : '-';   // 시뮬레이션 결과
@@ -3615,7 +3768,7 @@ SimController.prototype.softReset = function() {
     this.cars = [];
     for (var i = 0; i < this.network.edges.length; i++) {
         var e = this.network.edges[i];
-        e.cars.length = 0; e.flowCount = 0;
+        e.clearCars(); e.flowCount = 0;
         e.arr.straight = 0; e.arr.left = 0; e.arr.right = 0;
     }
     this.jc.completedTrips.length = 0;
