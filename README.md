@@ -261,7 +261,7 @@ FlowLight-AI-Traffic-Signal
 │   └── sample_seoul_traffic_history.meta.json
 ├── tests                           # 235개 (mock 234 + live 1, live 는 opt-in)
 ├── docs
-│   ├── screens/                    # 현재 UI 화면 (사용법, 메인, 프로파일 모드, 진행 패널, 리포트, 적용, 보행 전용 현시, 고급 설정)
+│   ├── screens/                    # UI 화면 (사용법, 메인, 프로파일 모드, 진행 패널, 리포트, 적용, 보행 전용 현시, 녹화 재생, 고급 설정)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
 │   ├── system_architecture.png, data_flow.png, ai_decision_process.png, guardrail_cases.png
 │   ├── flowlight_before_ai.gif, flowlight_after_ai.gif   # AI 적용 전후 비교 (현재 버전)
@@ -411,7 +411,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 
 # 📸 실행 화면
 
-모두 현재 버전(Solar Pro 4, 실데이터 프로파일 모드)에서 실제 API 호출로 캡처한 화면입니다.
+Solar Pro 4 버전에서 캡처한 화면입니다. 진행 패널·리포트·적용·보행 현시 화면의 Agent 출력은 실제 API 호출 결과이고, 그 밖의 화면은 호출 없이 찍었습니다. 리포트와 적용 화면은 다차로 반영 전(1차로, 주기 20초) 화면이지만 Agent 출력은 그대로입니다.
 
 ## 처음 열었을 때의 사용법 안내
 
