@@ -39,7 +39,7 @@ It started from two ideas: **skip the pedestrian phase when nobody is at the cro
 Every LLM answer is forced into a fixed shape with **Structured Outputs (JSON Schema)**, passes through a rule-based **Guardrail**, and only then reaches the simulator.
 FastAPI streams each step over SSE (Server-Sent Events), so you can watch the decision being made.
 
-The repository is being shaped into a Solar Pro 4 demo and tutorial. Two rules hold throughout:
+The repository is organised as a Solar Pro 4 demo and tutorial. Two rules hold throughout:
 
 - **Hourly traffic volume** is converted into a **vehicle arrival rate** that spawns cars in the simulator. The **queue** (waiting vehicles) is always a simulation result.
   A volume of 842 vehicles per hour is never treated as 842 waiting cars.
@@ -572,14 +572,14 @@ Problem statement, agent design, architecture, experiment results and retrospect
 - Against a fixed signal without pedestrian time, the AI plan comes out about the same when demand is balanced (see "When demand on the two axes is similar"). In the ten-seed comparison the clear gain came from skipping the pedestrian phase when nobody was waiting, while the effect of re-splitting time between the two axes was smaller than the margin of error.
 - The on-screen congestion index is the share of stopped and slow cars, including cars waiting at a red light. It sits around 0.9 (red) even when the intersection runs normally, so it is not used to compare signals; throughput and stopped vehicles are. The legend and the bar tooltip say so.
 - Automatic re-analysis only reacts to hour changes. A big change in demand within the same hour keeps the old plan, and for 20 s after a change the road still holds cars from the previous hour, so the plan can come out similar.
-- When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are on the roadmap.
+- When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are left as an extension idea.
 - In manual mode, applying an AI plan still halves the spawn rate for 120 s as a relief measure. This is disabled in profile mode.
 - The sample data is a **synthetic example** that follows the column layout of the real dataset. Steps for swapping in real data are in `data/README.md`.
 - The congestion multiplier (`demo_scale`) is a demo device. The agent input carries a `note` saying the demand is scaled. Turn ratios (`turn_ratio`) are not read from data yet; the simulator picks turns at random.
 
 ---
 
-# 🚀 Roadmap
+# 💡 Extension ideas
 
 | Area | Description |
 |------------------|-------------|
