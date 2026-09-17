@@ -1921,6 +1921,10 @@ Analyzer.prototype.applyRecommendations = function() {
             if (k === 'cycle') continue;
             ng[k] = rec.recommended[k];
         }
+        // Webster 권장값은 고정 시간표다. AI 적용 뒤의 감응 모드가 남아 있으면 매 주기 AI 계획으로 되돌려
+        // A/B 검증의 B 단계가 A 와 똑같아지므로, 이 교차로의 감응을 끈다.
+        light.actuated = null;
+        light.leadingLeft = {};
         // 위상 위치 보존 적용 — phaseIdx/t를 리셋하면 적응형 모드에서
         // 첫 위상만 반복 재생되어 신호 운영이 파괴된다.
         light.applyGreens(ng, rec.recommended.cycle);
@@ -1960,13 +1964,27 @@ Renderer.prototype.render = function(network, jc, cam) {
     }
 
     // 인도: 도로 가장자리에 사람만 통행 가능한 영역(회색 블록)
+    // 끝을 직각으로 자르고, 모서리는 교차점마다 원으로 둥글게 메운다. 원 반지름은 그 점에 닿는 인도 중 가장 좁은 것의 절반이라,
+    // 차로 수가 다른 도로(예: 남북 3차로)가 테두리와 만나도 넓은 도로의 둥근 끝이 격자 밖으로 튀어나오지 않는다.
+    var walkR = {};
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#6b7280'; // 밝은 회색
     for (var i = 0; i < network.edges.length; i++) {
         var e = network.edges[i];
         if (e.isArc || e.from.id > e.to.id) continue;
-        ctx.lineWidth = roadWidthOf(e) + 16; // 도로 + 양옆 8픽셀 인도
-        ctx.lineCap = 'round'; // 교차로에서 둥글게 이어짐
-        ctx.strokeStyle = '#6b7280'; // 밝은 회색
+        var ww = roadWidthOf(e) + 16; // 도로 + 양옆 8픽셀 인도
+        ctx.lineWidth = ww;
         ctx.beginPath(); ctx.moveTo(e.from.x,e.from.y); ctx.lineTo(e.to.x,e.to.y); ctx.stroke();
+        var ends = [e.from, e.to];
+        for (var k = 0; k < 2; k++) {
+            var nd0 = ends[k], prev = walkR[nd0.id];
+            walkR[nd0.id] = { nd: nd0, r: prev ? Math.min(prev.r, ww / 2) : ww / 2 };
+        }
+    }
+    ctx.fillStyle = '#6b7280';
+    for (var nid in walkR) {
+        var wr = walkR[nid];
+        ctx.beginPath(); ctx.arc(wr.nd.x, wr.nd.y, wr.r, 0, Math.PI * 2); ctx.fill();
     }
 
     // 도로: 인도 위에 차량이 다니는 슬래브 (폭 = 양방향 차로 폭의 합, 1차로면 예전처럼 약 25)
