@@ -215,6 +215,7 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 | Run from the profile-mode UI (9 cars, 2 queued on N, saturation 1.2) | main direction "N", plan 12/8/0, score 82, operator approval → applied manually, congestion index 0.61 → 0.35 (measured with the earlier two-phase apply) |
 | Manual mode 4x4, one lane, 49 cars, 33 stopped (the split state of the earlier before/after comparison) | main direction "north-south", plan 12/8/0, no Guardrail correction, score 88, auto apply → applied as a real signal system, throughput 121 → 131 after 60 s |
 | Manual mode 4x4, cycle 30 s, 18 cars, 2 pedestrians at the crosswalk including an elderly person | Agent 1 flags a vulnerable user, plan 12/8/10 ("one vulnerable pedestrian, so 10 s for crossing speed"), no Guardrail correction, score 82, operator approval → 10 s pedestrian-only phase after applying |
+| Run from the profile-mode UI, multiplier ×1, 11 cars, 7 stopped, W saturation 1.14 (the current report and applied screenshots, 09-17) | main direction "W", plan 10/20/0 (reason: saturation sum 1.14 north-south vs 1.71 east-west), no Guardrail correction, score 88, auto apply → 15 s mean throughput 31 → 48 veh/min, congestion index 1.00 → 0.88, stopped 7 → 7 |
 | Profile mode 08:00, lanes from the data, multiplier ×3, 35 cars, 30 stopped (the split state of the current before/after GIFs, 09-17) | main direction "east-west" (saturation E 2.86 · W 2.29), plan 12/18/0, no Guardrail correction, score 88, auto apply → throughput 100 → 98 after 60 s, stopped 21.3 → 21.4. No difference from the fixed signal |
 
 Reasoning stayed off (`reasoning_effort` not sent, 0 reasoning tokens). Response times depend on the network.
@@ -411,7 +412,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 
 # 📸 Screenshots
 
-Captured on the Solar Pro 4 version. The agent output in the progress panel, report, applied and pedestrian-phase screens comes from real API calls; the other screens were taken without a call. The report and applied screens predate the multi-lane update (one lane, 20 s cycle), but the agent output is unchanged. The UI text is Korean.
+Captured on the current version (Solar Pro 4, 2 to 3 lanes per direction, 30 s cycle). The agent output in the progress panel, report, applied and pedestrian-phase screens comes from real API calls; the other screens were taken without a call. The UI text is Korean.
 
 ## Usage guide on first launch
 
