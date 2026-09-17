@@ -89,7 +89,7 @@ The idea the project started from, "skip the pedestrian phase when nobody is at 
 
 - Skipping the pedestrian phase when nobody is waiting makes a clear difference. For throughput and stopped vehicles the interval excludes zero, and all ten seeds point the same way.
 - Most of that difference is the pedestrian time handed back to vehicles. Fixed B also beat Fixed A by +11.8 ± 5.7 in throughput and −3.7 ± 1.4 in stopped vehicles.
-- The LLM's re-split between the two axes adds little. AI versus Fixed B is +2.9 ± 5.4 in throughput (AI higher in seven seeds), which cannot be told apart from noise.
+- The LLM's re-split between the two axes adds little. AI passed 2.9 more cars than Fixed B on average and was ahead in seven seeds, but the difference is smaller than the margin of error (±5.4), so we cannot say AI is better.
 - In this demo the AI reads "nobody is at the crosswalk" from the state, picks 0 s and writes down why; the Guardrail raises the value back to 6 s (10 s for vulnerable users) whenever pedestrians are present. A simple rule that only checks whether anyone is waiting could make the same call.
 - Setup: real-data profile at 08:00, lanes as in the data, multiplier ×3, cycle 30 s, no pedestrian spawning, seeds 20260702 to 20260711, 120 s warm-up, then 90 s from the identical state under each signal. Fixed A and B go through the app's own apply path (70 % through / 30 % left) with actuation off. Intervals are paired t intervals over seeds (9 degrees of freedom). The congestion index sat around 0.96 for all three at this load, so it is left out of the table.
 - The plans are applied the way a real signal system would: each direction's green is split 70 % through / 30 % left to keep the four-phase cycle (with two or more lanes the left turn is protected, from a dedicated lane), and every cycle the left-turn and pedestrian phases are added or skipped from actual demand. The method matches the built-in A/B check under Advanced settings (same seed, fixed 1/30 s step, same warm-up, then branch).
@@ -105,7 +105,7 @@ Against the default fixed signal, which has no pedestrian time and splits the 30
 | Congestion index (60 s mean) | 0.944 | 0.955 |
 
 - At the 120 s split, saturation per approach was E 2.86 · W 2.29 · N 1.57 · S 1.00, and the AI gave more green to the more saturated east-west axis.
-- The differences sit inside the noise of a single seed, so we claim neither an improvement nor a loss. Demand on the two axes is not far apart, so an even split is already close to optimal; the AI plan gained on east-west what it lost on north-south.
+- These are small differences from a single seed, so we claim neither an improvement nor a loss. Demand on the two axes is not far apart, so an even split is already close to optimal; the AI plan gained on east-west what it lost on north-south.
 - The earlier experiment (manual mode, 4x4, one lane, 5 veh/s, 2026-09-10) measured the same way gave throughput 121 → 131 and stopped vehicles 33.9 → 31.3. It is kept in the verification log below.
 
 ---
@@ -569,7 +569,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 - The time axis is compressed: default cycle 30 s (real ones are 100 to 180 s), 2 s amber, 1.7 s green-wave offset per block. Ratios are realistic, absolute values are not. After applying a plan the real cycle is vehicle greens + left-turn and pedestrian phases + amber and all-red, so it is longer than the input `cycle_sec`.
 - At most three lanes, and always exactly one left-turn lane. Cars choose the lane for their turn on entry and never change lanes mid-block, so through traffic does not move over even when the left-turn lane is empty. On single-lane roads a protected-only left (no left during the through green) gridlocks the grid, so those roads use protected-permissive left turns.
 - More lanes raise throughput but also raise queues and the congestion index, because every lane admits cars while intersection capacity is set by the signal.
-- Against a fixed signal without pedestrian time, the AI plan comes out about the same when demand is balanced (see "When demand on the two axes is similar"). In the ten-seed comparison the clear gain came from skipping the pedestrian phase when nobody was waiting, while re-splitting time between the two axes could not be told apart from noise.
+- Against a fixed signal without pedestrian time, the AI plan comes out about the same when demand is balanced (see "When demand on the two axes is similar"). In the ten-seed comparison the clear gain came from skipping the pedestrian phase when nobody was waiting, while the effect of re-splitting time between the two axes was smaller than the margin of error.
 - The on-screen congestion index is the share of stopped and slow cars, including cars waiting at a red light. It sits around 0.9 (red) even when the intersection runs normally, so it is not used to compare signals; throughput and stopped vehicles are. The legend and the bar tooltip say so.
 - Automatic re-analysis only reacts to hour changes. A big change in demand within the same hour keeps the old plan, and for 20 s after a change the road still holds cars from the previous hour, so the plan can come out similar.
 - When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are on the roadmap.
