@@ -83,10 +83,10 @@ The idea the project started from, "skip the pedestrian phase when nobody is at 
 | 🚗 Mean stopped vehicles | 26.3 | 22.5 | **22.0** | **−4.2 ± 2.2 (−16%)**, AI lower in all ten seeds |
 | ⏱ Mean wait | 15.8 s | 13.8 s | 14.0 s | −1.8 ± 2.0 s (−11%), AI shorter in seven seeds |
 
-- **Skipping the pedestrian phase when nobody is waiting clearly helps.** For throughput and stopped vehicles the interval excludes zero, and all ten seeds point the same way.
-- **Most of the gain comes from handing the pedestrian time back to vehicles.** Fixed B also beat Fixed A by +11.8 ± 5.7 in throughput and −3.7 ± 1.4 in stopped vehicles.
-- **The LLM's re-split between the two axes adds little.** AI versus Fixed B is +2.9 ± 5.4 in throughput (AI higher in seven seeds), which cannot be told apart from noise.
-- In this demo the AI reads "nobody is at the crosswalk" from the state, picks 0 s and writes down why; the Guardrail raises the value back to 6 s (10 s for vulnerable users) whenever pedestrians are present. A simple rule on pedestrian presence could make the same call, and we say so.
+- Skipping the pedestrian phase when nobody is waiting makes a clear difference. For throughput and stopped vehicles the interval excludes zero, and all ten seeds point the same way.
+- Most of that difference is the pedestrian time handed back to vehicles. Fixed B also beat Fixed A by +11.8 ± 5.7 in throughput and −3.7 ± 1.4 in stopped vehicles.
+- The LLM's re-split between the two axes adds little. AI versus Fixed B is +2.9 ± 5.4 in throughput (AI higher in seven seeds), which cannot be told apart from noise.
+- In this demo the AI reads "nobody is at the crosswalk" from the state, picks 0 s and writes down why; the Guardrail raises the value back to 6 s (10 s for vulnerable users) whenever pedestrians are present. A simple rule that only checks whether anyone is waiting could make the same call.
 - Setup: real-data profile at 08:00, lanes as in the data, multiplier ×3, cycle 30 s, no pedestrian spawning, seeds 20260702 to 20260711, 120 s warm-up, then 90 s from the identical state under each signal. Fixed A and B go through the app's own apply path (70 % through / 30 % left) with actuation off. Intervals are paired t intervals over seeds (9 degrees of freedom). The congestion index sat around 0.96 for all three at this load, so it is left out of the table.
 - The plans are applied the way a real signal system would: each direction's green is split 70 % through / 30 % left to keep the four-phase cycle (with two or more lanes the left turn is protected, from a dedicated lane), and every cycle the left-turn and pedestrian phases are added or skipped from actual demand. The method matches the built-in A/B check under Advanced settings (same seed, fixed 1/30 s step, same warm-up, then branch).
 
@@ -204,6 +204,8 @@ The AI plan (NS N s / EW M s / pedestrian P s) is a budget; the simulator runs i
   - Left turns: two or more cars waiting to turn left → a left-turn phase is added; if the lead car is a left-turner blocking the lane, the arrow comes first (leading left). No left demand → no left phase.
 - **Pedestrian-only phase**: every vehicle stops and every crosswalk turns green. Right turns are barred while the pedestrian signal is green, and a right turn on red yields to pedestrians.
 
+- **When the LLM is called**: when you press "AI analysis", and, with "re-analyse when the hour changes" switched on, 20 s after the real-data profile moves to a new hour. This mirrors real intersections that switch between morning, midday and evening plans. Between those calls the per-cycle adjustments (pedestrian and left-turn phases) come from the actuated rules above, not from the LLM.
+
 Before a plan is applied, the default signal is a fixed timetable (four phases, the green left after amber and all-red split evenly between the two axes, pedestrian green alongside the cross-direction vehicle green).
 
 ## 📡 SSE streaming
@@ -222,6 +224,7 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
 - **Demand input modes**
   - Manual: a network-wide veh/s slider spawns cars at random entry edges
   - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, lane counts from the data (3 north-south, 2 east-west), hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles
+  - Re-analyse when the hour changes (off by default): 20 s after the hour changes the AI analysis runs once more and the plan is replaced. Runs never overlap, automatic runs open no report window or alert, and without a server they are skipped instead of replaying the recording.
   - Congestion multiplier (×1 to 5, demo only): real peak demand leaves a single intersection fairly quiet, so this slider scales the size of the demand while keeping the ratio between directions. Spawn rate = per-lane arrival rate × lanes × multiplier. It is sent to the agents as `demand.demo_scale` so they know it is a demo multiplier
 - The AI plan is applied with the four-phase cycle, a green wave and actuated phases (see above). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
@@ -257,6 +260,7 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 | Manual mode 4x4, cycle 30 s, 18 cars, 2 pedestrians at the crosswalk including an elderly person | Agent 1 flags a vulnerable user, plan 12/8/10 ("one vulnerable pedestrian, so 10 s for crossing speed"), no Guardrail correction, score 82, operator approval → 10 s pedestrian-only phase after applying |
 | Run from the profile-mode UI, multiplier ×1, 11 cars, 7 stopped, W saturation 1.14 (the current report and applied screenshots, 09-17) | main direction "W", plan 10/20/0 (reason: saturation sum 1.14 north-south vs 1.71 east-west), no Guardrail correction, score 88, auto apply → 15 s mean throughput 31 → 48 veh/min, congestion index 1.00 → 0.88, stopped 7 → 7 |
 | Same setup, seed 20260702, the call made for the before/after GIFs (09-17) | main direction "east-west", plan 10/20/0, no Guardrail correction, score 88, auto apply → against a fixed signal with an 8 s pedestrian phase, 90 s throughput 138 → 156, stopped 25.2 → 19.1 |
+| Profile mode, multiplier ×3, "re-analyse when the hour changes" on, 08:00 → 03:00 → 08:00 (09-17) | two automatic analyses 20 s after each change, both 14/16/0 and auto apply, no report window or alert. For 20 s after switching to 03:00 the road still held cars from 08:00, so the plan came out the same. With the backend unreachable the run was shown as skipped, with no replay |
 | Profile mode 08:00, multiplier ×3, no pedestrians, ten seeds (09-17) | pedestrian 0 s and auto apply in all ten calls, plans from 8/22 to 18/12 depending on the seed → against a fixed signal with an 8 s pedestrian phase, 90 s throughput +14.7 ± 7.2, stopped −4.2 ± 2.2 (section "An intersection with no pedestrians" above) |
 | Profile mode 08:00, lanes from the data, multiplier ×3, 35 cars, 30 stopped (the split state of the "similar demand" comparison, 09-17) | main direction "east-west" (saturation E 2.86 · W 2.29), plan 12/18/0, no Guardrail correction, score 88, auto apply → throughput 100 → 98 after 60 s, stopped 21.3 → 21.4. No difference from the fixed signal |
 
@@ -302,7 +306,7 @@ FlowLight-AI-Traffic-Signal
 │   ├── README.md                   # data source, column mapping, synthetic sample formula, replacement steps
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 235 tests (234 mocked + 1 live, live is opt-in)
+├── tests                           # 240 tests (239 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -361,7 +365,7 @@ Open `app/index.html` directly in a browser. It calls the backend at `http://127
 
 1. On first launch a five-step **usage guide** appears. Read it and press "Start". The sidebar button reopens it any time.
 2. Press **Play** to start the simulation. 4x speed is comfortable to watch.
-3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. Real demand leaves the screen fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection.
+3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. Real demand leaves the screen fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection. Switch on **re-analyse when the hour changes** and change the hour (or turn on auto advance) to have the plan rebuilt for every hour.
 4. Press **AI analysis**. The left panel shows the five steps as they run, and the report shows each agent's real output, the Guardrail correction and the evaluation reasoning.
 5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 simulated seconds the before/after effect is shown.
 6. To see the pedestrian side, raise the **pedestrians (per second)** slider to 1. Analyse while a child, an elderly person or a wheelchair user is waiting at a crosswalk: the pedestrian green comes back as 10 s or more, and after applying you see a pedestrian-only phase with every car stopped. With nobody waiting it comes back as 0 s and the phase disappears.
@@ -372,7 +376,7 @@ You can open `app/index.html` with no API key and no server. When **AI analysis*
 
 - The recording is the raw SSE event stream from one real call made in profile mode at 08:00, congestion multiplier ×3, after a 120 s warm-up. Nobody edited it. Plan 8 s north-south / 22 s east-west / 0 s pedestrian, score 82, auto apply.
 - The report title and the left panel are marked "녹화 재생" (recorded replay), and a note says the input state is the one from the recording. The plan is applied to the simulation you are looking at.
-- Step timings in the progress panel follow the recorded arrival times. No model is called, so the same response comes back whatever the screen shows.
+- Step timings in the progress panel follow the recorded arrival times. The model is not called again, so the same response comes back whatever the screen shows.
 - To record again, start the server and save the events of one real call in the same format. `tests/test_replay_data.py` checks the format.
 
 ---
@@ -431,7 +435,7 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 python -m pytest -q
 ```
 
-- The default run never calls the Solar API (the client is mocked). Currently 234 pass and 1 is skipped as live.
+- The default run never calls the Solar API (the client is mocked). Currently 239 pass and 1 is skipped as live.
 - The live API test is opt-in.
 
 ```bash
@@ -449,6 +453,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_traffic_profile_api.py` | Profile endpoint |
 | `test_scenario_extension.py` | Extended input passing through the backend |
 | `test_replay_data.py` | Recorded replay: SSE order, plan and decision format, page wiring |
+| `test_hourly_reanalysis.py` | Hourly re-analysis: scheduling, no overlap, quiet automatic runs |
 
 ---
 
@@ -539,6 +544,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 - At most three lanes, and always exactly one left-turn lane. Cars choose the lane for their turn on entry and never change lanes mid-block, so through traffic does not move over even when the left-turn lane is empty. On single-lane roads a protected-only left (no left during the through green) gridlocks the grid, so those roads use protected-permissive left turns.
 - More lanes raise throughput but also raise queues and the congestion index, because every lane admits cars while intersection capacity is set by the signal.
 - Against a fixed signal without pedestrian time, the AI plan comes out about the same when demand is balanced (see "When demand on the two axes is similar"). In the ten-seed comparison the clear gain came from skipping the pedestrian phase when nobody was waiting, while re-splitting time between the two axes could not be told apart from noise.
+- Automatic re-analysis only reacts to hour changes. A big change in demand within the same hour keeps the old plan, and for 20 s after a change the road still holds cars from the previous hour, so the plan can come out similar.
 - When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are on the roadmap.
 - In manual mode, applying an AI plan still halves the spawn rate for 120 s as a relief measure. This is disabled in profile mode.
 - The sample data is a **synthetic example** that follows the column layout of the real dataset. Steps for swapping in real data are in `data/README.md`.
@@ -551,6 +557,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 | Area | Description |
 |------------------|-------------|
 | **Real Traffic Data** | Wire up a real public data file, turn ratios (`turn_ratio`) |
+| **Re-planning** | Re-analyse on other changes too, such as a sudden saturation jump or a vulnerable user arriving |
 | **Demo Packaging** | Serve the frontend statically to simplify setup |
 | **Signal Fidelity** | Apply pedestrian phases for real and align the displayed cycle |
 | **Roundabout Scenario** | Roundabout flow and priority rules |
@@ -598,13 +605,13 @@ I focused on **LLM agent design, backend integration, Guardrail verification, fr
 
 # 📝 Lessons learned
 
-Calling an LLM API turned out to be the easy part. The hard part was **evaluating and verifying the answer before letting it touch the service**.
+Calling the LLM API was the easy part. Checking the answer before it reached the signals took far more work.
 
-- Designing an LLM as an **agent-based decision structure** rather than a question-and-answer box.
-- Using prompt engineering and Structured Outputs so the model follows **a fixed input and output shape**.
-- Streaming the analysis and its result to the screen **in real time** with FastAPI and SSE.
-- Applying AI output **only after verification**, through the Guardrail and JSON validation.
-- Presenting results with numbers and video together made the project far more convincing.
+- Instead of one question and one answer, the decision is split across three agents: analysis, planning and evaluation.
+- Prompts and Structured Outputs fix the shape of what goes in and what comes out.
+- FastAPI and SSE stream each step of the analysis to the screen.
+- Only results that pass the Guardrail and JSON validation reach the signals.
+- Numbers and video together get the result across. The numbers, though, had to come from repeated runs rather than one good run.
 
 ---
 
