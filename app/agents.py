@@ -5,8 +5,18 @@ from openai import OpenAI
 
 load_dotenv()
 
+# 키가 없어도 서버는 뜬다 (교통량 프로파일 API 와 화면의 녹화 재생은 키 없이 쓸 수 있어야 하므로).
+# OpenAI SDK 는 api_key 가 없으면 생성 시점에 예외를 내므로 자리표시 값으로 만들고,
+# 실제 호출은 call_solar_agent 에서 키 유무를 먼저 확인해 막는다.
+NO_API_KEY_DETAIL = "no_api_key"
+
+
+def has_api_key() -> bool:
+    return bool(os.getenv("UPSTAGE_API_KEY"))
+
+
 client = OpenAI(
-    api_key=os.getenv("UPSTAGE_API_KEY"),
+    api_key=os.getenv("UPSTAGE_API_KEY") or "missing-upstage-api-key",
     base_url="https://api.upstage.ai/v1"
 )
 
@@ -69,6 +79,14 @@ mock_scenario = {
 
 
 def call_solar_agent(agent_name: str, system_prompt: str, user_input: dict, output_schema: dict | None = None):
+    if not has_api_key():
+        # 키가 없으면 Upstage 를 부르지 않는다. 화면은 이 detail 을 보고 녹화 재생으로 넘어간다.
+        return {
+            "status": "error",
+            "agent": agent_name,
+            "message": "UPSTAGE_API_KEY 가 설정되지 않았습니다. .env 에 키를 넣거나, 녹화 재생으로 흐름을 확인하세요.",
+            "detail": NO_API_KEY_DETAIL,
+        }
     try:
         response = client.chat.completions.create(
             model=get_solar_model(),
