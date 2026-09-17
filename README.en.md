@@ -64,6 +64,28 @@ In real-data profile mode the same seed builds the same state, then **fixed-time
 - The method matches the built-in A/B check under Advanced settings: same seed, fixed 1/30 s step, same warm-up, then branch. Profile mode has no inflow relief after applying, so both runs see identical demand.
 - The earlier experiment (manual mode, 4x4, one lane, 5 veh/s, 2026-09-10) measured the same way gave throughput 121 → 131 and stopped vehicles 33.9 → 31.3. It is kept in the verification log below.
 
+### An intersection with no pedestrians: ten seeds
+
+The idea the project started from, "skip the pedestrian phase when nobody is at the crosswalk", was measured on its own. A fixed timetable that gives a pedestrian phase every cycle whether or not anyone is there was compared with FlowLight AI over ten seeds. Each seed made one real Solar Pro 4 call for its plan.
+
+| Arm (all three plan a 30 s total) | Signal |
+|---|---|
+| Fixed A | NS 11 s / EW 11 s / pedestrian 8 s, pedestrian-only phase every cycle even with nobody waiting |
+| Fixed B | NS 15 s / EW 15 s / pedestrian 0 s |
+| FlowLight AI | the real plan for each seed (pedestrian 0 s and auto apply in all ten), with actuation |
+
+| Metric (90 s, mean of ten seeds) | Fixed A | Fixed B | FlowLight AI | AI − Fixed A (95% CI) |
+|:--|--:|--:|--:|:--|
+| 🚦 Throughput | 134.1 | 145.9 | **148.8** | **+14.7 ± 7.2 (+11%)**, AI higher in all ten seeds |
+| 🚗 Mean stopped vehicles | 26.3 | 22.5 | **22.1** | **−4.2 ± 2.2 (−16%)**, AI lower in all ten seeds |
+| ⏱ Mean wait | 15.8 s | 13.8 s | 14.0 s | −1.8 ± 2.0 s (−11%), AI shorter in seven seeds |
+
+- **Skipping the pedestrian phase when nobody is waiting clearly helps.** For throughput and stopped vehicles the interval excludes zero, and all ten seeds point the same way.
+- **Most of the gain comes from handing the pedestrian time back to vehicles.** Fixed B also beat Fixed A by +11.8 ± 5.7 in throughput and −3.7 ± 1.4 in stopped vehicles.
+- **The LLM's re-split between the two axes adds little.** AI versus Fixed B is +2.9 ± 5.4 in throughput (AI higher in seven seeds), which cannot be told apart from noise.
+- In this demo the AI reads "nobody is at the crosswalk" from the state, picks 0 s and writes down why; the Guardrail raises the value back to 6 s (10 s for vulnerable users) whenever pedestrians are present. A simple rule on pedestrian presence could make the same call, and we say so.
+- Setup: real-data profile at 08:00, lanes as in the data, multiplier ×3, cycle 30 s, no pedestrian spawning, seeds 20260702 to 20260711, 120 s warm-up, then 90 s from the identical state under each signal. Fixed A and B go through the app's own apply path (70 % through / 30 % left) with actuation off. Intervals are paired t intervals over seeds (9 degrees of freedom). The congestion index sat around 0.96 for all three at this load, so it is left out of the table.
+
 ---
 
 # 🏗 System architecture
@@ -216,6 +238,7 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 | Manual mode 4x4, one lane, 49 cars, 33 stopped (the split state of the earlier before/after comparison) | main direction "north-south", plan 12/8/0, no Guardrail correction, score 88, auto apply → applied as a real signal system, throughput 121 → 131 after 60 s |
 | Manual mode 4x4, cycle 30 s, 18 cars, 2 pedestrians at the crosswalk including an elderly person | Agent 1 flags a vulnerable user, plan 12/8/10 ("one vulnerable pedestrian, so 10 s for crossing speed"), no Guardrail correction, score 82, operator approval → 10 s pedestrian-only phase after applying |
 | Run from the profile-mode UI, multiplier ×1, 11 cars, 7 stopped, W saturation 1.14 (the current report and applied screenshots, 09-17) | main direction "W", plan 10/20/0 (reason: saturation sum 1.14 north-south vs 1.71 east-west), no Guardrail correction, score 88, auto apply → 15 s mean throughput 31 → 48 veh/min, congestion index 1.00 → 0.88, stopped 7 → 7 |
+| Profile mode 08:00, multiplier ×3, no pedestrians, ten seeds (09-17) | pedestrian 0 s and auto apply in all ten calls, plans from 8/22 to 18/12 depending on the seed → against a fixed signal with an 8 s pedestrian phase, 90 s throughput +14.7 ± 7.2, stopped −4.2 ± 2.2 (section "An intersection with no pedestrians" above) |
 | Profile mode 08:00, lanes from the data, multiplier ×3, 35 cars, 30 stopped (the split state of the current before/after GIFs, 09-17) | main direction "east-west" (saturation E 2.86 · W 2.29), plan 12/18/0, no Guardrail correction, score 88, auto apply → throughput 100 → 98 after 60 s, stopped 21.3 → 21.4. No difference from the fixed signal |
 
 Reasoning stayed off (`reasoning_effort` not sent, 0 reasoning tokens). Response times depend on the network.
@@ -496,7 +519,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 - The time axis is compressed: default cycle 30 s (real ones are 100 to 180 s), 2 s amber, 1.7 s green-wave offset per block. Ratios are realistic, absolute values are not. After applying a plan the real cycle is vehicle greens + left-turn and pedestrian phases + amber and all-red, so it is longer than the input `cycle_sec`.
 - At most three lanes, and always exactly one left-turn lane. Cars choose the lane for their turn on entry and never change lanes mid-block, so through traffic does not move over even when the left-turn lane is empty. On single-lane roads a protected-only left (no left during the through green) gridlocks the grid, so those roads use protected-permissive left turns.
 - More lanes raise throughput but also raise queues and the congestion index, because every lane admits cars while intersection capacity is set by the signal.
-- With balanced demand the AI plan comes out about the same as the fixed signal; the comparison above is an example. The difference appears when demand is skewed to one axis or the pedestrian situation changes.
+- With balanced demand the AI plan comes out about the same as the fixed signal; the comparison above is an example. In the ten-seed comparison the clear gain came from skipping the pedestrian phase when nobody was waiting, while re-splitting time between the two axes could not be told apart from noise.
 - When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are on the roadmap.
 - In manual mode, applying an AI plan still halves the spawn rate for 120 s as a relief measure. This is disabled in profile mode.
 - The sample data is a **synthetic example** that follows the column layout of the real dataset. Steps for swapping in real data are in `data/README.md`.
