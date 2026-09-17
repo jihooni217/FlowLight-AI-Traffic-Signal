@@ -282,6 +282,10 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <label class="toggle-label mt-2">
                         <input type="checkbox" id="chk-demand-autohour"> <span>시간대 자동 진행 (<span id="val-demand-secs">120</span>초마다)</span>
                     </label>
+                    <label class="toggle-label mt-2">
+                        <input type="checkbox" id="chk-hour-reanalyze"> <span>시간대가 바뀌면 AI 재분석</span>
+                    </label>
+                    <div class="hint">실제 교차로가 출근·낮·퇴근 시간대별 계획을 쓰듯, 시간대가 바뀌고 20초 뒤 AI 분석을 한 번 다시 부릅니다. 켜면 Solar 호출이 시간대마다 1번 늘어납니다.</div>
                     <div class="slider-group mt-2">
                         <label>혼잡 배율 (데모용): ×<span id="val-demand-scale">1</span></label>
                         <input type="range" id="sim-demand-scale" min="1" max="5" step="1" value="1">
@@ -2393,6 +2397,11 @@ function SimController() {
     this.approachEdges = null;    // {N:[edge], S:[edge], E:[edge], W:[edge]}
     this.demandSpawn = {};        // 접근로별 발생률·다음 도착 시각·진입/손실 카운터
     this.autoHour = false;
+    // 시간대가 바뀌면 AI 재분석 (기본 꺼짐). 새 수요가 도로에 반영되도록 바뀐 뒤 reanalyzeSettle 초 기다렸다가 한 번 부른다.
+    this.autoReanalyze = false;
+    this.reanalyzeSettle = 20;
+    this.reanalyzeAt = null;
+    this.aiBusy = false;
     this.demoScale = 1;           // 실데이터 모드 혼잡 배율 (데모용). 방향별 비율은 데이터 그대로, 크기만 곱한다.
     this.secsPerHour = 120;       // 시간대 자동 진행 시 시간대 하나가 지속되는 시뮬레이션 초
     this.hourAcc = 0;
@@ -2518,6 +2527,8 @@ SimController.prototype._initDOM = function() {
         self.hourAcc = 0;
     };
     autoHourChk.onchange = function() { self.autoHour = autoHourChk.checked; self.hourAcc = 0; };
+    var reanalyzeChk = document.getElementById('chk-hour-reanalyze');
+    reanalyzeChk.onchange = function() { self.autoReanalyze = reanalyzeChk.checked; self.reanalyzeAt = null; };
     var scaleSlider = document.getElementById('sim-demand-scale');
     scaleSlider.oninput = function() {
         self.demoScale = parseInt(scaleSlider.value, 10) || 1;
@@ -2636,10 +2647,23 @@ SimController.prototype._initDOM = function() {
     }
     function yesNo(v) { return v === true ? '있음' : v === false ? '없음' : String(v); }
 
-    btnOpt.onclick = async function() {
+    // opts.auto: 시간대 변경에 따른 자동 재분석. 리포트 창과 적용 알림을 띄우지 않고, 서버가 없으면 녹화 재생 없이 건너뛴다.
+    async function runAIAnalysis(opts) {
+        opts = opts || {};
+        if (self.aiBusy) return;   // 분석이 진행 중이면 새 요청을 겹치지 않는다
+        if (opts.auto && document.getElementById('chk-replay') && document.getElementById('chk-replay').checked) return;
+        self.aiBusy = true;
+        try { await analyzeOnce(opts); } finally { self.aiBusy = false; }
+    }
+    self.runAIAnalysis = runAIAnalysis;
+    btnOpt.onclick = function() { runAIAnalysis(); };
+
+    async function analyzeOnce(opts) {
         var lt = document.getElementById('log-text');
         lt.textContent = 'AI 에이전트 분석을 시작합니다...\n\n';
-        document.getElementById('log-overlay').classList.remove('hidden');
+        if (opts.reason) lt.textContent += '[자동 재분석] ' + opts.reason + '\n\n';
+        if (!opts.auto) document.getElementById('log-overlay').classList.remove('hidden');
+        self.quietApply = !!opts.auto;
 
         // 진행 표시 초기화. 단계별 소요 시간은 SSE 메시지 도착 시각 기준이다.
         resetAISteps();
@@ -2788,7 +2812,7 @@ SimController.prototype._initDOM = function() {
                     });
                 } catch (netErr) {
                     // 서버가 없을 때: 녹화가 있으면 재생으로 넘어가고, 없으면 예전처럼 연결 실패로 처리한다.
-                    if (!replayRec) throw netErr;
+                    if (!replayRec || opts.auto) throw netErr;   // 자동 재분석은 녹화를 반복 재생하지 않는다
                     lt.textContent += "[안내] FastAPI 서버에 연결할 수 없어 녹화된 응답을 재생합니다.\n";
                 }
             }
@@ -3001,9 +3025,13 @@ SimController.prototype._initDOM = function() {
             document.getElementById('ai-state').textContent = "서버 연결 실패";
             lt.textContent += "\n[오류] FastAPI 서버 연결 실패\n";
             lt.textContent += err.message;
-            if (!window.FLOWLIGHT_REPLAY) lt.textContent += "\n(서버 없이 보려면 app/replay_data.js 가 index.html 옆에 있어야 합니다.)";
+            if (opts.auto) {
+                document.getElementById('ai-state').textContent = "자동 재분석 건너뜀 (서버 연결 실패)";
+            } else if (!window.FLOWLIGHT_REPLAY) {
+                lt.textContent += "\n(서버 없이 보려면 app/replay_data.js 가 index.html 옆에 있어야 합니다.)";
+            }
         }
-    };
+    }
     document.getElementById('btn-close-log').onclick = function(){ document.getElementById('log-overlay').classList.add('hidden'); };
 
     // ===== 사용법 안내 (처음 열 때 한 번, 이후 "사용법 보기" 버튼) =====
@@ -3141,7 +3169,8 @@ SimController.prototype._initDOM = function() {
         var waveInfo = self._applyGreenWave();
 
         console.log("적용 교차로 수:", appliedCount);
-        alert("AI 권장안 적용 완료: " + appliedCount + "개 교차로");
+        if (!self.quietApply) alert("AI 권장안 적용 완료: " + appliedCount + "개 교차로");
+        self.quietApply = false;
 
         var banner = document.getElementById("ai-apply-banner");
         var bannerDetail = document.getElementById("ai-banner-detail");
@@ -3217,7 +3246,9 @@ SimController.prototype._initDOM = function() {
         var effectSampleCount = 0;
         var effectLastSimT = self.simTime;
 
-        var effectTimer = setInterval(function() {
+        // 다시 적용하면 이전 측정은 멈춘다 (자동 재분석으로 여러 번 적용될 때 타이머가 겹치지 않게)
+        if (self.effectTimer) clearInterval(self.effectTimer);
+        var effectTimer = self.effectTimer = setInterval(function() {
             if (self.simTime - effectLastSimT < 1) return;
             effectLastSimT += 1;
             var stoppedNow = 0;
@@ -3255,6 +3286,7 @@ SimController.prototype._initDOM = function() {
 
             if (effectSampleCount >= 15) {
                 clearInterval(effectTimer);
+                if (self.effectTimer === effectTimer) self.effectTimer = null;
 
                 var sumStopped = 0;
                 var sumCongestion = 0;
@@ -3449,6 +3481,11 @@ SimController.prototype._update = function(dt, skipUI) {
                 var hs = this.profile.available_hours;
                 this.applyProfileHour(hs[(hs.indexOf(this.profileHour) + 1) % hs.length]);
             }
+        }
+        if (!skipUI && this.autoReanalyze && this.reanalyzeAt !== null && this.simTime >= this.reanalyzeAt
+                && !this.aiBusy && this.runAIAnalysis) {
+            this.reanalyzeAt = null;
+            this.runAIAnalysis({auto: true, reason: '시간대가 ' + pad2(this.profileHour) + '시로 바뀌어 다시 분석합니다.'});
         }
     } else {
         // 수동: 네트워크 전체 발생률(슬라이더)을 누적해 무작위 진입로에 생성 (기존 방식)
@@ -3678,6 +3715,9 @@ SimController.prototype.applyProfileHour = function(hour) {
         if (this.profile.hours[i].hour === hour) { entry = this.profile.hours[i]; break; }
     }
     if (!entry) return;
+    // 시간대가 실제로 바뀌었고 자동 재분석이 켜져 있으면, 새 수요가 도로에 반영될 시간을 두고 재분석을 예약한다.
+    // 슬라이더를 끄는 동안 여러 번 바뀌어도 예약은 마지막 시각 하나만 남는다.
+    if (this.autoReanalyze && hour !== this.profileHour) this.reanalyzeAt = this.simTime + this.reanalyzeSettle;
     this.profileHour = hour;
     this.currentDemand = entry;
     for (var k = 0; k < APPROACH_KEYS.length; k++) {
