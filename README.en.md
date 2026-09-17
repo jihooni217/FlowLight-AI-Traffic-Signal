@@ -261,7 +261,7 @@ FlowLight-AI-Traffic-Signal
 │   └── sample_seoul_traffic_history.meta.json
 ├── tests                           # 235 tests (234 mocked + 1 live, live is opt-in)
 ├── docs
-│   ├── screens/                    # current UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, advanced)
+│   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
 │   ├── system_architecture.png, data_flow.png, ai_decision_process.png, guardrail_cases.png
 │   ├── flowlight_before_ai.gif, flowlight_after_ai.gif   # before/after comparison (current version)
@@ -411,7 +411,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 
 # 📸 Screenshots
 
-All captured on the current version (Solar Pro 4, real-data profile mode) with real API calls. The UI text is Korean.
+Captured on the Solar Pro 4 version. The agent output in the progress panel, report, applied and pedestrian-phase screens comes from real API calls; the other screens were taken without a call. The report and applied screens predate the multi-lane update (one lane, 20 s cycle), but the agent output is unchanged. The UI text is Korean.
 
 ## Usage guide on first launch
 
