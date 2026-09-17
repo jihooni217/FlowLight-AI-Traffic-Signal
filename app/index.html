@@ -307,6 +307,10 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <button id="btn-optimize" class="btn secondary">AI 분석</button>
                     <button id="btn-apply-opt" class="btn success" disabled>권장값 적용</button>
                 </div>
+                <label class="hint mt-2" style="display:block;">
+                    <input type="checkbox" id="chk-replay"> 서버 없이 녹화 재생 (실제 Solar Pro 4 응답 기록)
+                </label>
+                <p class="hint">API 키나 서버가 없어도 체험할 수 있습니다. 서버에 연결되지 않으면 자동으로 녹화를 재생하고, 리포트에 녹화 재생임을 표시합니다.</p>
             </section>
 
             <details class="panel advanced">
@@ -466,7 +470,7 @@ input[type="range"]:disabled { opacity: 0.35; }
             <div class="help-body">
                 <p>실제 교통량으로 차량을 만들고, Solar Pro 4 Agent 세 개가 신호 계획을 세우는 데모입니다. 아래 순서대로 눌러 보세요.</p>
                 <ol>
-                    <li><b>백엔드 켜기</b> · 터미널에서 <code>uvicorn app.main:app --reload</code>. 이 화면은 <code>127.0.0.1:8000</code> 을 호출합니다.</li>
+                    <li><b>백엔드 켜기</b> · 터미널에서 <code>uvicorn app.main:app --reload</code>. 이 화면은 <code>127.0.0.1:8000</code> 을 호출합니다. 서버나 API 키가 없으면 "AI 분석"이 기록된 실제 Solar Pro 4 응답을 재생합니다(리포트에 "녹화 재생" 표시).</li>
                     <li><b>Play</b> · 시뮬레이션을 시작합니다. 배속은 4x 가 보기 편합니다.</li>
                     <li><b>교통 수요 입력 → 실데이터 프로파일</b> · 격자가 3x3(교차로 1개)이 되고 시간대별 실제 교통량으로 차량이 들어옵니다. 표의 "수요"는 입력값, "대기"는 시뮬레이션 결과입니다.</li>
                     <li><b>AI 분석</b> · 왼쪽 위 패널에서 5단계 진행을 보고, 리포트에서 Agent 가 실제로 돌려준 분석·계획·평가를 읽습니다.</li>
@@ -491,6 +495,8 @@ input[type="range"]:disabled { opacity: 0.35; }
         </div>
     </div>
 
+    <!-- 녹화 재생용 실제 Solar Pro 4 응답 기록. 없어도 페이지는 동작한다(서버 연결 실패만 표시). -->
+    <script src="replay_data.js"></script>
     <script>
 // ===== Constants =====
 var MIN_GAP = 5;
@@ -504,6 +510,30 @@ var COL_YELLOW = '#eab308';
 var COL_RED = '#ef4444';
 var COL_LEFT_ARROW = '#22c55e';   // 한국 4색 신호등의 좌회전 등은 녹색 화살표 (보라색 아님)
 var API_BASE = 'http://127.0.0.1:8000';   // FastAPI 백엔드 (Agent 스트림, 교통 수요 프로파일)
+
+// ===== 녹화 재생 (서버 없이 체험) =====
+// replay_data.js 에 실제 Solar Pro 4 가 돌려준 SSE 이벤트가 시각과 함께 기록되어 있다.
+// 백엔드에 연결할 수 없거나 사용자가 재생을 고르면, 그 기록을 원래 시간 간격대로 흘려보내는 가짜 응답을 만든다.
+// 파싱 코드는 실제 fetch 응답과 같은 경로를 타므로 화면 동작은 동일하고, 리포트에는 녹화 재생임을 표시한다.
+function makeReplayResponse(rec) {
+    var enc = new TextEncoder();
+    var events = (rec && rec.events) || [];
+    return {
+        body: new ReadableStream({
+            start: async function(ctrl) {
+                var prev = 0;
+                for (var i = 0; i < events.length; i++) {
+                    var ev = events[i];
+                    var wait = Math.max(0, (ev.t || 0) - prev);
+                    prev = ev.t || 0;
+                    if (wait > 0) await new Promise(function(r) { setTimeout(r, wait * 1000); });
+                    ctrl.enqueue(enc.encode("event: " + ev.event + "\ndata: " + JSON.stringify(ev.data) + "\n\n"));
+                }
+                ctrl.close();
+            }
+        })
+    };
+}
 
 // ===== 보행자 상수 =====
 var PED_TYPES = [
@@ -2742,14 +2772,35 @@ SimController.prototype._initDOM = function() {
             scenario.context.window_sec = approachState.window_sec;
         }
 
+        var replaying = false;
         try {
-            var response = await fetch(API_BASE + '/api/agent/stream', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(scenario)
-            });
+            var response = null;
+            var chkReplay = document.getElementById('chk-replay');
+            var replayRec = window.FLOWLIGHT_REPLAY || null;
+            if (!(chkReplay && chkReplay.checked)) {
+                try {
+                    response = await fetch(API_BASE + '/api/agent/stream', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(scenario)
+                    });
+                } catch (netErr) {
+                    // 서버가 없을 때: 녹화가 있으면 재생으로 넘어가고, 없으면 예전처럼 연결 실패로 처리한다.
+                    if (!replayRec) throw netErr;
+                    lt.textContent += "[안내] FastAPI 서버에 연결할 수 없어 녹화된 응답을 재생합니다.\n";
+                }
+            }
+            if (!response) {
+                if (!replayRec) throw new Error("replay_data.js 를 찾을 수 없어 녹화 재생을 할 수 없습니다.");
+                replaying = true;
+                lt.textContent += "[녹화 재생] " + (replayRec.recorded_at || "") + " 에 실제 Solar Pro 4(" + (replayRec.model || "solar-pro4") +
+                    ")가 돌려준 응답을 원래 시간 간격대로 재생합니다. 아래 입력 상태는 녹화 당시 값이고, 계획은 지금 화면에 적용됩니다.\n";
+                if (replayRec.note) lt.textContent += "[녹화 재생] " + replayRec.note + "\n";
+                lt.textContent += "\n";
+                response = makeReplayResponse(replayRec);
+            }
 
             var reader = response.body.getReader();
             var decoder = new TextDecoder("utf-8");
@@ -2841,8 +2892,11 @@ SimController.prototype._initDOM = function() {
                         var g = self.lastGuardrail;
 
                         lt.textContent += "\n==============================\n";
-                        lt.textContent += " FlowLight AI 분석 결과\n";
+                        lt.textContent += " FlowLight AI 분석 결과" + (replaying ? " (녹화 재생)" : "") + "\n";
                         lt.textContent += "==============================\n\n";
+                        if (replaying) {
+                            lt.textContent += "※ 아래 입력·분석·계획·평가는 녹화 당시 실제 Solar Pro 4 응답 그대로입니다. 지금 화면의 상태와는 다를 수 있습니다.\n\n";
+                        }
 
                         // 아래 문장들은 모두 Agent 가 실제로 반환한 값(summary / explanation / reason)이다.
                         lt.textContent += "[Agent 1 · 교통 상황 분석]\n";
@@ -2916,7 +2970,7 @@ SimController.prototype._initDOM = function() {
                         self.lastTrafficAnalysis = analysis;
                         self.lastInputState = input;
                         setAIStep('decision', 'done', data.final_decision);
-                        document.getElementById('ai-state').textContent = "분석 완료";
+                        document.getElementById('ai-state').textContent = replaying ? "분석 완료 (녹화 재생)" : "분석 완료";
                         document.getElementById('ai-decision').textContent = data.final_decision;
                         document.getElementById('ai-priority').textContent = priorityText;
                         document.getElementById('ai-ns').textContent = d.north_south_green_sec + "초 (권장)";
@@ -2947,6 +3001,7 @@ SimController.prototype._initDOM = function() {
             document.getElementById('ai-state').textContent = "서버 연결 실패";
             lt.textContent += "\n[오류] FastAPI 서버 연결 실패\n";
             lt.textContent += err.message;
+            if (!window.FLOWLIGHT_REPLAY) lt.textContent += "\n(서버 없이 보려면 app/replay_data.js 가 index.html 옆에 있어야 합니다.)";
         }
     };
     document.getElementById('btn-close-log').onclick = function(){ document.getElementById('log-overlay').classList.add('hidden'); };
