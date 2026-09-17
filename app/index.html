@@ -487,15 +487,17 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <button id="btn-close-help" class="btn-close">&times;</button>
             </div>
             <div class="help-body">
-                <p>실제 교통량으로 차량을 만들고, Solar Pro 4 Agent 세 개가 신호 계획을 세우는 데모입니다. 아래 순서대로 눌러 보세요.</p>
+                <p>공공 교통량 데이터 형식의 시간대별 수요로 차량을 만들고, Solar Pro 4 Agent 세 개가 신호 계획을 세우는 데모입니다. 아래 순서대로 눌러 보세요.</p>
                 <ol>
-                    <li><b>백엔드 켜기</b> · 터미널에서 <code>uvicorn app.main:app --reload</code>. 이 화면은 <code>127.0.0.1:8000</code> 을 호출합니다. 서버나 API 키가 없으면 "AI 분석"이 기록된 실제 Solar Pro 4 응답을 재생합니다(리포트에 "녹화 재생" 표시).</li>
+                    <li id="help-step-server"><b>백엔드 켜기</b> · 터미널에서 <code>uvicorn app.main:app --reload</code>. 이 화면은 <code>127.0.0.1:8000</code> 을 호출합니다. 서버나 API 키가 없으면 "AI 분석"이 기록된 실제 Solar Pro 4 응답을 재생합니다(리포트에 "녹화 재생" 표시).</li>
                     <li><b>Play</b> · 시뮬레이션을 시작합니다. 배속은 4x 가 보기 편합니다.</li>
-                    <li><b>교통 수요 입력 → 실데이터 프로파일</b> · 격자가 3x3(교차로 1개)이 되고 시간대별 실제 교통량으로 차량이 들어옵니다. 표의 "수요"는 입력값, "대기"는 시뮬레이션 결과입니다.</li>
-                    <li><b>AI 분석</b> · 왼쪽 위 패널에서 5단계 진행을 보고, 리포트에서 Agent 가 실제로 돌려준 분석·계획·평가를 읽습니다.</li>
-                    <li><b>권장값 적용</b> · 판단이 "자동 적용"이면 바로 적용되고, 아니면 이 버튼으로 적용합니다. 15초 뒤 적용 효과가 표시됩니다.</li>
+                    <li><b>교통 수요 입력 → 실데이터 프로파일</b> · 격자가 3x3(교차로 1개)이 되고 시간대별 수요(서울시 교통량 데이터와 같은 형식의 합성 예제)로 차량이 들어옵니다. 표의 "수요"는 입력값, "대기"는 시뮬레이션 결과입니다.</li>
+                    <li><b>AI 분석</b> · 진행 패널(넓은 화면은 도로 왼쪽 위, 휴대폰은 도로 아래)에서 5단계 진행을 보고, 리포트에서 Agent 가 실제로 돌려준 분석·계획·평가를 읽습니다.</li>
+                    <li><b>권장값 적용</b> · 판단이 "자동 적용"이면 바로 적용되고, 아니면 이 버튼으로 적용합니다. 적용 뒤 시뮬레이션 시간 15초 동안 재서 적용 효과를 보여 줍니다.</li>
+                    <li><b>시간대 바꾸기</b> · 시간대 슬라이더를 옮기거나 "시간대 자동 진행"을 켭니다. "시간대가 바뀌면 AI 재분석"을 켜 두면 시간대가 바뀌고 20초 뒤 계획을 다시 세웁니다(서버 실행 시).</li>
                 </ol>
-                <p class="hint">교차로 유형, 데이터 내보내기, 내장 Webster 최적화는 사이드바의 "고급 설정"에 있습니다.</p>
+                <p class="hint">교차로 유형, 데이터 내보내기, 내장 Webster 최적화와 A/B 검증은 사이드바의 "고급 설정"에 있습니다.</p>
+                <p class="hint">정체 지수는 신호를 기다리는 차도 포함하므로 정상 운영 중에도 빨강이 자주 나옵니다. 효과는 통과·정지 차량 수로 비교하세요.</p>
                 <label class="toggle-label mt-2"><input type="checkbox" id="chk-help-hide" checked> 다음에 열 때 자동으로 보지 않기</label>
                 <div class="btn-group mt-2">
                     <button id="btn-help-start" class="btn primary">시작하기</button>
@@ -3145,6 +3147,8 @@ SimController.prototype._initDOM = function() {
             '<a href="https://github.com/jihooni217/FlowLight-AI-Traffic-Signal" target="_blank" rel="noopener">저장소</a>를 내려받아 실행하세요.';
         var helpBody = helpOverlay.querySelector('.help-body');
         helpBody.insertBefore(note, helpBody.firstChild);
+        var serverStep = document.getElementById('help-step-server');
+        if (serverStep) serverStep.remove();
         var optHint = chkR.closest('label').nextElementSibling;
         if (optHint) optHint.textContent = '공개 데모에서는 서버 없이 녹화된 실제 응답을 재생합니다. 시간대 자동 재분석은 동작하지 않습니다.';
     }
