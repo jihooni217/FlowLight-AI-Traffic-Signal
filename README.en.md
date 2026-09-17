@@ -20,7 +20,11 @@
 
 ## 🎬 Live Demo
 
-From the first-run guide to the real-data profile, the AI analysis and the applied signal plan.
+**Try it without installing anything: [https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/](https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/)**
+
+The public page runs without a server. The real-data profile opens from bundled data, and AI analysis replays a recorded real Solar Pro 4 response. To see live calls, clone the repository and add your API key as described under Getting started. The UI text is Korean.
+
+Below: from the first-run guide to the real-data profile, the AI analysis and the applied signal plan.
 
 <p align="center">
   <img src="docs/flowlight_live_demo.gif" width="100%">
@@ -301,12 +305,16 @@ FlowLight-AI-Traffic-Signal
 │   ├── agents.py                   # Solar client, 3 prompts, 3 JSON Schemas, Guardrail
 │   ├── traffic_data.py             # public traffic CSV → normalised profile → arrival rates
 │   ├── index.html                  # simulator + UI + backend client (open this in a browser)
-│   └── replay_data.js              # recorded real Solar Pro 4 response for the no-server replay
+│   ├── replay_data.js              # recorded real Solar Pro 4 response for the no-server replay
+│   └── profile_data.js             # bundled demand profile (same content as /api/traffic/profile)
+├── scripts
+│   └── build_profile_data.py       # rebuilds profile_data.js
+├── .github/workflows/pages.yml     # public demo deployment (the three static files only)
 ├── data
 │   ├── README.md                   # data source, column mapping, synthetic sample formula, replacement steps
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 247 tests (246 mocked + 1 live, live is opt-in)
+├── tests                           # 252 tests (251 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -325,6 +333,13 @@ FlowLight-AI-Traffic-Signal
 ---
 
 # 🚀 Getting started
+
+There are two ways in.
+
+| Way | What you need | AI analysis |
+|---|---|---|
+| **Try it now** | Nothing. Open the [public demo page](https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/) | Replays a recorded real Solar Pro 4 response |
+| **Run it yourself** | Steps 1 to 6 below (Python, API key) | Calls Solar Pro 4 live on the current state |
 
 ### 1. Clone
 
@@ -377,7 +392,8 @@ You can see the whole flow without an API key. **AI analysis** then replays a **
 | Setup | What you get |
 |---|---|
 | Server started without a key (`uvicorn app.main:app`, no `.env`) | Real-data profile mode in full. AI analysis says the key is missing and plays the recording |
-| Only `app/index.html` opened, no server | Manual mode and the replay. The real-data profile comes from the server, so that mode does not open |
+| Only `app/index.html` opened, no server | The whole flow. The real-data profile opens from bundled data (`app/profile_data.js`) and AI analysis plays the recording |
+| [Public demo page](https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/) | Same as above. On a public address the page never looks for a server on the visitor's machine and uses the bundled data and the replay from the start |
 
 With a server and a key you can still pick the replay via the "replay without server" checkbox in the sidebar. Hourly re-analysis skips instead of replaying the recording again and again.
 
@@ -442,7 +458,7 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 python -m pytest -q
 ```
 
-- The default run never calls the Solar API (the client is mocked). Currently 246 pass and 1 is skipped as live.
+- The default run never calls the Solar API (the client is mocked). Currently 251 pass and 1 is skipped as live.
 - The live API test is opt-in.
 
 ```bash
@@ -460,6 +476,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_traffic_profile_api.py` | Profile endpoint |
 | `test_scenario_extension.py` | Extended input passing through the backend |
 | `test_replay_data.py` | Recorded replay: SSE order, plan and decision format, page wiring |
+| `test_hosted_demo.py` | Bundled profile equals the backend response, no backend calls on a public address, deployment scope |
 | `test_no_api_key.py` | The server starts without a key, Upstage is not called, `no_api_key` is sent, and the page falls back to the replay |
 | `test_render_and_ab.py` | Sidewalk corners where roads with different lane counts meet; Webster values in the A/B check are not overwritten by actuation |
 | `test_hourly_reanalysis.py` | Hourly re-analysis: scheduling, no overlap, quiet automatic runs |
@@ -567,7 +584,6 @@ Problem statement, agent design, architecture, experiment results and retrospect
 |------------------|-------------|
 | **Real Traffic Data** | Wire up a real public data file, turn ratios (`turn_ratio`) |
 | **Re-planning** | Re-analyse on other changes too, such as a sudden saturation jump or a vulnerable user arriving |
-| **Demo Packaging** | Serve the frontend statically to simplify setup |
 | **Signal Fidelity** | Apply pedestrian phases for real and align the displayed cycle |
 | **Roundabout Scenario** | Roundabout flow and priority rules |
 | **Multi-Intersection Control** | Coordinated signals and green waves across neighbouring intersections |

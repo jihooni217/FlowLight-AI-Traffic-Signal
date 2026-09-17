@@ -1,0 +1,38 @@
+# 공개 데모: app/ 의 정적 파일 세 개만 GitHub Pages 로 배포한다 (백엔드 코드와 설정은 올리지 않는다).
+# 공개 페이지는 서버 없이 동작한다. 실데이터 프로파일은 app/profile_data.js, AI 분석은 app/replay_data.js 를 쓴다.
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/index.html"
+      - "app/replay_data.js"
+      - "app/profile_data.js"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare site (static files only)
+        run: |
+          mkdir -p _site
+          cp app/index.html app/replay_data.js app/profile_data.js _site/
+          touch _site/.nojekyll
+          ls -la _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - uses: actions/deploy-pages@v4

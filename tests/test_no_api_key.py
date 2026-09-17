@@ -53,5 +53,5 @@ def test_profile_api_works_without_a_key(monkeypatch, client):
 def test_page_falls_back_to_the_recording_on_missing_key():
     assert 'data.detail === "no_api_key" && !replaying' in HTML
     assert "return analyzeOnce(Object.assign({}, opts, {forceReplay: true, keyMissing: true}));" in HTML
-    assert "if (!(chkReplay && chkReplay.checked) && !opts.forceReplay) {" in HTML
+    assert "if (!(chkReplay && chkReplay.checked) && !opts.forceReplay && !HOSTED_DEMO) {" in HTML
     assert "자동 재분석 건너뜀 (API 키 없음)" in HTML
