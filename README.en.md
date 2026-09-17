@@ -57,6 +57,12 @@ This is an intersection with no pedestrians at all. A **fixed timetable** that g
 | 🚗 Mean stopped vehicles | 25.2 | **19.1** |
 | ⏱ Mean wait | 15.1 s | **12.3 s** |
 
+<p align="center">
+  <img src="docs/no_pedestrian_effect.png" width="100%">
+</p>
+
+The chart shows, for the 90 s in the GIFs, how many cars are stopped each second (grey bands = the fixed timetable giving a pedestrian phase to an empty crosswalk), plus the ten-seed means (bars) and every seed (dots) from the comparison below. The chart labels are in Korean. Every grey band is followed by a jump in stopped cars on the fixed side.
+
 - On the left every car stops for 8 s each cycle even though nobody is waiting to cross; 16 of the 90 seconds were pedestrian-only phase. On the right the pedestrian time is 0 s, so traffic keeps moving.
 - These GIFs come from one real Solar Pro 4 call at seed 20260702 after a 120 s warm-up (35 cars, 30 stopped): main direction "east-west", plan 10/20/0, no Guardrail correction, score 88, auto apply.
 - The gap in this one clip (+18 throughput) is a little larger than the ten-seed mean (+14.7). It was a separate call made for the video, so its plan differs from the same seed's row in the ten-seed run (plan 12/18/0, +8). Use the ten-seed numbers below as the representative result.
@@ -74,7 +80,7 @@ The idea the project started from, "skip the pedestrian phase when nobody is at 
 | Metric (90 s, mean of ten seeds) | Fixed A | Fixed B | FlowLight AI | AI − Fixed A (95% CI) |
 |:--|--:|--:|--:|:--|
 | 🚦 Throughput | 134.1 | 145.9 | **148.8** | **+14.7 ± 7.2 (+11%)**, AI higher in all ten seeds |
-| 🚗 Mean stopped vehicles | 26.3 | 22.5 | **22.1** | **−4.2 ± 2.2 (−16%)**, AI lower in all ten seeds |
+| 🚗 Mean stopped vehicles | 26.3 | 22.5 | **22.0** | **−4.2 ± 2.2 (−16%)**, AI lower in all ten seeds |
 | ⏱ Mean wait | 15.8 s | 13.8 s | 14.0 s | −1.8 ± 2.0 s (−11%), AI shorter in seven seeds |
 
 - **Skipping the pedestrian phase when nobody is waiting clearly helps.** For throughput and stopped vehicles the interval excludes zero, and all ten seeds point the same way.
