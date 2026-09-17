@@ -229,7 +229,7 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
 - The AI plan is applied with the four-phase cycle, a green wave and actuated phases (see above). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
 - A five-step usage guide appears on first launch and can be reopened from the sidebar
-- Recorded replay without a server: when the backend is unreachable, a stored real Solar Pro 4 response is replayed and the report says so (see Getting started)
+- Recorded replay: without an API key, or when the backend is unreachable, a stored real Solar Pro 4 response is replayed and the report says so (see Getting started)
 - Intersection type, data export, and the built-in Webster optimiser with a seeded A/B harness (independent of the LLM) live under the collapsed "Advanced settings" section
 
 ---
@@ -306,7 +306,7 @@ FlowLight-AI-Traffic-Signal
 │   ├── README.md                   # data source, column mapping, synthetic sample formula, replacement steps
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 242 tests (241 mocked + 1 live, live is opt-in)
+├── tests                           # 247 tests (246 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -344,7 +344,7 @@ Copy `.env.example` to `.env` and paste your key. `.env` is not committed.
 
 | Variable | Default | Description |
 |---|---|---|
-| `UPSTAGE_API_KEY` | (required) | Issued in the Upstage console |
+| `UPSTAGE_API_KEY` | (needed for live analysis) | Issued in the Upstage console. Without it the server still starts and AI analysis falls back to the recorded replay |
 | `UPSTAGE_MODEL` | `solar-pro4` | Set `solar-pro3` to roll back, or `solar-pro4-260806` to pin a snapshot |
 | `UPSTAGE_OUTPUT_MODE` | `json_schema` | Structured Outputs. Fall back to `json_object` if needed |
 | `TRAFFIC_PROFILE_META` | `data/sample_seoul_traffic_history.meta.json` | Path to another profile meta file |
@@ -370,9 +370,16 @@ Open `app/index.html` directly in a browser. It calls the backend at `http://127
 5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 simulated seconds the before/after effect is shown.
 6. To see the pedestrian side, raise the **pedestrians (per second)** slider to 1. Analyse while a child, an elderly person or a wheelchair user is waiting at a crosswalk: the pedestrian green comes back as 10 s or more, and after applying you see a pedestrian-only phase with every car stopped. With nobody waiting it comes back as 0 s and the phase disappears.
 
-### Trying it without a server (recorded replay)
+### Trying it without an API key (recorded replay)
 
-You can open `app/index.html` with no API key and no server. When **AI analysis** cannot reach the backend, the page replays a **real Solar Pro 4 response** stored in `app/replay_data.js`, with the original timing between events. With a server running you can still pick the replay via the "replay without server" checkbox in the sidebar.
+You can see the whole flow without an API key. **AI analysis** then replays a **real Solar Pro 4 response** stored in `app/replay_data.js`, with the original timing between events.
+
+| Setup | What you get |
+|---|---|
+| Server started without a key (`uvicorn app.main:app`, no `.env`) | Real-data profile mode in full. AI analysis says the key is missing and plays the recording |
+| Only `app/index.html` opened, no server | Manual mode and the replay. The real-data profile comes from the server, so that mode does not open |
+
+With a server and a key you can still pick the replay via the "replay without server" checkbox in the sidebar. Hourly re-analysis skips instead of replaying the recording again and again.
 
 - The recording is the raw SSE event stream from one real call made in profile mode at 08:00, congestion multiplier ×3, after a 120 s warm-up. Nobody edited it. Plan 8 s north-south / 22 s east-west / 0 s pedestrian, score 82, auto apply.
 - The report title and the left panel are marked "녹화 재생" (recorded replay), and a note says the input state is the one from the recording. The plan is applied to the simulation you are looking at.
@@ -435,7 +442,7 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 python -m pytest -q
 ```
 
-- The default run never calls the Solar API (the client is mocked). Currently 241 pass and 1 is skipped as live.
+- The default run never calls the Solar API (the client is mocked). Currently 246 pass and 1 is skipped as live.
 - The live API test is opt-in.
 
 ```bash
@@ -453,6 +460,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_traffic_profile_api.py` | Profile endpoint |
 | `test_scenario_extension.py` | Extended input passing through the backend |
 | `test_replay_data.py` | Recorded replay: SSE order, plan and decision format, page wiring |
+| `test_no_api_key.py` | The server starts without a key, Upstage is not called, `no_api_key` is sent, and the page falls back to the replay |
 | `test_render_and_ab.py` | Sidewalk corners where roads with different lane counts meet; Webster values in the A/B check are not overwritten by actuation |
 | `test_hourly_reanalysis.py` | Hourly re-analysis: scheduling, no overlap, quiet automatic runs |
 
@@ -504,7 +512,7 @@ A real run analysed while an elderly person was waiting at the crosswalk. Agent 
 
 ![Pedestrian-only phase: all vehicles stopped, all crosswalks green](docs/screens/ped_phase.png)
 
-## Recorded replay without a server
+## Recorded replay
 
 "AI analysis" pressed with the backend switched off. The page reports the failed connection, replays the stored real response, and marks the result title as a recorded replay.
 

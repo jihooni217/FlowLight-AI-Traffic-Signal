@@ -314,7 +314,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <label class="hint mt-2" style="display:block;">
                     <input type="checkbox" id="chk-replay"> 서버 없이 녹화 재생 (실제 Solar Pro 4 응답 기록)
                 </label>
-                <p class="hint">API 키나 서버가 없어도 체험할 수 있습니다. 서버에 연결되지 않으면 자동으로 녹화를 재생하고, 리포트에 녹화 재생임을 표시합니다.</p>
+                <p class="hint">API 키가 없어도 체험할 수 있습니다. 서버에 키가 없거나 서버에 연결되지 않으면 녹화를 재생하고, 리포트에 녹화 재생임을 표시합니다. 실데이터 프로파일은 서버(키 없어도 됨)가 켜져 있어야 열립니다.</p>
             </section>
 
             <details class="panel advanced">
@@ -2815,11 +2815,15 @@ SimController.prototype._initDOM = function() {
         }
 
         var replaying = false;
+        var keyMissing = false;
         try {
             var response = null;
             var chkReplay = document.getElementById('chk-replay');
             var replayRec = window.FLOWLIGHT_REPLAY || null;
-            if (!(chkReplay && chkReplay.checked)) {
+            if (opts.keyMissing) {
+                lt.textContent += "[안내] 서버에 UPSTAGE_API_KEY 가 없어 녹화된 응답을 재생합니다.\n";
+            }
+            if (!(chkReplay && chkReplay.checked) && !opts.forceReplay) {
                 try {
                     response = await fetch(API_BASE + '/api/agent/stream', {
                         method: 'POST',
@@ -3031,12 +3035,26 @@ SimController.prototype._initDOM = function() {
                     }
 
                     if (eventName === "error") {
+                        // 서버에 API 키가 없으면(키 없이 서버만 켠 경우) 녹화 재생으로 넘어간다. 자동 재분석은 건너뛴다.
+                        if (data.detail === "no_api_key" && !replaying) {
+                            keyMissing = true;
+                            continue;
+                        }
                         if (activeStep) { setAIStep(activeStep, 'error', '실패'); activeStep = null; }
                         document.getElementById('ai-state').textContent = "분석 실패";
                         lt.textContent += "\n[오류]\n";
                         lt.textContent += JSON.stringify(data, null, 2);
                     }
                 }
+            }
+            if (keyMissing) {
+                if (activeStep) { setAIStep(activeStep, 'idle'); activeStep = null; }
+                if (opts.auto || !window.FLOWLIGHT_REPLAY) {
+                    document.getElementById('ai-state').textContent = opts.auto ? "자동 재분석 건너뜀 (API 키 없음)" : "분석 불가 (API 키 없음)";
+                    lt.textContent += "\n[안내] 서버에 UPSTAGE_API_KEY 가 없습니다. .env 에 키를 넣고 서버를 다시 켜 주세요.\n";
+                    return;
+                }
+                return analyzeOnce(Object.assign({}, opts, {forceReplay: true, keyMissing: true}));
             }
         } catch (err) {
             if (activeStep) { setAIStep(activeStep, 'error', '연결 실패'); activeStep = null; }

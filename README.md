@@ -229,7 +229,7 @@ AI 적용 전의 기본 신호는 고정 시간표(4현시, 주기에서 황색�
 - AI 계획은 4현시 유지·녹색파·감응 신호로 적용(위 절 참고). 적용 후 효과는 시뮬레이션 시간 15초 평균으로 측정하므로 배속을 걸면 그만큼 빨리 나옴
 - AI 분석 진행 패널(5단계, 단계별 소요 시간), Agent 실제 출력 표시, Guardrail 보정 전후 표시
 - 처음 열면 다섯 단계 사용법 안내가 뜨고, 사이드바의 "사용법 보기"로 다시 열 수 있음
-- 서버 없이 녹화 재생: 백엔드에 연결되지 않으면 실제 Solar Pro 4 응답 기록을 재생하고 리포트에 표시 (실행 방법 참고)
+- 녹화 재생: API 키가 없거나 백엔드에 연결되지 않으면 실제 Solar Pro 4 응답 기록을 재생하고 리포트에 표시 (실행 방법 참고)
 - 교차로 유형, 데이터 내보내기, Webster 기반 로컬 최적화기와 시드 고정 A/B 검증(LLM과 무관)은 "고급 설정" 접기에 정리
 
 ---
@@ -306,7 +306,7 @@ FlowLight-AI-Traffic-Signal
 │   ├── README.md                   # 데이터 출처, 컬럼 매핑, 합성 예제 공식, 교체 절차
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 242개 (mock 241 + live 1, live 는 opt-in)
+├── tests                           # 247개 (mock 246 + live 1, live 는 opt-in)
 ├── docs
 │   ├── screens/                    # UI 화면 (사용법, 메인, 프로파일 모드, 진행 패널, 리포트, 적용, 보행 전용 현시, 녹화 재생, 고급 설정)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -344,7 +344,7 @@ pip install -r requirements.txt
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `UPSTAGE_API_KEY` | (필수) | Upstage 콘솔에서 발급 |
+| `UPSTAGE_API_KEY` | (실제 분석에 필요) | Upstage 콘솔에서 발급. 없어도 서버는 켜지고, AI 분석은 녹화 재생으로 대신합니다 |
 | `UPSTAGE_MODEL` | `solar-pro4` | `solar-pro3`로 롤백하거나 `solar-pro4-260806`로 스냅샷 고정 가능 |
 | `UPSTAGE_OUTPUT_MODE` | `json_schema` | Structured Outputs. 문제 시 `json_object`로 폴백 |
 | `TRAFFIC_PROFILE_META` | `data/sample_seoul_traffic_history.meta.json` | 다른 교통량 프로파일 메타 파일 경로 |
@@ -370,9 +370,16 @@ uvicorn app.main:app --reload
 5. 최종 판단이 `자동 적용`이면 신호가 자동 적용되고, 그 외에는 **권장값 적용** 으로 수동 적용할 수 있습니다. 시뮬레이션 15초 뒤 적용 전후 효과가 표시됩니다.
 6. 보행자 쪽을 보려면 사이드바 **보행자(명/초)** 슬라이더를 1로 올립니다. 횡단보도에 어린이·노약자·휠체어 이용자가 서 있을 때 분석하면 보행 녹색이 10초 이상으로 잡히고, 적용 후 모든 차가 멈추는 보행 전용 현시가 보입니다. 보행자가 없으면 0초로 잡혀 보행 현시가 사라집니다.
 
-### 서버 없이 체험하기 (녹화 재생)
+### API 키 없이 체험하기 (녹화 재생)
 
-API 키나 서버가 없어도 `app/index.html`만 열면 됩니다. **AI 분석** 을 눌렀을 때 백엔드에 연결되지 않으면 `app/replay_data.js`에 기록된 **실제 Solar Pro 4 응답**을 원래 시간 간격대로 재생합니다. 서버가 있어도 사이드바의 "서버 없이 녹화 재생" 체크로 재생을 고를 수 있습니다.
+API 키가 없어도 흐름 전체를 볼 수 있습니다. **AI 분석**을 누르면 `app/replay_data.js`에 기록된 **실제 Solar Pro 4 응답**을 원래 시간 간격대로 재생합니다.
+
+| 준비 | 볼 수 있는 것 |
+|---|---|
+| 키 없이 서버만 켬 (`.env` 없이 `uvicorn app.main:app`) | 실데이터 프로파일 모드 전체. AI 분석은 "API 키가 없어 녹화를 재생한다"는 안내 뒤 재생 |
+| 서버 없이 `app/index.html`만 엶 | 수동 모드와 녹화 재생. 실데이터 프로파일은 서버에서 받아오므로 열리지 않습니다 |
+
+서버와 키가 있어도 사이드바의 "서버 없이 녹화 재생" 체크로 재생을 고를 수 있습니다. 시간대 자동 재분석은 녹화를 반복 재생하지 않고 건너뜁니다.
 
 - 기록은 실데이터 프로파일 08시, 혼잡 배율 ×3, 워밍업 120초 상태에서 한 번 호출해 받은 SSE 이벤트 그대로이고 사람이 고치지 않았습니다. 계획 남북 8초 / 동서 22초 / 보행자 0초, 82점, 자동 적용.
 - 리포트 제목과 왼쪽 패널에 "녹화 재생" 이 붙고, 입력 상태가 녹화 당시 값이라는 안내가 같이 나옵니다. 계획은 지금 화면에 적용됩니다.
@@ -435,7 +442,7 @@ API 키나 서버가 없어도 `app/index.html`만 열면 됩니다. **AI 분석
 python -m pytest -q
 ```
 
-- 기본 실행은 Solar API를 호출하지 않습니다(클라이언트를 mock). 현재 241개 통과, 1개는 live로 스킵됩니다.
+- 기본 실행은 Solar API를 호출하지 않습니다(클라이언트를 mock). 현재 246개 통과, 1개는 live로 스킵됩니다.
 - 실제 API를 부르는 테스트는 opt-in입니다.
 
 ```bash
@@ -453,6 +460,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_traffic_profile_api.py` | 프로파일 엔드포인트 |
 | `test_scenario_extension.py` | 확장 입력의 백엔드 통과 |
 | `test_replay_data.py` | 녹화 재생 데이터의 SSE 순서·계획·판단 형식과 화면 연결 |
+| `test_no_api_key.py` | 키 없이 서버가 켜지는지, Upstage 를 부르지 않고 `no_api_key` 를 보내는지, 화면이 녹화 재생으로 넘어가는지 |
 | `test_render_and_ab.py` | 차로 수가 다른 도로의 인도 모서리 그리기, A/B 검증에서 Webster 권장값이 감응 모드에 덮이지 않는지 |
 | `test_hourly_reanalysis.py` | 시간대 변경 시 자동 재분석의 예약·중복 방지·조용한 실행 배선 |
 
@@ -504,7 +512,7 @@ Agent가 실제로 돌려준 `summary` / `explanation` / `reason`과 Guardrail �
 
 ![보행 전용 현시: 모든 차량 정지, 모든 횡단보도 녹색](docs/screens/ped_phase.png)
 
-## 서버 없이 녹화 재생
+## 녹화 재생
 
 백엔드를 끄고 "AI 분석" 을 누른 화면입니다. 연결 실패를 알린 뒤 기록된 실제 응답을 재생하고, 결과 제목에 "녹화 재생" 이 붙습니다.
 
