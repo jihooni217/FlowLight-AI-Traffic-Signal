@@ -41,7 +41,7 @@ FastAPI streams each step over SSE (Server-Sent Events), so you can watch the de
 
 The repository is being turned into an official Upstage demo and tutorial. Two rules hold throughout:
 
-- Real **hourly traffic volume** is converted into a **vehicle arrival rate** that spawns cars in the simulator. The **queue** (waiting vehicles) is always a simulation result.
+- **Hourly traffic volume** is converted into a **vehicle arrival rate** that spawns cars in the simulator. The **queue** (waiting vehicles) is always a simulation result.
   A volume of 842 vehicles per hour is never treated as 842 waiting cars.
 - The model's internal reasoning is never switched on. The screen shows only the `summary` / `explanation` / `reason` fields the agents **explicitly return**.
 
@@ -229,7 +229,7 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
   - Manual: a network-wide veh/s slider spawns cars at random entry edges
   - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, lane counts from the data (3 north-south, 2 east-west), hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles
   - Re-analyse when the hour changes (off by default): 20 s after the hour changes the AI analysis runs once more and the plan is replaced. Runs never overlap, automatic runs open no report window or alert, and without a server they are skipped instead of replaying the recording.
-  - Congestion multiplier (×1 to 5, demo only): real peak demand leaves a single intersection fairly quiet, so this slider scales the size of the demand while keeping the ratio between directions. Spawn rate = per-lane arrival rate × lanes × multiplier. It is sent to the agents as `demand.demo_scale` so they know it is a demo multiplier
+  - Congestion multiplier (×1 to 5, demo only): peak demand at ×1 leaves a single intersection fairly quiet, so this slider scales the size of the demand while keeping the ratio between directions. Spawn rate = per-lane arrival rate × lanes × multiplier. It is sent to the agents as `demand.demo_scale` so they know it is a demo multiplier
 - The AI plan is applied with the four-phase cycle, a green wave and actuated phases (see above). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
 - A six-step usage guide appears on first launch and can be reopened from the sidebar
@@ -539,7 +539,7 @@ A real run analysed while an elderly person was waiting at the crosswalk. Agent 
 
 ## Advanced settings
 
-Intersection type, data export and the built-in Webster optimiser are tucked into a collapsible section.
+Intersection type, data export, the built-in Webster optimiser and the A/B check are tucked into a collapsible section.
 
 <p align="center">
   <img src="docs/screens/advanced.png" width="320">
@@ -585,11 +585,10 @@ Problem statement, agent design, architecture, experiment results and retrospect
 |------------------|-------------|
 | **Real Traffic Data** | Wire up a real public data file, turn ratios (`turn_ratio`) |
 | **Re-planning** | Re-analyse on other changes too, such as a sudden saturation jump or a vulnerable user arriving |
-| **Signal Fidelity** | Apply pedestrian phases for real and align the displayed cycle |
 | **Roundabout Scenario** | Roundabout flow and priority rules |
 | **Multi-Intersection Control** | Coordinated signals and green waves across neighbouring intersections |
 | **Reinforcement Learning** | Hybrid optimisation combining LLM agents with RL |
-| **Evaluation Automation** | Automatic collection of mean speed, queue length, throughput and other metrics |
+| **Evaluation Automation** | Run the multi-seed comparison and confidence intervals straight from the on-screen A/B check |
 
 ---
 
