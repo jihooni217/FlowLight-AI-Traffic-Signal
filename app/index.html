@@ -501,6 +501,8 @@ input[type="range"]:disabled { opacity: 0.35; }
 
     <!-- 녹화 재생용 실제 Solar Pro 4 응답 기록. 없어도 페이지는 동작한다(서버 연결 실패만 표시). -->
     <script src="replay_data.js"></script>
+    <!-- 서버 없이 실데이터 프로파일 모드를 쓰기 위한 내장 수요 데이터 (GET /api/traffic/profile 과 같은 내용). -->
+    <script src="profile_data.js"></script>
     <script>
 // ===== Constants =====
 var MIN_GAP = 5;
@@ -514,6 +516,11 @@ var COL_YELLOW = '#eab308';
 var COL_RED = '#ef4444';
 var COL_LEFT_ARROW = '#22c55e';   // 한국 4색 신호등의 좌회전 등은 녹색 화살표 (보라색 아님)
 var API_BASE = 'http://127.0.0.1:8000';   // FastAPI 백엔드 (Agent 스트림, 교통 수요 프로파일)
+// 공개 데모(GitHub Pages 처럼 localhost 가 아닌 주소)에서는 백엔드를 부르지 않는다. 방문자 PC 의 127.0.0.1 로 요청하면
+// 브라우저가 로컬 네트워크 접근 권한을 묻거나 막기 때문이다. 대신 내장 프로파일(profile_data.js)과 녹화 재생을 쓴다.
+// 주소 끝에 ?hosted=1 을 붙이면 로컬에서도 같은 동작을 시험할 수 있다.
+var HOSTED_DEMO = /[?&]hosted=1(&|$)/.test(location.search) ||
+    (location.protocol !== 'file:' && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname));
 
 // ===== 녹화 재생 (서버 없이 체험) =====
 // replay_data.js 에 실제 Solar Pro 4 가 돌려준 SSE 이벤트가 시각과 함께 기록되어 있다.
@@ -2669,7 +2676,10 @@ SimController.prototype._initDOM = function() {
     async function runAIAnalysis(opts) {
         opts = opts || {};
         if (self.aiBusy) return;   // 분석이 진행 중이면 새 요청을 겹치지 않는다
-        if (opts.auto && document.getElementById('chk-replay') && document.getElementById('chk-replay').checked) return;
+        if (opts.auto && (HOSTED_DEMO || (document.getElementById('chk-replay') && document.getElementById('chk-replay').checked))) {
+            if (HOSTED_DEMO) document.getElementById('ai-state').textContent = "자동 재분석 건너뜀 (공개 데모)";
+            return;
+        }
         self.aiBusy = true;
         try { await analyzeOnce(opts); } finally { self.aiBusy = false; }
     }
@@ -2823,7 +2833,10 @@ SimController.prototype._initDOM = function() {
             if (opts.keyMissing) {
                 lt.textContent += "[안내] 서버에 UPSTAGE_API_KEY 가 없어 녹화된 응답을 재생합니다.\n";
             }
-            if (!(chkReplay && chkReplay.checked) && !opts.forceReplay) {
+            if (HOSTED_DEMO) {
+                lt.textContent += "[공개 데모] 이 페이지는 서버 없이 동작하므로 녹화된 응답을 재생합니다. 실제 Solar Pro 4 호출은 저장소를 내려받아 API 키를 넣고 실행하면 볼 수 있습니다.\n";
+            }
+            if (!(chkReplay && chkReplay.checked) && !opts.forceReplay && !HOSTED_DEMO) {
                 try {
                     response = await fetch(API_BASE + '/api/agent/stream', {
                         method: 'POST',
@@ -3084,6 +3097,21 @@ SimController.prototype._initDOM = function() {
     document.getElementById('btn-help').onclick = showHelp;
     document.getElementById('btn-close-help').onclick = hideHelp;
     document.getElementById('btn-help-start').onclick = hideHelp;
+    // 공개 데모: 녹화 재생을 고정하고, 사용법 안내 맨 위에 무엇이 다른지 적는다.
+    if (HOSTED_DEMO) {
+        var chkR = document.getElementById('chk-replay');
+        chkR.checked = true; chkR.disabled = true;
+        var note = document.createElement('p');
+        note.className = 'hint';
+        note.id = 'hosted-note';
+        note.innerHTML = '<b>공개 데모 페이지</b> · 설치 없이 바로 체험합니다. 실데이터 프로파일은 내장 데이터로 열리고, ' +
+            'AI 분석은 기록해 둔 <b>실제 Solar Pro 4 응답을 재생</b>합니다. 직접 호출하려면 ' +
+            '<a href="https://github.com/jihooni217/FlowLight-AI-Traffic-Signal" target="_blank" rel="noopener">저장소</a>를 내려받아 실행하세요.';
+        var helpBody = helpOverlay.querySelector('.help-body');
+        helpBody.insertBefore(note, helpBody.firstChild);
+        var optHint = chkR.closest('label').nextElementSibling;
+        if (optHint) optHint.textContent = '공개 데모에서는 서버 없이 녹화된 실제 응답을 재생합니다. 시간대 자동 재분석은 동작하지 않습니다.';
+    }
     var helpSeen = false;
     try { helpSeen = localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch (e) {}
     if (!helpSeen) showHelp();
@@ -3670,18 +3698,28 @@ function nextArrivalGap(rate) {
 SimController.prototype.loadTrafficProfile = async function() {
     var metaEl = document.getElementById('demand-profile-meta');
     metaEl.textContent = '프로파일 불러오는 중...';
+    var bundled = window.FLOWLIGHT_PROFILE || null;
+    var source = 'server';
     try {
+        if (HOSTED_DEMO) throw new Error('공개 데모');
         var resp = await fetch(API_BASE + '/api/traffic/profile');
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         this.profile = await resp.json();
     } catch (err) {
-        this.profile = null;
-        metaEl.textContent = '프로파일을 불러오지 못했습니다: ' + err.message + ' (FastAPI 서버가 켜져 있는지 확인)';
-        return false;
+        // 서버가 없으면 같은 내용을 담은 내장 데이터로 연다. 내장 데이터도 없을 때만 실패로 처리한다.
+        if (!bundled) {
+            this.profile = null;
+            metaEl.textContent = '프로파일을 불러오지 못했습니다: ' + err.message + ' (FastAPI 서버가 켜져 있는지 확인)';
+            return false;
+        }
+        this.profile = JSON.parse(JSON.stringify(bundled));
+        source = 'bundled';
     }
+    this.profileSource = source;
     var m = this.profile.meta;
     metaEl.textContent = m.site_name + ' · ' + m.date + ' (' + m.weekday + ') · 차로 N' + m.lanes.N +
-        '/S' + m.lanes.S + '/E' + m.lanes.E + '/W' + m.lanes.W + ' · ' + m.approach_naming;
+        '/S' + m.lanes.S + '/E' + m.lanes.E + '/W' + m.lanes.W + ' · ' + m.approach_naming +
+        (source === 'bundled' ? ' · 서버 없이 내장 데이터 사용' : '');
     var hours = this.profile.available_hours;
     var slider = document.getElementById('sim-demand-hour');
     slider.min = Math.min.apply(null, hours);
