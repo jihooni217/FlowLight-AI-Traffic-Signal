@@ -232,7 +232,7 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
   - Congestion multiplier (×1 to 5, demo only): real peak demand leaves a single intersection fairly quiet, so this slider scales the size of the demand while keeping the ratio between directions. Spawn rate = per-lane arrival rate × lanes × multiplier. It is sent to the agents as `demand.demo_scale` so they know it is a demo multiplier
 - The AI plan is applied with the four-phase cycle, a green wave and actuated phases (see above). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
-- A five-step usage guide appears on first launch and can be reopened from the sidebar
+- A six-step usage guide appears on first launch and can be reopened from the sidebar
 - Recorded replay: without an API key, or when the backend is unreachable, a stored real Solar Pro 4 response is replayed and the report says so (see Getting started)
 - Intersection type, data export, and the built-in Webster optimiser with a seeded A/B harness (independent of the LLM) live under the collapsed "Advanced settings" section
 
@@ -378,9 +378,9 @@ Open `app/index.html` directly in a browser. It calls the backend at `http://127
 
 ### 6. Walk through the demo
 
-1. On first launch a five-step **usage guide** appears. Read it and press "Start". The sidebar button reopens it any time.
+1. On first launch a six-step **usage guide** appears. Read it and press "Start". The sidebar button reopens it any time.
 2. Press **Play** to start the simulation. 4x speed is comfortable to watch.
-3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. Real demand leaves the screen fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection. Switch on **re-analyse when the hour changes** and change the hour (or turn on auto advance) to have the plan rebuilt for every hour.
+3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. At ×1 demand the screen stays fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection. Switch on **re-analyse when the hour changes** and change the hour (or turn on auto advance) to have the plan rebuilt for every hour.
 4. Press **AI analysis**. The left panel shows the five steps as they run, and the report shows each agent's real output, the Guardrail correction and the evaluation reasoning.
 5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 simulated seconds the before/after effect is shown.
 6. To see the pedestrian side, raise the **pedestrians (per second)** slider to 1. Analyse while a child, an elderly person or a wheelchair user is waiting at a crosswalk: the pedestrian green comes back as 10 s or more, and after applying you see a pedestrian-only phase with every car stopped. With nobody waiting it comes back as 0 s and the phase disappears.
