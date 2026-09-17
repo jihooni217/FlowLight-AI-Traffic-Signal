@@ -39,7 +39,7 @@ FlowLight는 고정 시간 신호 대신 **LLM Agent 세 개**가 교통 상황�
 LLM 출력은 **Structured Outputs(JSON Schema)** 로 형식이 강제되고, **Guardrail**(규칙 기반 안전 장치)을 거친 뒤에만 시뮬레이터에 적용되며,
 FastAPI + SSE(Server-Sent Events)로 AI의 의사결정 과정을 단계별로 실시간 확인할 수 있습니다.
 
-이 저장소는 Upstage 공식 Demo/튜토리얼로 발전시키는 중이며, 다음 원칙을 따릅니다.
+이 저장소는 Solar Pro 4 데모·튜토리얼로 정리하는 중이며, 다음 원칙을 따릅니다.
 
 - **시간당 교통량(volume)** 을 **차량 발생률(arrival rate)** 로 변환해 시뮬레이터에 차량을 만들고, **대기 차량 수(queue)** 는 시뮬레이터가 계산합니다.
   842대/시라는 교통량을 대기 차량 842대로 취급하지 않습니다.

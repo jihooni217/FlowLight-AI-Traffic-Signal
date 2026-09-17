@@ -39,7 +39,7 @@ It started from two ideas: **skip the pedestrian phase when nobody is at the cro
 Every LLM answer is forced into a fixed shape with **Structured Outputs (JSON Schema)**, passes through a rule-based **Guardrail**, and only then reaches the simulator.
 FastAPI streams each step over SSE (Server-Sent Events), so you can watch the decision being made.
 
-The repository is being turned into an official Upstage demo and tutorial. Two rules hold throughout:
+The repository is being shaped into a Solar Pro 4 demo and tutorial. Two rules hold throughout:
 
 - **Hourly traffic volume** is converted into a **vehicle arrival rate** that spawns cars in the simulator. The **queue** (waiting vehicles) is always a simulation result.
   A volume of 842 vehicles per hour is never treated as 842 waiting cars.
