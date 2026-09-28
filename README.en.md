@@ -312,9 +312,11 @@ FlowLight-AI-Traffic-Signal
 │   └── fetch_seoul_traffic.py      # downloads measured counts from the Seoul open data API into a new data/ profile
 ├── .github/workflows/pages.yml     # public demo deployment (the three static files only)
 ├── data
-│   ├── README.md                   # data source, column mapping, synthetic sample formula, replacement steps
-│   ├── sample_seoul_traffic_history.csv
-│   └── sample_seoul_traffic_history.meta.json
+│   ├── README.md                   # data source, column mapping, synthetic sample formula, how to download measured data
+│   ├── sample_seoul_traffic_history.csv        # synthetic sample (default profile; every experiment and recording uses it)
+│   ├── sample_seoul_traffic_history.meta.json
+│   ├── seoul_sungnyemun_20260916.csv           # measured: four sites around Sungnyemun, Seoul, one day (2026-09-16)
+│   └── seoul_sungnyemun_20260916.meta.json
 ├── tests                           # 270 tests (269 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
@@ -381,7 +383,7 @@ Open `app/index.html` directly in a browser. It calls the backend at `http://127
 
 1. On first launch a six-step **usage guide** appears. Read it and press "Start". The sidebar button reopens it any time.
 2. Press **Play** to start the simulation. 4x speed is comfortable to watch.
-3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. At ×1 demand the screen stays fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection. Switch on **re-analyse when the hour changes** and change the hour (or turn on auto advance) to have the plan rebuilt for every hour.
+3. In **Traffic demand input** on the sidebar, choose *real-data profile*. The grid switches to 3x3 and cars are spawned from the per-approach demand of the selected hour (0 to 23). The default is the 08:00 peak. Lane counts follow the data: 3 north-south, 2 east-west. Pick the Sungnyemun measured profile (서울 숭례문 일대 실측, 2026-09-16) in the data picker above to switch to counts that were really measured. At ×1 demand the screen stays fairly quiet, so raise the **congestion multiplier** slider to about ×3 to see a busy intersection. Switch on **re-analyse when the hour changes** and change the hour (or turn on auto advance) to have the plan rebuilt for every hour.
 4. Press **AI analysis**. The left panel shows the five steps as they run, and the report shows each agent's real output, the Guardrail correction and the evaluation reasoning.
 5. If the final decision is auto apply, the signals change on their own. Otherwise use **Apply recommended values**. After 15 simulated seconds the before/after effect is shown.
 6. To see the pedestrian side, raise the **pedestrians (per second)** slider to 1. Analyse while a child, an elderly person or a wheelchair user is waiting at a crosswalk: the pedestrian green comes back as 10 s or more, and after applying you see a pedestrian-only phase with every car stopped. With nobody waiting it comes back as 0 s and the phase disappears.
@@ -500,7 +502,7 @@ Captured on the current version (Solar Pro 4, 2 to 3 lanes per direction, 30 s c
 
 ## Real-data profile mode
 
-The grid becomes a 3x3 network, and per-approach demand (input) and queue (simulation result) sit side by side in one table.
+The grid becomes a 3x3 network, and per-approach demand (input) and queue (simulation result) sit side by side in one table. The screens below have the measured Sungnyemun profile selected in the "data" picker.
 
 | Profile mode | Demand · arrival rate · entered · lost · queue per approach |
 |---|---|
@@ -577,7 +579,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 - Automatic re-analysis only reacts to hour changes. A big change in demand within the same hour keeps the old plan, and for 20 s after a change the road still holds cars from the previous hour, so the plan can come out similar.
 - When actuation makes cycle lengths differ between intersections, the green-wave offsets drift. Per-intersection plans are left as an extension idea.
 - In manual mode, applying an AI plan still halves the spawn rate for 120 s as a relief measure. This is disabled in profile mode.
-- The sample data is a **synthetic example** that follows the column layout of the real dataset. Steps for swapping in real data are in `data/README.md`.
+- The default profile (synthetic sample) follows the column layout of the real dataset, and every experiment and recording above used it. A measured profile (around Sungnyemun, Seoul, 2026-09-16) can be chosen from the "data" picker, but the sites are road cross-sections rather than the four legs of one intersection, and approaches with 4 or 5 lanes are simulated with 3 lanes only. Details are in `data/README.md`.
 - The congestion multiplier (`demo_scale`) is a demo device. The agent input carries a `note` saying the demand is scaled. Turn ratios (`turn_ratio`) are not read from data yet; the simulator picks turns at random.
 
 ---
@@ -586,7 +588,7 @@ Problem statement, agent design, architecture, experiment results and retrospect
 
 | Area | Description |
 |------------------|-------------|
-| **Real Traffic Data** | Wire up a real public data file, turn ratios (`turn_ratio`) |
+| **Real Traffic Data** | More measured days and sites, turn ratios (`turn_ratio`) |
 | **Re-planning** | Re-analyse on other changes too, such as a sudden saturation jump or a vulnerable user arriving |
 | **Roundabout Scenario** | Roundabout flow and priority rules |
 | **Multi-Intersection Control** | Coordinated signals and green waves across neighbouring intersections |
