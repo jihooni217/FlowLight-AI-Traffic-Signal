@@ -186,6 +186,47 @@ class TestProfileConfig:
 
 
 # ==========================================================================
+# Several profiles: GET /api/traffic/profiles and ?profile=<id>
+# ==========================================================================
+class TestProfileSelection:
+    def test_list_includes_the_sample_as_default(self, client):
+        body = client.get("/api/traffic/profiles").json()
+        ids = [p["id"] for p in body["profiles"]]
+        assert body["default"] == "sample_seoul_traffic_history"
+        assert "sample_seoul_traffic_history" in ids
+        sample = next(p for p in body["profiles"] if p["id"] == body["default"])
+        assert sample["default"] is True and sample["file"] == SAMPLE_META.name
+        assert sample["date"] == "20250514" and sample["site_name"]
+
+    def test_every_listed_profile_loads(self, client):
+        for p in client.get("/api/traffic/profiles").json()["profiles"]:
+            resp = client.get("/api/traffic/profile", params={"profile": p["id"]})
+            assert resp.status_code == 200, p
+            assert resp.json()["meta"]["profile_file"] == p["file"]
+
+    def test_selecting_the_default_id_equals_the_plain_request(self, client):
+        plain = client.get("/api/traffic/profile").json()
+        picked = client.get("/api/traffic/profile", params={"profile": "sample_seoul_traffic_history"}).json()
+        assert plain == picked
+
+    def test_unknown_profile_is_404(self, client):
+        resp = client.get("/api/traffic/profile", params={"profile": "no_such_profile"})
+        assert resp.status_code == 404
+
+    @pytest.mark.parametrize("bad", ["../sample_seoul_traffic_history", "a/b", "x.meta.json", "한글"])
+    def test_profile_id_cannot_leave_the_data_folder(self, client, bad):
+        resp = client.get("/api/traffic/profile", params={"profile": bad})
+        assert resp.status_code == 400
+
+    def test_env_default_outside_data_folder_is_listed_first(self, client, tmp_path, monkeypatch):
+        monkeypatch.setenv("TRAFFIC_PROFILE_META", str(_write_partial_day_profile(tmp_path)))
+        body = client.get("/api/traffic/profiles").json()
+        assert body["default"] == "partial"
+        assert body["profiles"][0]["id"] == "partial" and body["profiles"][0]["default"] is True
+        assert client.get("/api/traffic/profile", params={"profile": "partial"}).json()["meta"]["site_id"] == "P-X"
+
+
+# ==========================================================================
 # Existing pipeline untouched
 # ==========================================================================
 class TestPipelineUnaffected:

@@ -227,7 +227,7 @@ AI 적용 전의 기본 신호는 고정 시간표(4현시, 주기에서 황색�
 - 방향당 차로 수 1~3(기본 2, 슬라이더). 2차로 이상이면 좌회전 전용 차로와 보호 좌회전, 차로별 차간 거리 계산. 기본 주기 30초
 - **교통 수요 입력 모드**
   - 수동: 교통량 슬라이더(네트워크 전체 대/초)로 무작위 진입로에 차량 생성
-  - 실데이터 프로파일: 백엔드 프로파일의 접근로별 발생률로 3x3 교차로의 N/S/E/W 진입로에 Poisson 도착 생성, 차로 수도 데이터대로(남북 3, 동서 2), 시간대 선택·자동 진행, 접근로별 수요·발생률·진입·손실·대기 표
+  - 실데이터 프로파일: 백엔드 프로파일의 접근로별 발생률로 3x3 교차로의 N/S/E/W 진입로에 Poisson 도착 생성, 차로 수도 데이터대로(남북 3, 동서 2), 시간대 선택·자동 진행, 접근로별 수요·발생률·진입·손실·대기 표. `data/` 에 프로파일이 둘 이상이면 "데이터" 선택 상자로 고름(`scripts/fetch_seoul_traffic.py` 로 실측 데이터 추가, `data/README.md` 참고)
   - 시간대가 바뀌면 AI 재분석(기본 꺼짐): 시간대가 바뀌고 20초 뒤 AI 분석을 한 번 다시 불러 계획을 바꿉니다. 분석이 진행 중이면 겹쳐 부르지 않고, 자동 호출에서는 리포트 창과 알림을 띄우지 않으며, 서버가 없으면 녹화를 재생하지 않고 건너뜁니다.
   - 혼잡 배율(×1~5, 데모용): 배율 ×1의 첨두 수요로는 교차로 하나에 차가 많지 않아, 방향별 비율은 그대로 두고 크기만 곱하는 슬라이더. 생성률 = 차로당 발생률 × 차로 수 × 배율. Agent에는 `demand.demo_scale`로 함께 보내 데모용 배율임을 알림
 - AI 계획은 4현시 유지·녹색파·감응 신호로 적용(위 절 참고). 적용 후 효과는 시뮬레이션 시간 15초 평균으로 측정하므로 배속을 걸면 그만큼 빨리 나옴
@@ -306,15 +306,16 @@ FlowLight-AI-Traffic-Signal
 │   ├── traffic_data.py             # 공공 교통량 CSV → 정규화 프로파일 → 발생률
 │   ├── index.html                  # 시뮬레이터 + UI + 백엔드 연동 (브라우저로 여는 파일)
 │   ├── replay_data.js              # 녹화 재생용 실제 Solar Pro 4 응답 기록 (서버 없이 체험)
-│   └── profile_data.js             # 내장 교통 수요 프로파일 (/api/traffic/profile 과 같은 내용)
+│   └── profile_data.js             # 내장 교통 수요 프로파일 (/api/traffic/profiles, /api/traffic/profile 과 같은 내용)
 ├── scripts
-│   └── build_profile_data.py       # profile_data.js 다시 만들기
+│   ├── build_profile_data.py       # profile_data.js 다시 만들기
+│   └── fetch_seoul_traffic.py      # 서울 열린데이터광장 API 로 실측 교통량을 받아 data/ 에 프로파일 추가
 ├── .github/workflows/pages.yml     # 공개 데모 배포 (정적 파일 세 개만)
 ├── data
 │   ├── README.md                   # 데이터 출처, 컬럼 매핑, 합성 예제 공식, 교체 절차
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 252개 (mock 251 + live 1, live 는 opt-in)
+├── tests                           # 270개 (mock 269 + live 1, live 는 opt-in)
 ├── docs
 │   ├── screens/                    # UI 화면 (사용법, 메인, 프로파일 모드, 진행 패널, 리포트, 적용, 보행 전용 현시, 녹화 재생, 고급 설정)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -409,7 +410,8 @@ API 키가 없어도 흐름 전체를 볼 수 있습니다. **AI 분석**을 누
 | 메서드·경로 | 설명 |
 |---|---|
 | `GET /` | 헬스 체크 |
-| `GET /api/traffic/profile` | 정규화된 수요 프로파일. `meta`, `available_hours`, `hours[{hour, volume, arrival_rate_per_sec}]`. `?hour=8`로 한 시간대만 조회 (범위 밖 400, 없는 시간 404) |
+| `GET /api/traffic/profiles` | 쓸 수 있는 수요 프로파일 목록 (`data/*.meta.json`)과 기본값 |
+| `GET /api/traffic/profile` | 정규화된 수요 프로파일. `meta`, `available_hours`, `hours[{hour, volume, arrival_rate_per_sec}]`. `?hour=8`로 한 시간대만 조회 (범위 밖 400, 없는 시간 404), `?profile=<id>`로 다른 프로파일 선택 (없으면 404) |
 | `POST /api/agent/stream` | 시뮬레이션 상태 JSON → SSE로 Agent 파이프라인 진행·결과 |
 | `GET /api/agent/stream` | 내장 mock 상태로 같은 파이프라인 실행 (테스트용) |
 
@@ -458,7 +460,7 @@ API 키가 없어도 흐름 전체를 볼 수 있습니다. **AI 분석**을 누
 python -m pytest -q
 ```
 
-- 기본 실행은 Solar API를 호출하지 않습니다(클라이언트를 mock). 현재 251개 통과, 1개는 live로 스킵됩니다.
+- 기본 실행은 Solar API를 호출하지 않습니다(클라이언트를 mock). 현재 269개 통과, 1개는 live로 스킵됩니다.
 - 실제 API를 부르는 테스트는 opt-in입니다.
 
 ```bash
@@ -480,6 +482,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_no_api_key.py` | 키 없이 서버가 켜지는지, Upstage 를 부르지 않고 `no_api_key` 를 보내는지, 화면이 녹화 재생으로 넘어가는지 |
 | `test_render_and_ab.py` | 차로 수가 다른 도로의 인도 모서리 그리기, A/B 검증에서 Webster 권장값이 감응 모드에 덮이지 않는지 |
 | `test_hourly_reanalysis.py` | 시간대 변경 시 자동 재분석의 예약·중복 방지·조용한 실행 배선 |
+| `test_fetch_seoul_traffic.py` | 열린데이터광장 응답을 로더 형식 CSV 로 바꾸는 수집 스크립트 (네트워크 없이 응답 형식만 검사) |
 
 ---
 

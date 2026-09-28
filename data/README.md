@@ -17,6 +17,15 @@
 | `sample_seoul_traffic_history.csv` | 데모용 **합성 예제**. 컬럼 구조는 아래 실제 데이터셋과 동일 |
 | `sample_seoul_traffic_history.meta.json` | 위 CSV 를 읽는 방법(지점→접근로 매핑, 날짜, 유입/유출 선택, 출처) |
 
+## 프로파일 여러 개
+
+이 폴더의 `*.meta.json` 은 모두 프로파일로 잡힌다. 백엔드 `GET /api/traffic/profiles` 가 목록을 주고,
+`GET /api/traffic/profile?profile=<id>` 로 하나를 고른다(`<id>` = 메타 파일 이름에서 `.meta.json` 을 뺀 것).
+화면의 실데이터 프로파일 패널에는 프로파일이 둘 이상일 때 "데이터" 선택 상자가 나타난다.
+기본 프로파일은 `sample_seoul_traffic_history` 이고, 환경 변수 `TRAFFIC_PROFILE_META` 로 바꿀 수 있다.
+메타 파일을 추가하거나 고치면 `python scripts/build_profile_data.py` 로 내장 데이터(`app/profile_data.js`)를 다시 만든다.
+서버 없이 열었을 때와 공개 데모 페이지는 그 내장 데이터로 같은 선택 상자를 보여 준다.
+
 ## 데이터가 흘러가는 길
 
 1. `app/traffic_data.py` 의 `load_profile_from_meta()` 가 메타 파일을 읽어 `TrafficProfile` 로 정규화한다.
@@ -74,9 +83,35 @@
 - 차로 분배: `V // lanes` 를 기본으로 하고 나머지를 앞 차로부터 1대씩 더한다
 - 따라서 08시 유입 합계는 정확히 N 842 / S 790 / E 610 / W 655 이다
 
-## 실제 데이터로 교체하는 방법
+## 실측 데이터 받기 (`scripts/fetch_seoul_traffic.py`)
 
-1. 공공데이터포털에서 위 데이터셋을 받아 CSV 로 저장한다. 인코딩이 `cp949` 이면 `meta.json` 의 `encoding` 을 바꾼다.
+공공데이터포털의 위 데이터셋은 서울 열린데이터광장 API 로 연결되어 있다 (서비스 이름 `VolInfo` = 교통량 이력, `SpotInfo` = 지점 정보,
+호출 형식 `http://openapi.seoul.go.kr:8088/{인증키}/xml/VolInfo/1/1000/{지점번호}/{YYYYMMDD}/{HH}/`).
+인증키는 data.seoul.go.kr 에 가입해 "인증키 신청"을 누르면 바로 나온다. 키는 `.env` 에 `SEOUL_OPENAPI_KEY=...` 로 두고 저장소에 올리지 않는다.
+
+```bash
+# 지점 목록. 이름으로 거르거나, GRS80 TM 좌표에서 가까운 순으로 본다
+python scripts/fetch_seoul_traffic.py spots --grep 대교
+python scripts/fetch_seoul_traffic.py spots --near 203000 445000 --k 12
+
+# 접근로 4개에 지점을 붙여 하루치를 받는다 (지점 4개 × 24시간 = 96번 호출, 1분 안팎)
+python scripts/fetch_seoul_traffic.py fetch --date 20240515 \
+    --spot N=A-01 --spot S=A-02 --spot E=B-01 --spot W=B-02 \
+    --name "서울 ○○ (실측)" --out data/seoul_xx_20240515.csv
+python scripts/build_profile_data.py
+python -m pytest -q
+```
+
+`fetch` 는 로더가 읽는 형식 그대로 CSV 를 쓰고 같은 이름의 `.meta.json` 을 만든 뒤, 그 메타로 프로파일을 읽어 08시 표를 출력한다.
+API 의 `io_type` 코드는 `1 → 유입`, `2 → 유출` 로 적는다. 어느 쪽을 접근 교통으로 볼지는 메타의 `flow_type` 으로 바꿀 수 있다.
+
+주의: 이 데이터의 지점은 "월드컵대교", "올림픽대로"처럼 **도로 단면**이라, 한 교차로의 접근로 4개가 그대로 있지는 않다.
+서로 가까운 지점 4개를 골라 한 교차로의 접근로로 쓰는 것이므로, 프로파일 이름(`--name`)에 어느 지점을 어떻게 묶었는지 적어 둔다.
+
+## 직접 받은 CSV 를 쓰는 방법
+
+1. 위 데이터셋을 CSV 로 저장한다. 인코딩이 `cp949` 이면 `meta.json` 의 `encoding` 을 바꾼다.
 2. 교차로의 접근로 4개에 해당하는 `지점번호` 4개를 찾아 `site_to_approach` 에 적는다.
 3. 재생할 날짜를 `date` 에 적고, 차로 수를 데이터로 세지 않으려면 `lanes` 에 직접 적는다.
 4. `source`, `license` 를 실제 출처로 바꾼다.
+5. `python scripts/build_profile_data.py` 를 돌린다.

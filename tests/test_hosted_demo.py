@@ -13,11 +13,15 @@ ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / "app" / "index.html").read_text(encoding="utf-8")
 
 
-def _bundled_profile():
+def _bundled(name):
     text = (ROOT / "app" / "profile_data.js").read_text(encoding="utf-8")
-    m = re.search(r"window\.FLOWLIGHT_PROFILE\s*=\s*(\{.*\});\s*$", text, flags=re.S)
-    assert m, "profile_data.js 는 window.FLOWLIGHT_PROFILE = {...}; 형태여야 한다"
+    m = re.search(r"window\." + name + r"\s*=\s*(\{.*?\});\n(?=window\.|$)", text, flags=re.S)
+    assert m, f"profile_data.js 에 window.{name} = {{...}}; 가 있어야 한다"
     return json.loads(m.group(1))
+
+
+def _bundled_profile():
+    return _bundled("FLOWLIGHT_PROFILE")
 
 
 def test_bundled_profile_matches_backend_response(client, monkeypatch):
@@ -25,6 +29,23 @@ def test_bundled_profile_matches_backend_response(client, monkeypatch):
     resp = client.get("/api/traffic/profile")
     assert resp.status_code == 200
     assert _bundled_profile() == resp.json()
+
+
+def test_bundled_profile_list_and_data_match_backend(client, monkeypatch):
+    monkeypatch.delenv("TRAFFIC_PROFILE_META", raising=False)
+    listing = _bundled("FLOWLIGHT_PROFILE_LIST")
+    data = _bundled("FLOWLIGHT_PROFILE_DATA")
+    assert listing == client.get("/api/traffic/profiles").json()
+    assert set(data) == {p["id"] for p in listing["profiles"]}
+    for pid in data:
+        assert data[pid] == client.get("/api/traffic/profile", params={"profile": pid}).json()
+    assert data[listing["default"]] == _bundled_profile()
+
+
+def test_page_has_the_profile_picker():
+    assert 'id="sim-profile-source"' in HTML
+    assert "var bundledData = window.FLOWLIGHT_PROFILE_DATA || null;" in HTML
+    assert "'/api/traffic/profiles'" in HTML
 
 
 def test_page_loads_bundled_files():

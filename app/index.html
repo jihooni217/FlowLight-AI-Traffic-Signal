@@ -288,6 +288,10 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <label><input type="radio" name="dmode" value="profile"> 실데이터 프로파일 (교차로 1개, 3x3)</label>
                 </div>
                 <div id="demand-profile-box" class="mt-2" style="display:none">
+                    <div class="slider-group" id="profile-source-group" style="display:none">
+                        <label for="sim-profile-source">데이터:</label>
+                        <select id="sim-profile-source" style="width:100%"></select>
+                    </div>
                     <p class="hint" id="demand-profile-meta">프로파일 불러오는 중...</p>
                     <div class="slider-group">
                         <label>시간대: <span id="val-demand-hour">08</span>시</label>
@@ -2434,6 +2438,8 @@ function SimController() {
     // 교통 수요 입력 모드 (6-3): 'manual' = 교통량 슬라이더(기존), 'profile' = 백엔드 실데이터 프로파일
     this.demandMode = 'manual';
     this.profile = null;          // GET /api/traffic/profile 응답
+    this.profileList = null;      // GET /api/traffic/profiles 응답 (데이터 선택 상자)
+    this.profileId = null;        // 고른 프로파일 id (null 이면 서버 기본값)
     this.profileHour = 8;
     this.currentDemand = null;    // 선택된 시간대의 {hour, volume, arrival_rate_per_sec}
     this.approachEdges = null;    // {N:[edge], S:[edge], E:[edge], W:[edge]}
@@ -2590,6 +2596,12 @@ SimController.prototype._initDOM = function() {
         self.hourAcc = 0;
     };
     autoHourChk.onchange = function() { self.autoHour = autoHourChk.checked; self.hourAcc = 0; };
+    // 데이터 선택: 다른 프로파일을 고르면 다시 받아서 격자를 초기화한다 (차로 수와 발생률이 바뀐다).
+    document.getElementById('sim-profile-source').onchange = function() {
+        self.profileId = this.value;
+        self.profile = null;
+        setDemandMode('profile');
+    };
     var reanalyzeChk = document.getElementById('chk-hour-reanalyze');
     reanalyzeChk.onchange = function() { self.autoReanalyze = reanalyzeChk.checked; self.reanalyzeAt = null; };
     var scaleSlider = document.getElementById('sim-demand-scale');
@@ -3731,14 +3743,41 @@ function nextArrivalGap(rate) {
     return -Math.log(1 - rand()) / rate;           // 지수분포 (평균 1/rate 초)
 }
 
+// 프로파일 목록(GET /api/traffic/profiles)으로 "데이터" 선택 상자를 채운다. 하나뿐이면 상자를 숨긴다.
+SimController.prototype._fillProfileSelect = function(listing) {
+    var group = document.getElementById('profile-source-group');
+    var sel = document.getElementById('sim-profile-source');
+    if (!listing || !listing.profiles || listing.profiles.length === 0) { group.style.display = 'none'; return; }
+    if (!this.profileId) this.profileId = listing.default;
+    sel.innerHTML = '';
+    for (var i = 0; i < listing.profiles.length; i++) {
+        var p = listing.profiles[i];
+        var opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.site_name + (p.date ? ' · ' + p.date : '');
+        if (p.id === this.profileId) opt.selected = true;
+        sel.appendChild(opt);
+    }
+    group.style.display = listing.profiles.length > 1 ? '' : 'none';
+};
+
 SimController.prototype.loadTrafficProfile = async function() {
     var metaEl = document.getElementById('demand-profile-meta');
     metaEl.textContent = '프로파일 불러오는 중...';
     var bundled = window.FLOWLIGHT_PROFILE || null;
+    var bundledList = window.FLOWLIGHT_PROFILE_LIST || null;
+    var bundledData = window.FLOWLIGHT_PROFILE_DATA || null;
     var source = 'server';
     try {
         if (HOSTED_DEMO) throw new Error('공개 데모');
-        var resp = await fetch(API_BASE + '/api/traffic/profile');
+        if (!this.profileList) {
+            var lresp = await fetch(API_BASE + '/api/traffic/profiles');
+            if (!lresp.ok) throw new Error('HTTP ' + lresp.status);
+            this.profileList = await lresp.json();
+        }
+        this._fillProfileSelect(this.profileList);
+        var q = this.profileId ? '?profile=' + encodeURIComponent(this.profileId) : '';
+        var resp = await fetch(API_BASE + '/api/traffic/profile' + q);
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         this.profile = await resp.json();
     } catch (err) {
@@ -3748,7 +3787,10 @@ SimController.prototype.loadTrafficProfile = async function() {
             metaEl.textContent = '프로파일을 불러오지 못했습니다: ' + err.message + ' (FastAPI 서버가 켜져 있는지 확인)';
             return false;
         }
-        this.profile = JSON.parse(JSON.stringify(bundled));
+        this.profileList = bundledList;
+        this._fillProfileSelect(bundledList);
+        var picked = (bundledData && this.profileId && bundledData[this.profileId]) || bundled;
+        this.profile = JSON.parse(JSON.stringify(picked));
         source = 'bundled';
     }
     this.profileSource = source;
