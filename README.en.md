@@ -227,7 +227,7 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
 - 1 to 3 lanes per direction (default 2, slider). With two or more lanes: a dedicated left-turn lane, protected left turns and per-lane car following. Default cycle 30 s
 - **Demand input modes**
   - Manual: a network-wide veh/s slider spawns cars at random entry edges
-  - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, lane counts from the data (3 north-south, 2 east-west), hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles
+  - Real-data profile: 3x3 grid, Poisson arrivals on the N/S/E/W entry edges from the backend profile, lane counts from the data (3 north-south, 2 east-west), hour picker with auto advance, and a per-approach table of demand, arrival rate, entered, lost and queued vehicles. With more than one profile in `data/` a "data" picker appears (`scripts/fetch_seoul_traffic.py` adds measured counts; see `data/README.md`)
   - Re-analyse when the hour changes (off by default): 20 s after the hour changes the AI analysis runs once more and the plan is replaced. Runs never overlap, automatic runs open no report window or alert, and without a server they are skipped instead of replaying the recording.
   - Congestion multiplier (×1 to 5, demo only): peak demand at ×1 leaves a single intersection fairly quiet, so this slider scales the size of the demand while keeping the ratio between directions. Spawn rate = per-lane arrival rate × lanes × multiplier. It is sent to the agents as `demand.demo_scale` so they know it is a demo multiplier
 - The AI plan is applied with the four-phase cycle, a green wave and actuated phases (see above). The after-apply effect is averaged over 15 simulated seconds, so a higher speed multiplier shows it sooner
@@ -306,15 +306,16 @@ FlowLight-AI-Traffic-Signal
 │   ├── traffic_data.py             # public traffic CSV → normalised profile → arrival rates
 │   ├── index.html                  # simulator + UI + backend client (open this in a browser)
 │   ├── replay_data.js              # recorded real Solar Pro 4 response for the no-server replay
-│   └── profile_data.js             # bundled demand profile (same content as /api/traffic/profile)
+│   └── profile_data.js             # bundled demand profiles (same content as /api/traffic/profiles and /api/traffic/profile)
 ├── scripts
-│   └── build_profile_data.py       # rebuilds profile_data.js
+│   ├── build_profile_data.py       # rebuilds profile_data.js
+│   └── fetch_seoul_traffic.py      # downloads measured counts from the Seoul open data API into a new data/ profile
 ├── .github/workflows/pages.yml     # public demo deployment (the three static files only)
 ├── data
 │   ├── README.md                   # data source, column mapping, synthetic sample formula, replacement steps
 │   ├── sample_seoul_traffic_history.csv
 │   └── sample_seoul_traffic_history.meta.json
-├── tests                           # 252 tests (251 mocked + 1 live, live is opt-in)
+├── tests                           # 270 tests (269 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -409,7 +410,8 @@ With a server and a key you can still pick the replay via the "replay without se
 | Method · path | Description |
 |---|---|
 | `GET /` | Health check |
-| `GET /api/traffic/profile` | Normalised demand profile: `meta`, `available_hours`, `hours[{hour, volume, arrival_rate_per_sec}]`. `?hour=8` returns one hour (400 out of range, 404 missing) |
+| `GET /api/traffic/profiles` | Available demand profiles (`data/*.meta.json`) and the default |
+| `GET /api/traffic/profile` | Normalised demand profile: `meta`, `available_hours`, `hours[{hour, volume, arrival_rate_per_sec}]`. `?hour=8` returns one hour (400 out of range, 404 missing); `?profile=<id>` picks another profile (404 if unknown) |
 | `POST /api/agent/stream` | Simulation state JSON → agent pipeline progress and result over SSE |
 | `GET /api/agent/stream` | Same pipeline on a built-in mock state (for testing) |
 
@@ -458,7 +460,7 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 python -m pytest -q
 ```
 
-- The default run never calls the Solar API (the client is mocked). Currently 251 pass and 1 is skipped as live.
+- The default run never calls the Solar API (the client is mocked). Currently 269 pass and 1 is skipped as live.
 - The live API test is opt-in.
 
 ```bash
@@ -480,6 +482,7 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_no_api_key.py` | The server starts without a key, Upstage is not called, `no_api_key` is sent, and the page falls back to the replay |
 | `test_render_and_ab.py` | Sidewalk corners where roads with different lane counts meet; Webster values in the A/B check are not overwritten by actuation |
 | `test_hourly_reanalysis.py` | Hourly re-analysis: scheduling, no overlap, quiet automatic runs |
+| `test_fetch_seoul_traffic.py` | The download script that turns Seoul open data API responses into loader-format CSV (response shape only, no network) |
 
 ---
 

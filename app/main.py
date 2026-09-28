@@ -1,6 +1,7 @@
 import logging
 import json
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 from fastapi import FastAPI
@@ -99,6 +100,57 @@ def traffic_profile_meta_path() -> Path:
     return Path(os.getenv("TRAFFIC_PROFILE_META") or DEFAULT_TRAFFIC_PROFILE_META)
 
 
+PROFILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def profile_id_of(meta_path: Path) -> str:
+    """data/<id>.meta.json 의 <id>. 화면의 데이터 선택과 ?profile= 인자에 쓴다."""
+    name = meta_path.name
+    return name[: -len(".meta.json")] if name.endswith(".meta.json") else meta_path.stem
+
+
+def _profile_entry(meta_path: Path, default_id: str) -> dict:
+    try:
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        meta = {}
+    pid = profile_id_of(meta_path)
+    return {
+        "id": pid,
+        "file": meta_path.name,
+        "site_name": meta.get("site_name", pid),
+        "date": meta.get("date"),
+        "default": pid == default_id,
+    }
+
+
+def list_traffic_profiles() -> dict:
+    """data/*.meta.json 을 모두 나열한다. 기본 프로파일(환경 변수 포함)이 그 폴더 밖에 있으면 목록에 덧붙인다."""
+    default_path = traffic_profile_meta_path()
+    default_id = profile_id_of(default_path)
+    paths = sorted(DEFAULT_TRAFFIC_PROFILE_META.parent.glob("*.meta.json"))
+    if default_path.resolve() not in [p.resolve() for p in paths] and default_path.exists():
+        paths.insert(0, default_path)
+    entries = [_profile_entry(p, default_id) for p in paths]
+    return {"default": default_id, "profiles": entries}
+
+
+def resolve_profile_meta(profile_id: str | None) -> Path:
+    """?profile=<id> 를 data/<id>.meta.json 으로 바꾼다. id 는 영문·숫자·-·_ 만 허용해 폴더 밖을 가리키지 못하게 한다."""
+    if profile_id is None or profile_id == "":
+        return traffic_profile_meta_path()
+    if not PROFILE_ID_RE.match(profile_id):
+        raise HTTPException(status_code=400, detail="profile 은 영문, 숫자, -, _ 만 쓸 수 있습니다.")
+    default_path = traffic_profile_meta_path()
+    if profile_id == profile_id_of(default_path):
+        return default_path
+    path = DEFAULT_TRAFFIC_PROFILE_META.parent / f"{profile_id}.meta.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"프로파일이 없습니다: {profile_id}")
+    return path
+
+
 @lru_cache(maxsize=4)
 def get_traffic_profile(meta_path: str):
     """메타 경로별로 한 번만 읽는다. 로드 실패는 캐시되지 않는다."""
@@ -126,9 +178,15 @@ def profile_to_payload(profile, hours, meta_file: str) -> dict:
     }
 
 
+@app.get("/api/traffic/profiles")
+def traffic_profiles():
+    """쓸 수 있는 수요 프로파일 목록. 화면의 데이터 선택 상자가 이 목록으로 채워진다."""
+    return list_traffic_profiles()
+
+
 @app.get("/api/traffic/profile")
-def traffic_profile(hour: str | None = None):
-    meta_path = traffic_profile_meta_path()
+def traffic_profile(hour: str | None = None, profile: str | None = None):
+    meta_path = resolve_profile_meta(profile)
     try:
         profile = get_traffic_profile(str(meta_path))
     except TrafficDataError as e:
