@@ -173,7 +173,17 @@ def fetch_day(key: str, spots: list, date: str, hours=range(24), getter=http_get
     return out
 
 
-def write_outputs(rows: list, mapping: dict, args) -> Path:
+def spot_names(key: str, spots: list, getter=http_get) -> dict:
+    """SpotInfo 에서 지점번호 → 지점명. 못 찾은 지점은 번호를 그대로 쓴다."""
+    try:
+        rows = fetch_all("SpotInfo", key, getter=getter)
+    except SeoulApiError:
+        rows = []
+    names = {r.get("spot_num", ""): r.get("spot_nm", "") for r in rows}
+    return {s: (names.get(s) or s) for s in spots}
+
+
+def write_outputs(rows: list, mapping: dict, args, names: dict | None = None) -> Path:
     out_csv = Path(args.out)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", encoding="utf-8-sig", newline="") as f:
@@ -192,6 +202,8 @@ def write_outputs(rows: list, mapping: dict, args) -> Path:
         "flow_type": "유입",
         "site_to_approach": mapping,
         "lanes": None,
+        # 화면의 표와 도로 끝 이름표에 쓰는 도로 이름 (지점명). 원하면 손으로 고쳐도 된다.
+        "approach_names": {approach: (names or {}).get(spot, spot) for spot, approach in mapping.items()},
         "source": (
             "서울특별시_교통량 이력 정보 (공공데이터포털 15056899 → 서울 열린데이터광장 VolInfo, 원천 TOPIS). "
             f"{args.date} 하루치를 scripts/fetch_seoul_traffic.py 로 받음. io_type 1→유입, 2→유출로 표기"
@@ -218,10 +230,11 @@ def verify(meta_path: Path, log=print):
 
 def cmd_fetch(args, getter=http_get):
     mapping = parse_spot_args(args.spot)
-    rows = fetch_day(api_key(), list(mapping), args.date, getter=getter)
+    key = api_key()
+    rows = fetch_day(key, list(mapping), args.date, getter=getter)
     if not rows:
         raise SeoulApiError("받은 행이 없습니다. 지점번호와 날짜를 확인하세요.")
-    meta_path = write_outputs(rows, mapping, args)
+    meta_path = write_outputs(rows, mapping, args, names=spot_names(key, list(mapping), getter=getter))
     print(f"wrote {args.out} ({len(rows)} 행), {meta_path.name}")
     verify(meta_path)
     print("다음: python scripts/build_profile_data.py 로 내장 데이터를 다시 만들고, python -m pytest -q 를 돌린다.")

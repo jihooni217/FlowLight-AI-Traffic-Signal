@@ -79,11 +79,13 @@ def test_written_csv_loads_through_the_project_loader(tmp_path, monkeypatch):
     ])
     mapping = fst.parse_spot_args(args.spot)
     rows = fst.fetch_day("k", list(mapping), args.date, hours=range(24), getter=_fake_getter(lanes), log=lambda *a: None)
-    meta_path = fst.write_outputs(rows, mapping, args)
+    meta_path = fst.write_outputs(rows, mapping, args, names={"A-01": "세종대로(시청역2)", "A-02": "세종대로(서울역)"})
     assert meta_path.name == "seoul_test.meta.json"
 
     profile = fst.verify(meta_path, log=lambda *a: None)
     assert profile.lanes == {"N": 3, "S": 3, "E": 2, "W": 2}       # 차로 수는 차로번호 종류 수로 센다
+    # 지점명이 있으면 도로 이름으로, 없으면 지점번호 그대로
+    assert profile.approach_names == {"N": "세종대로(시청역2)", "S": "세종대로(서울역)", "E": "B-01", "W": "B-02"}
     assert len(profile.hours) == 24
     hv = profile.hour(8)
     assert hv.volume["N"] == (100 + 8) + (200 + 8) + (300 + 8)      # 유입 행만 더한다

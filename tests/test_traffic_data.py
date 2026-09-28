@@ -156,7 +156,7 @@ class TestProfileStructure:
         p = self._profile()
         d = p.to_dict()
         assert set(d) == {"meta", "hours"}
-        assert set(d["meta"]) == {"site_id", "site_name", "date", "weekday", "source", "license", "unit", "lanes"}
+        assert set(d["meta"]) == {"site_id", "site_name", "date", "weekday", "source", "license", "unit", "lanes", "approach_names"}
         assert d["meta"]["weekday"] == "Wed"
         assert d["meta"]["unit"] == "veh_per_hour"
         assert set(d["hours"][0]) == {"hour", "volume"}
