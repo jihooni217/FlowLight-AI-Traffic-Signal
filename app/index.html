@@ -2407,6 +2407,86 @@ Renderer.prototype.render = function(network, jc, cam) {
     }
     
     ctx.restore();
+    this._drawDemandOverlay(cam || {x: 0, y: 0, scale: 1});
+};
+
+// 실데이터 프로파일 모드의 도로 이름표와 출처 배지. 카메라 배율과 상관없이 글자 크기를 지키려고 화면 좌표로 그린다.
+// 이름표는 격자 바깥, 진입로 끝에서 인도 반지름만큼 떨어진 자리에 두어 도로·차·신호등 위에 글자가 올라가지 않는다.
+// 옆에 자리가 없는 좁은 화면에서는 동·서 이름표를 한 줄짜리 세로 이름표로 바꾼다.
+Renderer.prototype._drawDemandOverlay = function(cam) {
+    var src = this.overlaySource;
+    var ov = src && src.demandOverlay ? src.demandOverlay() : null;
+    if (!ov) return;
+    var ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
+    var bg = 'rgba(30,41,59,0.92)', bd = 'rgba(148,163,184,0.55)', fg = '#e2e8f0', mute = '#94a3b8', chip = '#1d4ed8';
+    var pill = function(x, y, w, h, r) {
+        ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    };
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 1;
+    var LB = ov.leftBound || 0;                               // 이 선 왼쪽은 AI 패널이 덮고 있다
+    var labels = ov.labels || [];
+    for (var i = 0; i < labels.length; i++) {
+        var L = labels[i];
+        var sx = cam.x + L.x * cam.scale, sy = cam.y + L.y * cam.scale;
+        var gap = L.r * cam.scale + 10;                       // 인도 원 바깥 + 여백
+        var volTxt = L.volume != null ? L.volume.toLocaleString() + '대/시 ' + L.arrow : '';
+        ctx.font = '11px sans-serif';
+        var nameW = ctx.measureText(L.name).width;
+        ctx.font = '10px sans-serif';
+        var volW = volTxt ? ctx.measureText(volTxt).width : 0;
+        var pw = 8 + 24 + 6 + Math.max(nameW, volW) + 10, ph = volTxt ? 36 : 28;
+        var horizontal = true, cx = sx, cy = sy;
+        if (L.side === 'N') cy = sy - gap - ph / 2;
+        else if (L.side === 'S') cy = sy + gap + ph / 2;
+        else if (L.side === 'E') { horizontal = sx + gap + pw <= W - 4; cx = sx + gap + pw / 2; }
+        else { horizontal = sx - gap - pw >= LB + 4; cx = sx - gap - pw / 2; }
+        if (horizontal) {
+            cx = Math.max(LB + pw / 2 + 4, Math.min(W - pw / 2 - 4, cx));
+            cy = Math.max(ph / 2 + 4, Math.min(H - ph / 2 - 4, cy));
+            ctx.strokeStyle = bd; ctx.beginPath(); ctx.moveTo(sx, sy);
+            if (L.side === 'N') ctx.lineTo(sx, cy + ph / 2);
+            else if (L.side === 'S') ctx.lineTo(sx, cy - ph / 2);
+            else if (L.side === 'E') ctx.lineTo(cx - pw / 2, sy);
+            else ctx.lineTo(cx + pw / 2, sy);
+            ctx.stroke();
+            var x0 = cx - pw / 2, y0 = cy - ph / 2;
+            ctx.fillStyle = bg; ctx.strokeStyle = bd; pill(x0, y0, pw, ph, 6); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = chip; pill(x0 + 6, y0 + ph / 2 - 12, 24, 24, 4); ctx.fill();
+            ctx.fillStyle = '#eff6ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(L.side, x0 + 18, y0 + ph / 2 + 0.5);
+            ctx.textAlign = 'left'; ctx.fillStyle = fg; ctx.font = '11px sans-serif';
+            ctx.fillText(L.name, x0 + 38, y0 + (volTxt ? 12 : ph / 2 + 0.5));
+            if (volTxt) { ctx.fillStyle = mute; ctx.font = '10px sans-serif'; ctx.fillText(volTxt, x0 + 38, y0 + 25); }
+        } else {
+            var t = L.side + ' ' + L.name + (L.volume != null ? ' · ' + L.volume.toLocaleString() + '대/시' : '');
+            ctx.font = '11px sans-serif';
+            var tw = ctx.measureText(t).width + 16, th = 20;
+            var vx = L.side === 'E' ? Math.min(W - th / 2 - 4, sx + gap + th / 2) : Math.max(LB + th / 2 + 4, sx - gap - th / 2);
+            var vy = Math.max(tw / 2 + 4, Math.min(H - tw / 2 - 4, sy));
+            ctx.save();
+            ctx.translate(vx, vy); ctx.rotate(L.side === 'E' ? Math.PI / 2 : -Math.PI / 2);
+            ctx.fillStyle = bg; ctx.strokeStyle = bd; pill(-tw / 2, -th / 2, tw, th, 6); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.fillText(t, 0, 0.5);
+            ctx.restore();
+        }
+    }
+    if (ov.badge) {
+        ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+        var bx = LB + 10, bh = 22, by = H - bh - 8;
+        var base = ov.badge, maxW = W - bx - 10 - 26, n = base.length;
+        while (n > 4 && ctx.measureText(base.slice(0, n) + '…').width > maxW) n--;
+        var txt = n < base.length ? base.slice(0, n) + '…' : base;
+        var bw = ctx.measureText(txt).width + 26;
+        ctx.fillStyle = bg; ctx.strokeStyle = bd; pill(bx, by, bw, bh, 4); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = ov.measured ? '#22c55e' : '#94a3b8';
+        ctx.beginPath(); ctx.arc(bx + 11, by + bh / 2, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#cbd5e1'; ctx.fillText(txt, bx + 20, by + bh / 2 + 0.5);
+    }
+    ctx.restore();
 };
 
 // ===== SimController =====
@@ -2460,15 +2540,28 @@ SimController.prototype._initDOM = function() {
     var self = this;
     this.canvas = document.getElementById('sim-canvas');
     this.renderer = new Renderer(this.canvas);
+    this.renderer.overlaySource = this;      // 실데이터 모드의 도로 이름표·출처 배지 데이터
 
     // 격자가 화면보다 크면(휴대폰 등) 화면에 맞게 줄이고, 넉넉하면 1배로 가운데 둔다.
+    // 실데이터 모드에서는 격자 둘레에 이름표(위·아래·옆)와 출처 배지(아래) 자리를 먼저 비워 둔다.
     var fitCamera = function(rect) {
         var nw = (self.gridSize+1)*100, nh = (self.gridSize+1)*100;
-        var s = Math.min(1, (rect.width - 16) / nw, (rect.height - 16) / nh);
+        var ov = self.demandOverlay ? self.demandOverlay() : null;
+        var hasLabels = !!(ov && ov.labels && ov.labels.length);
+        // AI 패널이 도로 화면 왼쪽 위에 떠 있으면(넓은 화면) 그 오른쪽 남은 공간에 격자를 가운데 둔다.
+        // 남은 공간이 격자 절반도 안 되면 예전처럼 전체 가운데에 둔다 (노트북 폭에서 격자와 이름표가 패널에 가려지지 않게).
+        var left = ov ? (ov.leftBound || 0) : self._panelLeftBound();
+        if (left) left += 12;
+        var availW = rect.width - left;
+        if (availW < nw * 0.5 + 80) { left = 0; availW = rect.width; }
+        var mx = hasLabels ? (availW >= 720 ? 190 : 40) : 16;
+        var top = hasLabels ? 80 : 16;
+        var bottom = (hasLabels ? 80 : 16) + (ov ? 32 : 0);
+        var s = Math.min(1, (availW - 2 * mx) / nw, (rect.height - top - bottom) / nh);
         if (!(s > 0)) s = 1;
         self.cam.scale = s;
-        self.cam.x = (rect.width - nw * s) / 2;
-        self.cam.y = (rect.height - nh * s) / 2;
+        self.cam.x = left + (availW - nw * s) / 2;
+        self.cam.y = top + (rect.height - top - bottom - nh * s) / 2;
     };
     self.fitCamera = fitCamera;
     // 좁은 화면에서는 AI 패널이 도로를 가리지 않도록 도로 화면 아래로 옮기고, 넓어지면 원래 자리로 돌린다.
@@ -3974,7 +4067,16 @@ SimController.prototype._renderDemandTable = function() {
         var a = APPROACH_KEYS[k], st = this.demandSpawn[a];
         var row = document.getElementById('demand-row-' + a);
         if (!row) continue;
+        var roadName = this.profile.meta.approach_names && this.profile.meta.approach_names[a];
         row.cells[0].textContent = APPROACH_LABELS[a] + ' · ' + lanes[a] + '차로';
+        if (roadName) {   // 도로 이름이 있으면 둘째 줄에 작게. 한 줄로 두고 넘치면 말줄임표 (다른 칸의 머리글이 밀리지 않도록)
+            var small = document.createElement('small');
+            // width:0 + min-width:100% → 칸 너비를 넓히지 않고 칸 안에서만 한 줄로 채운다
+            small.style.cssText = 'display:block;color:var(--text-muted);font-size:0.82em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:0;min-width:100%';
+            small.textContent = roadName;
+            row.cells[0].title = roadName;
+            row.cells[0].appendChild(small);
+        }
         row.cells[1].textContent = this.currentDemand.volume[a];
         row.cells[2].textContent = st.rate.toFixed(3) + (this.demoScale > 1 ? '×' + this.demoScale : '');
         row.cells[3].textContent = st.recent.length;
@@ -3983,6 +4085,41 @@ SimController.prototype._renderDemandTable = function() {
     }
 };
 var APPROACH_LABELS = { N: 'N 북측', S: 'S 남측', E: 'E 동측', W: 'W 서측' };
+var APPROACH_ARROWS = { N: '↓', S: '↑', E: '←', W: '→' };   // 차가 교차로로 들어오는 방향
+
+// 도로 화면에 얹는 이름표·출처 배지 데이터. 실데이터 모드가 아니면 null.
+// 이름표는 프로파일 메타의 approach_names 가 있는 접근로에만 붙고(합성 예제에는 없음), 배지는 실데이터 모드면 늘 나온다.
+SimController.prototype.demandOverlay = function() {
+    if (this.demandMode !== 'profile' || !this.profile || !this.profile.meta) return null;
+    var m = this.profile.meta, names = m.approach_names || {};
+    var labels = [];
+    if (this.approachEdges) {
+        for (var k = 0; k < APPROACH_KEYS.length; k++) {
+            var a = APPROACH_KEYS[k];
+            var edges = this.approachEdges[a];
+            if (!names[a] || !edges || edges.length === 0) continue;
+            var e = edges[0];
+            labels.push({
+                side: a, name: names[a], arrow: APPROACH_ARROWS[a],
+                x: e.from.x, y: e.from.y, r: roadWidthOf(e) / 2 + 8,          // 인도 원 반지름 (월드 좌표)
+                volume: this.currentDemand ? this.currentDemand.volume[a] : null,
+            });
+        }
+    }
+    var measured = Object.keys(names).length > 0;
+    var badge = m.site_name + ' · ' + pad2(this.profileHour) + '시' + (measured && /TOPIS/.test(m.source || '') ? ' · 출처 TOPIS' : '');
+    return { labels: labels, badge: badge, measured: measured, leftBound: this._panelLeftBound() };
+};
+
+// 도로 화면 위에 떠 있는 AI 패널의 오른쪽 끝 (캔버스 좌표). 패널이 아래로 내려가 있으면(좁은 화면) 0.
+// 이름표·배지·격자는 이 선 오른쪽에 두어 패널에 가려지지 않게 한다.
+SimController.prototype._panelLeftBound = function() {
+    var panel = document.getElementById('ai-floating-panel');
+    if (!panel || panel.parentElement !== this.canvas.parentElement || panel.classList.contains('docked')) return 0;
+    var pr = panel.getBoundingClientRect(), cr = this.canvas.getBoundingClientRect();
+    if (!(pr.width > 0) || pr.right <= cr.left) return 0;
+    return Math.min(cr.width, pr.right - cr.left);
+};
 
 // ===== A/B 검증 하네스 =====
 // 도로망·제어 유형·신호 설정은 유지한 채 차량/시간/데이터만 초기화.

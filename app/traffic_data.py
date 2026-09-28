@@ -87,6 +87,22 @@ def _validate_approach_map(mapping, what: str, validator) -> dict:
     return {a: validator(mapping[a]) for a in APPROACHES}
 
 
+def validate_approach_names(names) -> dict:
+    """{접근로: 도로 이름}. 비어 있어도 되고, 일부 접근로만 있어도 된다. 이름은 빈 문자열이 아닌 문자열."""
+    if names is None:
+        return {}
+    if not isinstance(names, dict):
+        raise TrafficDataError("approach_names 는 {접근로: 이름} dict 여야 합니다.")
+    out = {}
+    for approach, name in names.items():
+        if approach not in APPROACHES:
+            raise TrafficDataError(f"approach_names 의 접근로가 올바르지 않습니다: {approach!r}")
+        if not isinstance(name, str) or not name.strip():
+            raise TrafficDataError(f"approach_names[{approach!r}] 는 빈 문자열이 아닌 문자열이어야 합니다.")
+        out[approach] = name.strip()
+    return out
+
+
 def validate_lanes_map(lanes) -> dict:
     return _validate_approach_map(lanes, "lanes", validate_lanes)
 
@@ -185,6 +201,7 @@ class TrafficProfile:
     hours: list = field(default_factory=list)   # [HourVolume, ...]
     weekday: str = ""            # 비우면 date 에서 계산
     unit: str = UNIT_VEH_PER_HOUR
+    approach_names: dict = field(default_factory=dict)   # {"N": "세종대로(시청역2)", ...} 화면 표시용 도로 이름. 없으면 빈 dict
 
     def __post_init__(self):
         if not str(self.site_id).strip():
@@ -196,6 +213,7 @@ class TrafficProfile:
         if self.unit != UNIT_VEH_PER_HOUR:
             raise TrafficDataError(f"unit 은 {UNIT_VEH_PER_HOUR!r} 만 지원합니다: {self.unit!r}")
         object.__setattr__(self, "lanes", validate_lanes_map(self.lanes))
+        object.__setattr__(self, "approach_names", validate_approach_names(self.approach_names))
         hours = [h if isinstance(h, HourVolume) else HourVolume(**h) for h in self.hours]
         if not hours:
             raise TrafficDataError("hours 가 비어 있습니다.")
@@ -247,6 +265,7 @@ class TrafficProfile:
                 "license": self.license,
                 "unit": self.unit,
                 "lanes": dict(self.lanes),
+                "approach_names": dict(self.approach_names),
             },
             "hours": [h.to_dict() for h in self.hours],
         }
@@ -269,6 +288,7 @@ class TrafficProfile:
             license=meta["license"],
             unit=meta.get("unit", UNIT_VEH_PER_HOUR),
             lanes=meta["lanes"],
+            approach_names=meta.get("approach_names") or {},
             hours=[HourVolume(**h) for h in data["hours"]],
         )
 
@@ -304,6 +324,7 @@ def load_seoul_traffic_history(
     encoding: str = "utf-8-sig",
     source: str = SEOUL_HISTORY_SOURCE,
     license: str = SEOUL_HISTORY_LICENSE,
+    approach_names: dict | None = None,
 ) -> TrafficProfile:
     """서울시 교통량 이력 정보 형식 CSV 를 읽어 한 교차로의 TrafficProfile 로 정규화한다.
 
@@ -396,6 +417,7 @@ def load_seoul_traffic_history(
         license=license,
         lanes=lanes,
         hours=hour_volumes,
+        approach_names=approach_names or {},
     )
 
 
@@ -438,6 +460,7 @@ def load_profile_from_meta(meta_path) -> TrafficProfile:
         "flow_type": meta.get("flow_type", "유입"),
         "date_filter": meta.get("date"),
         "encoding": meta.get("encoding", "utf-8-sig"),
+        "approach_names": meta.get("approach_names"),
     }
     if meta.get("source"):
         kwargs["source"] = meta["source"]

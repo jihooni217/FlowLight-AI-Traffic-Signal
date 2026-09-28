@@ -72,8 +72,9 @@ class TestProfileEndpoint:
         meta = client.get("/api/traffic/profile").json()["meta"]
         assert set(meta) == {
             "site_id", "site_name", "date", "weekday", "source", "license", "unit", "lanes",
-            "profile_file", "approach_naming", "note",
+            "approach_names", "profile_file", "approach_naming", "note",
         }
+        assert meta["approach_names"] == {}      # 합성 예제에는 도로 이름이 없다
         assert meta["site_id"] == "DEMO-X"
         assert meta["date"] == "20250514" and meta["weekday"] == "Wed"
         assert meta["unit"] == "veh_per_hour"

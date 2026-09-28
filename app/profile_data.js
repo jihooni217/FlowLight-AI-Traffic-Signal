@@ -17,6 +17,7 @@ window.FLOWLIGHT_PROFILE = {
    "E": 2,
    "W": 2
   },
+  "approach_names": {},
   "profile_file": "sample_seoul_traffic_history.meta.json",
   "approach_naming": "N = 북측에서 진입해 남쪽으로 향하는 차량 (S/E/W 도 같은 규칙)",
   "note": "volume_per_hour 는 입력 수요(대/시), arrival_rate_per_sec 는 시뮬레이터 차량 발생률(차로당 대/초)이다. 둘 다 현재 대기 차량 수(queue)가 아니다. queue 는 시뮬레이션이 계산한다."
@@ -445,6 +446,7 @@ window.FLOWLIGHT_PROFILE_DATA = {
     "E": 2,
     "W": 2
    },
+   "approach_names": {},
    "profile_file": "sample_seoul_traffic_history.meta.json",
    "approach_naming": "N = 북측에서 진입해 남쪽으로 향하는 차량 (S/E/W 도 같은 규칙)",
    "note": "volume_per_hour 는 입력 수요(대/시), arrival_rate_per_sec 는 시뮬레이터 차량 발생률(차로당 대/초)이다. 둘 다 현재 대기 차량 수(queue)가 아니다. queue 는 시뮬레이션이 계산한다."
@@ -852,6 +854,12 @@ window.FLOWLIGHT_PROFILE_DATA = {
     "S": 4,
     "E": 2,
     "W": 3
+   },
+   "approach_names": {
+    "N": "세종대로(시청역2)",
+    "S": "세종대로(서울역)",
+    "E": "퇴계로(회현역)",
+    "W": "서소문로(시청역)"
    },
    "profile_file": "seoul_sungnyemun_20260916.meta.json",
    "approach_naming": "N = 북측에서 진입해 남쪽으로 향하는 차량 (S/E/W 도 같은 규칙)",
