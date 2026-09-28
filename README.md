@@ -319,7 +319,7 @@ FlowLight-AI-Traffic-Signal
 │   ├── sample_seoul_traffic_history.meta.json
 │   ├── seoul_sungnyemun_20260916.csv           # 실측: 서울 숭례문 일대 4개 지점, 2026-09-16 하루치
 │   └── seoul_sungnyemun_20260916.meta.json
-├── tests                           # 270개 (mock 269 + live 1, live 는 opt-in)
+├── tests                           # 285개 (mock 284 + live 1, live 는 opt-in)
 ├── docs
 │   ├── screens/                    # UI 화면 (사용법, 메인, 프로파일 모드, 진행 패널, 리포트, 적용, 보행 전용 현시, 녹화 재생, 고급 설정)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -464,7 +464,7 @@ API 키가 없어도 흐름 전체를 볼 수 있습니다. **AI 분석**을 누
 python -m pytest -q
 ```
 
-- 기본 실행은 Solar API를 호출하지 않습니다(클라이언트를 mock). 현재 269개 통과, 1개는 live로 스킵됩니다.
+- 기본 실행은 Solar API를 호출하지 않습니다(클라이언트를 mock). 현재 284개 통과, 1개는 live로 스킵됩니다.
 - 실제 API를 부르는 테스트는 opt-in입니다.
 
 ```bash
@@ -487,6 +487,9 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_render_and_ab.py` | 차로 수가 다른 도로의 인도 모서리 그리기, A/B 검증에서 Webster 권장값이 감응 모드에 덮이지 않는지 |
 | `test_hourly_reanalysis.py` | 시간대 변경 시 자동 재분석의 예약·중복 방지·조용한 실행 배선 |
 | `test_fetch_seoul_traffic.py` | 열린데이터광장 응답을 로더 형식 CSV 로 바꾸는 수집 스크립트 (네트워크 없이 응답 형식만 검사) |
+| `test_approach_labels.py` | 접근로 도로 이름(`approach_names`)의 검증·직렬화·API 응답, 화면 이름표와 출처 배지 배선 |
+| `test_decor.py` | 배경 꾸밈의 기본값·끄기 스위치, 도로 아래에 그리는 순서, 보행 신호기·남은 시간 위치와 횡단보도 길이 갱신 |
+| `test_control_hints.py` | 조작 요소 설명: 보이는 한 줄과 마우스 설명의 위치, AI 패널의 칸별 설명 |
 
 ---
 
