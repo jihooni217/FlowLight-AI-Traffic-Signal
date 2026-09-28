@@ -319,7 +319,7 @@ FlowLight-AI-Traffic-Signal
 │   ├── sample_seoul_traffic_history.meta.json
 │   ├── seoul_sungnyemun_20260916.csv           # measured: four sites around Sungnyemun, Seoul, one day (2026-09-16)
 │   └── seoul_sungnyemun_20260916.meta.json
-├── tests                           # 270 tests (269 mocked + 1 live, live is opt-in)
+├── tests                           # 285 tests (284 mocked + 1 live, live is opt-in)
 ├── docs
 │   ├── screens/                    # UI screens (guide, main, profile mode, progress, report, applied, pedestrian phase, replay, advanced)
 │   ├── flowlight_banner.png, flowlight_live_demo.gif
@@ -464,7 +464,7 @@ This is what the frontend sends. The legacy fields alone are enough. `demand` an
 python -m pytest -q
 ```
 
-- The default run never calls the Solar API (the client is mocked). Currently 269 pass and 1 is skipped as live.
+- The default run never calls the Solar API (the client is mocked). Currently 284 pass and 1 is skipped as live.
 - The live API test is opt-in.
 
 ```bash
@@ -487,6 +487,9 @@ RUN_LIVE_TESTS=1 python -m pytest tests/test_agent_stream.py -v
 | `test_render_and_ab.py` | Sidewalk corners where roads with different lane counts meet; Webster values in the A/B check are not overwritten by actuation |
 | `test_hourly_reanalysis.py` | Hourly re-analysis: scheduling, no overlap, quiet automatic runs |
 | `test_fetch_seoul_traffic.py` | The download script that turns Seoul open data API responses into loader-format CSV (response shape only, no network) |
+| `test_approach_labels.py` | Validation, serialisation and API output of road names (`approach_names`), and the wiring of the on-map labels and source badge |
+| `test_decor.py` | Background decoration default and switch, draw order under the roads, pedestrian lamp and countdown placement, crosswalk length refresh |
+| `test_control_hints.py` | Control hints: which controls get a visible line versus a tooltip, and the AI panel section notes |
 
 ---
 
