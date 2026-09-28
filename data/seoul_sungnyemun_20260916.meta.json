@@ -1,0 +1,18 @@
+{
+  "csv": "seoul_sungnyemun_20260916.csv",
+  "encoding": "utf-8-sig",
+  "format": "seoul_traffic_history",
+  "site_id": "SUNGNYEMUN",
+  "site_name": "서울 숭례문 일대 실측 (세종대로·퇴계로·서소문로, 2026-09-16 수)",
+  "date": "20260916",
+  "flow_type": "유입",
+  "site_to_approach": {
+    "A-17": "N",
+    "A-13": "S",
+    "A-12": "E",
+    "A-16": "W"
+  },
+  "lanes": null,
+  "source": "서울특별시_교통량 이력 정보 (공공데이터포털 15056899 → 서울 열린데이터광장 VolInfo, 원천 TOPIS). 20260916 하루치를 scripts/fetch_seoul_traffic.py 로 받음. io_type 1→유입, 2→유출로 표기",
+  "license": "공공데이터포털 표기상 이용허락범위 제한 없음. 출처: 서울특별시(TOPIS)"
+}
