@@ -234,6 +234,7 @@ Before a plan is applied, the default signal is a fixed timetable (four phases, 
 - Five-step AI progress panel with per-step timing, the agents' real output, Guardrail before/after
 - A six-step usage guide appears on first launch and can be reopened from the sidebar
 - Recorded replay: without an API key, or when the backend is unreachable, a stored real Solar Pro 4 response is replayed and the report says so (see Getting started)
+- City blocks between the roads carry building and park outlines (anonymous blocks, not real buildings; can be switched off in advanced settings)
 - Intersection type, data export, and the built-in Webster optimiser with a seeded A/B harness (independent of the LLM) live under the collapsed "Advanced settings" section
 
 ---
@@ -252,7 +253,7 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 </p>
 </details>
 
-## Live API verification (solar-pro4-260806, 2026-09-10 to 09-17)
+## Live API verification (solar-pro4-260806, 2026-09-10 to 09-29)
 
 | Condition | Result |
 |---|---|
@@ -262,7 +263,8 @@ Measured the same way on the previous version: waiting vehicles 18 → 13 (-27.8
 | Run from the profile-mode UI (9 cars, 2 queued on N, saturation 1.2) | main direction "N", plan 12/8/0, score 82, operator approval → applied manually, congestion index 0.61 → 0.35 (measured with the earlier two-phase apply) |
 | Manual mode 4x4, one lane, 49 cars, 33 stopped (the starting state of the earlier before/after comparison) | main direction "north-south", plan 12/8/0, no Guardrail correction, score 88, auto apply → applied as a real signal system, throughput 121 → 131 after 60 s |
 | Manual mode 4x4, cycle 30 s, 18 cars, 2 pedestrians at the crosswalk including an elderly person | Agent 1 flags a vulnerable user, plan 12/8/10 ("one vulnerable pedestrian, so 10 s for crossing speed"), no Guardrail correction, score 82, operator approval → 10 s pedestrian-only phase after applying |
-| Run from the profile-mode UI, multiplier ×1, seed 20260702, 11 cars, 7 stopped (the current report and applied screenshots, 09-17) | main direction "east-west" (E and W saturation 1.14, 6 queued on N), plan 10/20/0 (reason: saturation sum 2.28 east-west vs 1.29 north-south, the N queue treated as secondary), no Guardrail correction, score 88, auto apply → 15 s mean throughput 37 → 45 veh/min, congestion index 1.00 → 0.99, stopped 7 → 11 (up) |
+| Run from the profile-mode UI, multiplier ×1, seed 20260702, 11 cars, 7 stopped (09-17) | main direction "east-west" (E and W saturation 1.14, 6 queued on N), plan 10/20/0 (reason: saturation sum 2.28 east-west vs 1.29 north-south, the N queue treated as secondary), no Guardrail correction, score 88, auto apply → 15 s mean throughput 37 → 45 veh/min, congestion index 1.00 → 0.99, stopped 7 → 11 (up) |
+| Run from the profile-mode UI, multiplier ×1, seed 20260702, 11 cars, 6 stopped (the current progress, report and applied screenshots, 09-29) | main direction "east-west", plan 12/18/0, no Guardrail correction, score 88, auto apply → 15 s mean throughput 37 → 53 veh/min, stopped 6 → 10 (up), congestion index 1.00 → 0.97. Three earlier calls on the same state returned 8/22/0, 14/16/0 and 14/16/0; all scored 88 |
 | Same setup, seed 20260702, the call made for the before/after GIFs (09-17) | main direction "east-west", plan 10/20/0, no Guardrail correction, score 88, auto apply → against a fixed signal with an 8 s pedestrian phase, 90 s throughput 138 → 156, stopped 25.2 → 19.1 |
 | Profile mode, multiplier ×3, "re-analyse when the hour changes" on, 08:00 → 03:00 → 08:00 (09-17) | two automatic analyses 20 s after each change, both 14/16/0 and auto apply, no report window or alert. For 20 s after switching to 03:00 the road still held cars from 08:00, so the plan came out the same. With the backend unreachable the run was shown as skipped, with no replay |
 | Profile mode 08:00, multiplier ×3, no pedestrians, ten seeds (09-17) | pedestrian 0 s and auto apply in all ten calls, plans from 8/22 to 18/12 depending on the seed → against a fixed signal with an 8 s pedestrian phase, 90 s throughput +14.7 ± 7.2, stopped −4.2 ± 2.2 (section "An intersection with no pedestrians" above) |
@@ -544,7 +546,7 @@ A real run analysed while an elderly person was waiting at the crosswalk. Agent 
 
 ## Advanced settings
 
-Intersection type, data export, the built-in Webster optimiser and the A/B check are tucked into a collapsible section.
+Intersection type, data export, the built-in Webster optimiser, the A/B check and the background-decoration switch are tucked into a collapsible section.
 
 <p align="center">
   <img src="docs/screens/advanced.png" width="320">
