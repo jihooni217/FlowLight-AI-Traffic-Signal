@@ -210,9 +210,11 @@ input[type="range"]:disabled { opacity: 0.35; }
     background: rgba(17, 17, 17, 0.88);
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 10px;
-    padding: 1rem;
-    font-size: 0.78rem;
-    line-height: 1.6;
+    padding: 0.85rem 1rem;
+    font-size: 0.76rem;
+    line-height: 1.4;               /* 설명 줄이 더해져도 950px 화면에 적용 효과까지 들어오게 */
+    max-height: calc(100% - 2rem);   /* 화면이 낮으면 잘리지 말고 안에서 스크롤 */
+    overflow-y: auto;
     z-index: 20;
     color: var(--text-muted);
     box-shadow: 0 4px 12px rgba(0,0,0,0.35);
@@ -221,6 +223,16 @@ input[type="range"]:disabled { opacity: 0.35; }
 #ai-floating-panel .hint {
     margin: 0;
     color: var(--text-muted);
+}
+#ai-floating-panel hr { margin: 0.4rem 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1); }
+/* AI 패널 각 칸의 한 줄 설명: 값보다 조금 작고 흐리게 */
+#ai-floating-panel .panel-note {
+    display: block;
+    font-size: 0.86em;
+    color: var(--text-muted);
+    opacity: 0.8;
+    line-height: 1.35;
+    margin: 0 0 0.25rem;
 }
 
 /* 휴대폰·좁은 화면: 도로 화면을 위에, 조작 패널을 아래에 쌓고 페이지 전체를 스크롤한다. */
@@ -250,11 +262,11 @@ input[type="range"]:disabled { opacity: 0.35; }
             <section class="panel controls">
                 <h2>시뮬레이션 제어</h2>
                 <div class="btn-group">
-                    <button id="btn-toggle-play" class="btn primary">Play</button>
-                    <button id="btn-reset" class="btn danger">시뮬레이션 초기화</button>
+                    <button id="btn-toggle-play" class="btn primary" title="시뮬레이션을 시작하거나 멈춥니다">Play</button>
+                    <button id="btn-reset" class="btn danger" title="차량·시간·통계를 지우고 처음 상태로 돌립니다. 설정값은 그대로입니다">시뮬레이션 초기화</button>
                 </div>
                 <div class="slider-group mt-2">
-                    <label>배속:</label>
+                    <label title="화면 속 시간의 빠르기입니다. 4x면 실제 1초에 시뮬레이션 4초가 갑니다. 분석과 효과 측정은 시뮬레이션 시간 기준이라 결과는 같습니다">배속:</label>
                     <div class="speed-group">
                         <button class="speed-btn active" data-speed="1">1x</button>
                         <button class="speed-btn" data-speed="2">2x</button>
@@ -263,19 +275,22 @@ input[type="range"]:disabled { opacity: 0.35; }
                     </div>
                 </div>
                 <div class="slider-group mt-2">
-                    <label>교통량 (대/초): <span id="val-spawn">3</span> <span id="spawn-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 사용 안 함</span></label>
+                    <label title="수동 모드에서 격자 전체에 초당 넣는 차량 수입니다. 실데이터 프로파일에서는 쓰지 않습니다">교통량 (대/초): <span id="val-spawn">3</span> <span id="spawn-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 사용 안 함</span></label>
                     <input type="range" id="sim-spawn-rate" min="0" max="6" step="1" value="3">
-                    <label>보행자 (명/초): <span id="val-ped">0</span></label>
+                    <label title="횡단보도에 초당 오는 사람 수입니다. 0이면 보행자가 없어 AI가 보행 신호를 건너뜁니다">보행자 (명/초): <span id="val-ped">0</span></label>
                     <input type="range" id="sim-ped-rate" min="0" max="2" step="1" value="0">
                     <label>신호 주기 (s): <span id="val-cycle">30</span></label>
                     <input type="range" id="sim-cycle" min="10" max="120" step="2" value="30">
+                    <div class="hint">AI에 보내는 한 주기 길이입니다. 계획의 남북·동서·보행 시간이 이 안에 들어갑니다.</div>
                     <label>최대 차량 (대): <span id="val-maxcars">150</span></label>
                     <input type="range" id="sim-max-cars" min="1" max="400" step="1" value="150">
+                    <div class="hint">화면에 동시에 둘 수 있는 차량 상한입니다. 넘치면 진입로에서 만들지 못한 "손실"로 셉니다.</div>
                     <label>최고 속도 (px/s): <span id="val-speed">60</span></label>
                     <input type="range" id="sim-max-speed" min="20" max="120" step="5" value="60">
-                    <label>격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 3x3 고정</span></label>
+                    <div class="hint">차량의 최고 속도입니다. 위 통계의 평균속도와 정체 지수는 이 값을 기준으로 잽니다.</div>
+                    <label title="교차로 수입니다. 3x3은 교차로 1개, 4x4는 4개. 바꾸면 화면이 처음부터 다시 시작됩니다">격자 크기 (NxN): <span id="val-grid">4</span> <span id="grid-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 3x3 고정</span></label>
                     <input type="range" id="sim-grid-size" min="2" max="6" step="1" value="4">
-                    <label>차로 수 (방향당): <span id="val-lanes">2</span> <span id="lanes-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 데이터의 차로 수 사용</span></label>
+                    <label title="방향당 차로 수입니다. 바꾸면 화면이 처음부터 다시 시작됩니다">차로 수 (방향당): <span id="val-lanes">2</span> <span id="lanes-mode-note" class="mode-note" style="display:none">· 프로파일 모드: 데이터의 차로 수 사용</span></label>
                     <input type="range" id="sim-lanes" min="1" max="3" step="1" value="2">
                     <div class="hint">2차로 이상이면 맨 왼쪽이 좌회전 전용 차로가 되어 보호 좌회전이 성립합니다.</div>
                 </div>
@@ -289,17 +304,18 @@ input[type="range"]:disabled { opacity: 0.35; }
                 </div>
                 <div id="demand-profile-box" class="mt-2" style="display:none">
                     <div class="slider-group" id="profile-source-group" style="display:none">
-                        <label for="sim-profile-source">데이터:</label>
+                        <label for="sim-profile-source" title="교통량 데이터 파일을 고릅니다. 합성 예제는 실험에 쓴 기본값, 실측은 서울 숭례문 일대 하루치입니다">데이터:</label>
                         <select id="sim-profile-source" style="width:100%"></select>
                     </div>
                     <p class="hint" id="demand-profile-meta">프로파일 불러오는 중...</p>
                     <div class="slider-group">
-                        <label>시간대: <span id="val-demand-hour">08</span>시</label>
+                        <label title="이 시간대의 교통량으로 차를 만듭니다. 08시가 출근 첨두입니다">시간대: <span id="val-demand-hour">08</span>시</label>
                         <input type="range" id="sim-demand-hour" min="0" max="23" step="1" value="8">
                     </div>
                     <label class="toggle-label mt-2">
                         <input type="checkbox" id="chk-demand-autohour"> <span>시간대 자동 진행 (<span id="val-demand-secs">120</span>초마다)</span>
                     </label>
+                    <div class="hint">120초마다 다음 시간대로 넘어갑니다. 하루 흐름을 빠르게 훑어볼 때 씁니다.</div>
                     <label class="toggle-label mt-2">
                         <input type="checkbox" id="chk-hour-reanalyze"> <span>시간대가 바뀌면 AI 재분석</span>
                     </label>
@@ -326,8 +342,8 @@ input[type="range"]:disabled { opacity: 0.35; }
                 <h2>AI 신호 최적화 (Solar Pro 4)</h2>
                 <p class="hint">현재 교차로 상태를 보내 Agent 3개가 분석 → 계획 → 평가합니다. 판단이 "자동 적용"이면 바로 적용되고, 아니면 아래 버튼으로 적용합니다.</p>
                 <div class="btn-group mt-2">
-                    <button id="btn-optimize" class="btn secondary">AI 분석</button>
-                    <button id="btn-apply-opt" class="btn success" disabled>권장값 적용</button>
+                    <button id="btn-optimize" class="btn secondary" title="지금 화면 상태로 Solar Pro 4 Agent 3개를 차례로 부릅니다. 10~25초 걸립니다">AI 분석</button>
+                    <button id="btn-apply-opt" class="btn success" disabled title="판단이 '운영자 승인 필요'일 때 사람이 눌러 적용하는 버튼입니다. '자동 적용'이면 저절로 적용됩니다">권장값 적용</button>
                 </div>
                 <label class="hint mt-2" style="display:block;">
                     <input type="checkbox" id="chk-replay"> 서버 없이 녹화 재생 (실제 Solar Pro 4 응답 기록)
@@ -336,7 +352,7 @@ input[type="range"]:disabled { opacity: 0.35; }
             </section>
 
             <details class="panel advanced">
-                <summary>고급 설정 (교차로 유형 · 데이터 수집 · 내장 Webster 최적화)</summary>
+                <summary>고급 설정 (교차로 유형 · 데이터 수집 · 내장 Webster 최적화 · 화면)</summary>
 
                 <div class="sub">
                     <h3>교차로 제어 유형</h3>
@@ -381,16 +397,24 @@ input[type="range"]:disabled { opacity: 0.35; }
                     </div>
                     <div id="ab-status" class="hint mt-2" style="display:none"></div>
                 </div>
+
+                <div class="sub">
+                    <h3>화면</h3>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="chk-decor" checked> 배경 꾸밈 (블록에 건물·녹지 윤곽)
+                    </label>
+                    <p class="hint">어느 도시에나 있을 법한 익명의 블록입니다. 실제 건물이 아니고, 실측 프로파일의 지점과도 무관합니다. 캡처를 깔끔하게 찍고 싶으면 끄세요.</p>
+                </div>
             </details>
         </aside>
 
         <main class="main-content">
             <div class="stats-bar">
-                <div class="stat">차량: <b id="stat-cars">0</b></div>
-                <div class="stat">보행자: <b id="stat-peds">0</b></div>
-                <div class="stat">대기: <b id="stat-stopped">0</b></div>
-                <div class="stat">평균속도(최고 대비): <b id="stat-speed">0%</b></div>
-                <div class="stat">통과(1분): <b id="stat-throughput">0</b></div>
+                <div class="stat" title="지금 화면에 있는 차량 수입니다">차량: <b id="stat-cars">0</b></div>
+                <div class="stat" title="횡단보도에서 기다리거나 건너는 사람 수입니다">보행자: <b id="stat-peds">0</b></div>
+                <div class="stat" title="거의 멈춰 있는 차량 수입니다. 신호 앞 대기 행렬이 대부분입니다">대기: <b id="stat-stopped">0</b></div>
+                <div class="stat" title="최고 속도 설정값 대비 지금 차량들의 평균 속도입니다">평균속도(최고 대비): <b id="stat-speed">0%</b></div>
+                <div class="stat" title="최근 1분 동안 격자를 빠져나간 차량 수입니다. 신호를 비교할 때 가장 먼저 볼 값입니다">통과(1분): <b id="stat-throughput">0</b></div>
                 <div class="stat congestion" title="멈춘 차와 느린 차의 비율로 계산합니다. 신호 앞에서 기다리는 차도 포함되므로, 교차로가 정상적으로 돌아갈 때도 높게(빨강) 나올 수 있습니다. 신호끼리 비교할 때는 통과 차량과 정지 차량을 함께 보세요.">
                     정체 지수 ⓘ:
                     <div class="c-bar-bg"><div class="c-bar-fill" id="stat-congestion"></div></div>
@@ -406,8 +430,8 @@ input[type="range"]:disabled { opacity: 0.35; }
 
                 <div id="ai-floating-panel">
                     <div id="ai-progress-panel" class="hint"
-                         style="line-height:1.6;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:.6rem;margin-bottom:.6rem;">
-                        <b style="color:#fff;">AI 분석 진행</b><br>
+                         style="line-height:1.5;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:.45rem;margin-bottom:.45rem;">
+                        <b style="color:#fff;" title="AI 분석을 누르면 단계가 차례로 켜지고, 걸린 시간이 붙습니다">AI 분석 진행</b><br>
                         <span class="ai-step" data-step="analysis">○ 1. 교통 상황 분석</span><br>
                         <span class="ai-step" data-step="planning">○ 2. 신호 계획 생성</span><br>
                         <span class="ai-step" data-step="guardrail">○ 3. Guardrail 검증</span><br>
@@ -416,7 +440,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                     </div>
 
                     <div id="ai-status-panel" class="hint">
-                        <b style="color:#fff;">AI 제어 상태</b><br>
+                        <b style="color:#fff;" title="Agent가 돌려준 계획입니다. 남북·동서는 차량 녹색 시간, 보행자는 전용 현시 길이입니다">AI 제어 상태</b><br>
                         상태: <span id="ai-state">대기 중</span><br>
                         판단: <span id="ai-decision">-</span><br>
                         우선순위: <span id="ai-priority">-</span><br>
@@ -426,8 +450,9 @@ input[type="range"]:disabled { opacity: 0.35; }
                     </div>
 
                     <div id="ai-result-panel" class="hint mt-2"
-                         style="line-height:1.6;border-top:1px solid rgba(255,255,255,.1);padding-top:.75rem;">
+                         style="line-height:1.5;border-top:1px solid rgba(255,255,255,.1);padding-top:.5rem;">
                         <b style="color:#fff;">AI 적용 결과</b><br>
+                        <span class="panel-note">실제 신호에 들어간 모습. 직진·좌회전 분할과 Guardrail 보정.</span>
                         적용 여부: <span id="ai-apply-state">대기 중</span><br>
                         적용 교차로: <span id="ai-apply-count">-</span><br>
                         차량 제어: <span id="ai-vehicle-control">-</span><br>
@@ -436,6 +461,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                         <hr>
 
                         <b style="color:#fff;">AI 적용 효과</b><br>
+                        <span class="panel-note">적용 전후 15초(시뮬레이션 시간) 평균 비교. 참고용.</span>
 
                         처리량 :
                         <span id="effect-flow-before">-</span>
@@ -500,7 +526,7 @@ input[type="range"]:disabled { opacity: 0.35; }
                     <li><b>권장값 적용</b> · 판단이 "자동 적용"이면 바로 적용되고, 아니면 이 버튼으로 적용합니다. 적용 뒤 시뮬레이션 시간 15초 동안 재서 적용 효과를 보여 줍니다.</li>
                     <li><b>시간대 바꾸기</b> · 시간대 슬라이더를 옮기거나 "시간대 자동 진행"을 켭니다. "시간대가 바뀌면 AI 재분석"을 켜 두면 시간대가 바뀌고 20초 뒤 계획을 다시 세웁니다(서버 실행 시).</li>
                 </ol>
-                <p class="hint">교차로 유형, 데이터 내보내기, 내장 Webster 최적화와 A/B 검증은 사이드바의 "고급 설정"에 있습니다.</p>
+                <p class="hint">교차로 유형, 데이터 내보내기, 내장 Webster 최적화와 A/B 검증, 배경 꾸밈 끄기는 사이드바의 "고급 설정"에 있습니다.</p>
                 <p class="hint">정체 지수는 신호를 기다리는 차도 포함하므로 정상 운영 중에도 빨강이 자주 나옵니다. 효과는 통과·정지 차량 수로 비교하세요.</p>
                 <label class="toggle-label mt-2"><input type="checkbox" id="chk-help-hide" checked> 다음에 열 때 자동으로 보지 않기</label>
                 <div class="btn-group mt-2">
@@ -1419,6 +1445,12 @@ PedSystem.prototype.sync = function() {
         var nd = this.network.nodes[i];
         var ok = nd.control === 'signal' && !nd.isBoundary && this.jc.lights.has(nd.id);
         if (ok && !this.crosswalks.has(nd.id)) this.crosswalks.set(nd.id, this._buildCW(nd));
+        else if (ok) {
+            // 차로 수가 바뀌면(실데이터 프로파일, 차로 슬라이더) 도로 폭도 바뀌므로 횡단보도 길이를 맞춘다.
+            // 안 맞추면 횡단보도와 보행 신호기·남은 시간이 넓어진 도로 위에 놓여 차에 가려진다.
+            var list = this.crosswalks.get(nd.id);
+            for (var c = 0; c < list.length; c++) list[c].half = Math.max(CW_HALF, roadWidthOf(list[c].edgeIn) / 2 + 2);
+        }
         else if (!ok && this.crosswalks.has(nd.id)) {
             var gone = this.crosswalks.get(nd.id);
             this.peds = this.peds.filter(function(pd){ return gone.indexOf(pd.cw) < 0; });
@@ -1977,12 +2009,125 @@ function nodeHalfOf(nd) {
     for (var i = 0; i < nd.incoming.length; i++) { var e = nd.incoming[i]; if (!e.isArc) h = Math.max(h, roadWidthOf(e) / 2); }
     return h;
 }
+// 경계 노드의 바닥판 크기: 테두리 도로(경계끼리 잇는 도로) 폭에 맞춘다.
+// 넓은 진입로(예: 남북 3차로)가 테두리와 만나는 곳에서 가장 넓은 도로 폭으로 그리면 바닥판이 테두리 밖으로 튀어나온다.
+function boundaryHalfOf(nd) {
+    var h = null;
+    for (var i = 0; i < nd.incoming.length; i++) {
+        var e = nd.incoming[i];
+        if (e.isArc || !e.from.isBoundary) continue;
+        var half = roadWidthOf(e) / 2;
+        h = h === null ? half : Math.min(h, half);
+    }
+    return h === null ? nodeHalfOf(nd) : h;
+}
+// ===== 배경 꾸밈: 도로 사이 블록에 건물 윤곽과 녹지 =====
+// 어느 도시에나 있을 법한 익명의 블록이다. 실제 건물이 아니고, 실측 프로파일의 지점과도 무관하다.
+// 배치는 블록 위치로 정한 난수라 같은 격자·같은 차로 수면 늘 같은 모양이 나온다.
+// 색은 도로보다 어둡게 눌러 차량·신호등·보행자가 먼저 보이게 한다. 고급 설정의 "배경 꾸밈"으로 끌 수 있다.
+function seededRand(seed) {
+    var s = (seed * 2654435761) >>> 0;
+    return function() { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function edgeBetween(a, b) {
+    for (var i = 0; i < a.outgoing.length; i++) if (a.outgoing[i].to === b && !a.outgoing[i].isArc) return a.outgoing[i];
+    return null;
+}
+Renderer.prototype.buildDecor = function(network) {
+    var N = network.gridSize, sp = network.spacing;
+    var node = function(i, j) { return network.nodes[j * N + i]; };
+    // 도로 가장자리(인도 포함)에서 블록까지 띄우는 여백. 도로 폭은 차로 수에 따라 다르므로 이웃 도로마다 잰다.
+    var edgeHalf = function(a, b) { var e = a && b ? edgeBetween(a, b) : null; return (e ? roadWidthOf(e) / 2 : 12) + 8 + 4; };
+    var blocks = [];
+    var count = (N - 1) * (N - 1);
+    var parkAt = count > 1 ? Math.floor(seededRand(N * 7 + 1)() * count) : -1;   // 격자당 녹지 블록 하나
+    // 교차로 모서리에는 보행 신호등과 남은 시간 표시가 그려지므로, 교차로(경계가 아닌 노드)에서 이 반지름 안에는 아무것도 두지 않는다.
+    // 신호기(교차로에서 ~40px)와 그 뒤의 남은 시간 표시(~50px)까지 비운다.
+    var CLEAR_R = 54;
+    var juncs = [];
+    for (var n = 0; n < network.nodes.length; n++) if (!network.nodes[n].isBoundary) juncs.push(network.nodes[n]);
+    var nearJunction = function(x, y, w, h, r) {
+        for (var q = 0; q < juncs.length; q++) {
+            var px = Math.max(x, Math.min(juncs[q].x, x + w)), py = Math.max(y, Math.min(juncs[q].y, y + h));
+            if (Math.hypot(px - juncs[q].x, py - juncs[q].y) < (r || CLEAR_R)) return true;
+        }
+        return false;
+    };
+    for (var j = 0; j < N - 1; j++) {
+        for (var i = 0; i < N - 1; i++) {
+            var tl = node(i, j), tr = node(i + 1, j), bl = node(i, j + 1), br = node(i + 1, j + 1);
+            var x0 = tl.x + edgeHalf(tl, bl), x1 = tr.x - edgeHalf(tr, br);
+            var y0 = tl.y + edgeHalf(tl, tr), y1 = bl.y - edgeHalf(bl, br);
+            var w = x1 - x0, h = y1 - y0;
+            if (w < 14 || h < 14) continue;
+            var idx = j * (N - 1) + i, rnd = seededRand(N * 1000 + idx * 31 + 7);
+            var b = { x: x0, y: y0, w: w, h: h, park: idx === parkAt, buildings: [], trees: [] };
+            var addBuilding = function(bx, by, bw, bh, r) {
+                if (nearJunction(bx, by, bw, bh, r)) return false;
+                var wins = [];
+                var cols = Math.max(1, Math.floor((bw - 4) / 5)), rows = Math.max(1, Math.floor((bh - 4) / 5));
+                for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) if (rnd() < 0.55) wins.push({ x: bx + 3 + c * 5, y: by + 3 + r * 5 });
+                b.buildings.push({ x: bx, y: by, w: bw, h: bh, wins: wins });
+                return true;
+            };
+            if (b.park) {
+                var nT = 3 + Math.floor(rnd() * 3);
+                for (var t = 0; t < nT; t++) {
+                    var tx = x0 + 5 + rnd() * (w - 10), ty = y0 + 5 + rnd() * (h - 10), tr = 2.5 + rnd() * 2.5;
+                    if (!nearJunction(tx - tr, ty - tr, tr * 2, tr * 2)) b.trees.push({ x: tx, y: ty, r: tr });
+                }
+            } else {
+                // 블록을 2x2 칸으로 나누고 칸마다 건물 하나. 몇 칸은 비워 마당처럼 두고, 교차로 모서리 쪽 칸은 신호등 자리라 비운다.
+                var gap = 3, cw = (w - gap) / 2, ch = (h - gap) / 2;
+                for (var cy = 0; cy < 2; cy++) for (var cx = 0; cx < 2; cx++) {
+                    if (rnd() < 0.18) continue;
+                    var ix = rnd() * 3, iy = rnd() * 3, iw = rnd() * 4, ih = rnd() * 4;
+                    var bx = x0 + cx * (cw + gap) + ix, by = y0 + cy * (ch + gap) + iy;
+                    addBuilding(bx, by, Math.max(6, cw - ix - iw), Math.max(6, ch - iy - ih));
+                }
+                // 네 모서리가 모두 교차로라 칸이 다 비면(격자 안쪽 블록) 가운데에 작은 건물 하나 (신호기 자리만 피한다)
+                if (b.buildings.length === 0) {
+                    var s = Math.min(w, h) * 0.42;
+                    addBuilding(x0 + (w - s) / 2, y0 + (h - s) / 2, s, s, 48);
+                }
+            }
+            blocks.push(b);
+        }
+    }
+    return blocks;
+};
+Renderer.prototype._drawDecor = function(network) {
+    var sig = network.gridSize + '|' + network.edges.length + '|';
+    for (var i = 0; i < network.edges.length; i += 7) sig += network.edges[i].lanes;   // 차로 수가 바뀌면 블록 크기도 바뀐다
+    if (!this._decor || this._decor.sig !== sig) this._decor = { sig: sig, blocks: this.buildDecor(network) };
+    var ctx = this.ctx, blocks = this._decor.blocks;
+    for (var k = 0; k < blocks.length; k++) {
+        var b = blocks[k];
+        if (b.park) {
+            ctx.fillStyle = '#16241b';
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.strokeStyle = 'rgba(148,163,184,0.14)'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(b.x + 3, b.y + b.h - 3); ctx.quadraticCurveTo(b.x + b.w * 0.45, b.y + b.h * 0.55, b.x + b.w - 3, b.y + 3); ctx.stroke();
+            ctx.fillStyle = '#1f4a2c';
+            for (var t = 0; t < b.trees.length; t++) { ctx.beginPath(); ctx.arc(b.trees[t].x, b.trees[t].y, b.trees[t].r, 0, Math.PI * 2); ctx.fill(); }
+        } else {
+            for (var q = 0; q < b.buildings.length; q++) {
+                var bd = b.buildings[q];
+                ctx.fillStyle = '#1b2431'; ctx.strokeStyle = 'rgba(148,163,184,0.22)'; ctx.lineWidth = 1;
+                ctx.fillRect(bd.x, bd.y, bd.w, bd.h); ctx.strokeRect(bd.x + 0.5, bd.y + 0.5, bd.w - 1, bd.h - 1);
+                ctx.fillStyle = 'rgba(148,163,184,0.20)';
+                for (var wI = 0; wI < bd.wins.length; wI++) ctx.fillRect(bd.wins[wI].x, bd.wins[wI].y, 2, 2);
+            }
+        }
+    }
+};
+
 Renderer.prototype.render = function(network, jc, cam) {
     var ctx = this.ctx;
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
-    
+
     // 텍스트 겹침 방지를 위한 Bounding Box 배열
     var textBBoxes = [];
 
@@ -1990,6 +2135,9 @@ Renderer.prototype.render = function(network, jc, cam) {
         ctx.translate(cam.x, cam.y);
         ctx.scale(cam.scale, cam.scale);
     }
+
+    // 배경 꾸밈은 인도·도로보다 먼저 그려서 늘 그 아래에 깔린다
+    if (this.decorOn !== false) this._drawDecor(network);
 
     // 인도: 도로 가장자리에 사람만 통행 가능한 영역(회색 블록)
     // 끝을 직각으로 자르고, 모서리는 교차점마다 원으로 둥글게 메운다. 원 반지름은 그 점에 닿는 인도 중 가장 좁은 것의 절반이라,
@@ -2083,20 +2231,24 @@ Renderer.prototype.render = function(network, jc, cam) {
                 var sig = jc.peds.pedGreen(cw);
                 var greenLamp = sig.green && (sig.remain >= CW_CLEAR || blinkOn);
                 for (var sd = -1; sd <= 1; sd += 2) {
-                    // 신호기가 교차로 모서리에서 완전히 분리되도록 밖으로 더 밀고 크기를 줄임
-                    var sx = cw.cx + cw.tx * 12 + cw.px*sd*(cw.half+10);
-                    var sy = cw.cy + cw.ty * 12 + cw.py*sd*(cw.half+10);
+                    // 신호기는 횡단보도 끝 바로 옆 인도 위에 둔다: 횡단보도에서 7px 뒤, 자기 도로 가장자리 바깥 인도 띠(half+2.5).
+                    // 이 자리는 교차하는 도로의 인도(도로 반폭+8) 바깥이라 차에 가려지지 않고, 같은 모서리의 다른 횡단보도 신호기와도
+                    // 축이 달라 겹치지 않는다 (예: 3차로면 (25.5, 31) 과 (31, 25.5)). 차로 수가 달라도 half 가 도로 폭을 따라간다.
+                    var sx = cw.cx + cw.tx * 7 + cw.px*sd*(cw.half+2.5);
+                    var sy = cw.cy + cw.ty * 7 + cw.py*sd*(cw.half+2.5);
                     ctx.save();
                     ctx.translate(sx, sy);
+                    // 위에서 본 보행 신호등: 긴 축을 횡단 방향(px)에 맞추고, 녹색 렌즈가 도로 쪽·적색 렌즈가 인도 쪽을 향한다.
+                    // 그래서 한 횡단보도의 양 끝 신호기는 서로 마주 본다.
                     ctx.rotate(Math.atan2(cw.py, cw.px));
                     ctx.fillStyle = '#151515';
-                    ctx.fillRect(-2, -3.5, 4, 7);
+                    ctx.fillRect(-3.5, -2, 7, 4);
                     ctx.strokeStyle = '#000'; ctx.lineWidth = 0.5;
-                    ctx.strokeRect(-2, -3.5, 4, 7);
-                    ctx.fillStyle = !sig.green ? COL_RED : '#3a1212';   // 적색 램프 (위)
-                    ctx.beginPath(); ctx.arc(0, -1.8, 1.2, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = greenLamp ? COL_GREEN : '#0f2a18';  // 녹색 램프 (아래)
-                    ctx.beginPath(); ctx.arc(0, 1.8, 1.2, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeRect(-3.5, -2, 7, 4);
+                    ctx.fillStyle = !sig.green ? COL_RED : '#3a1212';   // 적색 램프 (인도 쪽)
+                    ctx.beginPath(); ctx.arc(sd * 1.8, 0, 1.2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = greenLamp ? COL_GREEN : '#0f2a18';  // 녹색 램프 (도로 쪽)
+                    ctx.beginPath(); ctx.arc(-sd * 1.8, 0, 1.2, 0, Math.PI*2); ctx.fill();
                     
                     // 보행자 신호 남은 시간 표시 (카운트다운) - 양쪽 보도 모두 표시하되, 모서리에서 겹치지 않도록 방향별 오프셋 적용
                     var textStr = "";
@@ -2127,16 +2279,14 @@ Renderer.prototype.render = function(network, jc, cam) {
                     
                     if (textStr) {
                         ctx.save();
-                        // 텍스트를 신호등 박스 옆에 겹치지 않게 배치
-                        // 모서리에서 확실히 분리하기 위해 각 도로가 뻗어나가는 방향(tx, ty)으로 더 강하게 밀고,
-                        // 횡단보도 바깥쪽 방향(px*sd, py*sd)으로도 약간 밀어줌
-                        var tox = cw.tx * 16 + cw.px * sd * 4;
-                        var toy = cw.ty * 16 + cw.py * sd * 4;
-                        
                         ctx.font = 'bold 7.5px sans-serif';
                         var tw = ctx.measureText(textStr).width;
                         var rw = Math.max(10, tw + 4);
                         var rh = 9;
+                        // 남은 시간은 그 신호기 바로 뒤(도로가 뻗는 방향, 교차로 반대쪽), 인도와 블록 사이 띠에 붙인다.
+                        // 차로 바깥이라 차에 가려지지 않고, 같은 모서리의 다른 횡단보도 신호기는 다른 축에 있어서 숫자끼리도 겹치지 않는다.
+                        var tox = cw.tx * (rh / 2 + 6.5) + cw.px * sd * 1.5;
+                        var toy = cw.ty * (rh / 2 + 6.5) + cw.py * sd * 1.5;
                         
                         // 충돌 회피 알고리즘: 절대 좌표계에서 다른 텍스트 박스와 겹치면 더 바깥쪽으로 밀어냄
                         var finalX = sx + tox;
@@ -2153,9 +2303,9 @@ Renderer.prototype.render = function(network, jc, cam) {
                                 }
                             }
                             if (!overlap) break;
-                            // 겹친다면 해당 교차로에서 밖으로 나가는 방향(cw.tx, cw.ty)으로 8px 더 밀어냄
-                            finalX += cw.tx * 8;
-                            finalY += cw.ty * 8;
+                            // 겹친다면 같은 방향(교차로 반대쪽)으로 6px 더 밀어냄
+                            finalX += cw.tx * 6;
+                            finalY += cw.ty * 6;
                         }
                         textBBoxes.push({x: finalX, y: finalY, rw: rw, rh: rh});
                         
@@ -2197,7 +2347,7 @@ Renderer.prototype.render = function(network, jc, cam) {
         if (nd.control === 'roundabout') continue;
         
         ctx.fillStyle = '#333';
-        var nh = nodeHalfOf(nd);
+        var nh = nd.isBoundary ? boundaryHalfOf(nd) : nodeHalfOf(nd);
         ctx.fillRect(nd.x - nh, nd.y - nh, nh * 2, nh * 2);
 
         // 경계 노드는 제어가 없으므로(무조건 통과) 신호등을 그리지 않는다 — 장식 신호 방지
@@ -2783,6 +2933,12 @@ SimController.prototype._initDOM = function() {
     var btnApply = document.getElementById('btn-apply-opt');
     var chkAdapt = document.getElementById('chk-adaptive');
     var optSlider = document.getElementById('sim-opt-int');
+    var chkDecor = document.getElementById('chk-decor');
+    self.renderer.decorOn = chkDecor.checked;
+    chkDecor.onchange = function() {
+        self.renderer.decorOn = chkDecor.checked;
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
 
     // ===== AI 분석 진행 상태 표시 =====
     // SSE 단계 메시지에 따라 좌측 패널의 5단계(교통 상황 분석 → 신호 계획 → Guardrail → 계획 평가 → 최종 의사결정)를 갱신한다.
@@ -3408,11 +3564,11 @@ SimController.prototype._initDOM = function() {
             (waveInfo ? " · 녹색파 " + waveInfo.label : "");
         document.getElementById("ai-ped-control").textContent =
             (plan.pedestrian_green_sec === 0
-                ? "지금 보행자 없음 → 전용 현시 생략 (오면 직진 녹색과 병행 횡단)"
+                ? "지금 보행자 없음 → 전용 현시 생략"
                 : vulnerableCount > 0
-                    ? "교통약자 감지 → 보행 전용 현시 " + plan.pedestrian_green_sec + "초 확보"
-                    : "보행자 " + plan.pedestrian_green_sec + "초 확보")
-            + " · 감응: 교통약자·다수 보행자면 전용 현시(교통약자 10초 이상), 그 외는 병행 횡단";
+                    ? "교통약자 감지 → 보행 전용 현시 " + plan.pedestrian_green_sec + "초"
+                    : "보행자 " + plan.pedestrian_green_sec + "초")
+            + " · 이후는 감응: 교통약자·다수 보행자면 전용 현시, 그 외는 병행 횡단";
         document.getElementById("ai-guardrail").textContent =
             self.lastGuardrail
                 ? (self.lastGuardrail.corrected
