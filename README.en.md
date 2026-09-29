@@ -155,7 +155,7 @@ public traffic CSV ─(app/traffic_data.py: normalise · lane correction · veh/
 
 # 🤖 How the AI decides
 
-FlowLight is a **multi-agent workflow**: analyse the situation, plan the signal, grade the plan. The Guardrail runs right after planning and before evaluation.
+Three agents take turns: one reads the situation, one plans the signal, one grades the plan. The Guardrail runs right after planning and before evaluation.
 
 <p align="center">
   <img src="docs/ai_decision_process.png" width="100%">
@@ -601,44 +601,20 @@ Problem statement, agent design, architecture, experiment results and retrospect
 | **Re-planning** | Re-analyse on other changes too, such as a sudden saturation jump or a vulnerable user arriving |
 | **Roundabout Scenario** | Roundabout flow and priority rules |
 | **Multi-Intersection Control** | Coordinated signals and green waves across neighbouring intersections |
-| **Reinforcement Learning** | Hybrid optimisation combining LLM agents with RL |
+| **Reinforcement Learning** | Signal control that uses the LLM plan together with RL |
 | **Evaluation Automation** | Run the multi-seed comparison and confidence intervals straight from the on-screen A/B check |
 
 ---
 
 # 👨‍💻 My contributions
 
-I focused on **LLM agent design, backend integration, Guardrail verification, frontend wiring, experiments and the presentation**.
+What I did in this repository:
 
-### AI / LLM
-- Designed the Traffic Analysis, Signal Planning and Plan Evaluation agents
-- Implemented the LLM call flow on the Upstage Solar API
-- Converted traffic state into prompt input the model can use
-- Designed the JSON output format for signal plans
-
-### Backend
-- Built the FastAPI agent server
-- Set up the endpoints the frontend talks to
-- Implemented real-time streaming with SSE
-- Delivered analysis, plan and evaluation to the client in order
-
-### Reliability
-- Guardrail checks for minimum and maximum green times
-- JSON response validation
-- Filtered out invalid values so only safe plans are applied
-- Error handling so the demo does not stop on failure
-
-### Frontend / Demo
-- Connected the HTML/JavaScript simulator to the backend
-- Displayed analysis results and signal plans on screen
-- Built the before/after comparison scenario
-- Recorded the full demo video
-
-### Documentation / Presentation
-- Prepared the slides
-- Documented the architecture and the decision process
-- Analysed and presented the experiment results
-- Gave the final presentation
+- Defined the roles, prompts and output JSON Schemas of the three agents (analysis, planning, evaluation), including the input JSON that describes the intersection to them.
+- Built the FastAPI server, the SSE stream and the traffic-profile API.
+- Put the Guardrail (minimum green times and the cycle total) and the final-decision override into code, and made sure a truncated or failed Solar response does not stop the demo.
+- Wired the browser simulator to the backend and put the analysis results and the applied effect on screen.
+- Designed and ran the before/after comparison and the ten-seed comparison, and made the video and the slides.
 
 ---
 
