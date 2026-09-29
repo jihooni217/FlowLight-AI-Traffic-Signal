@@ -58,11 +58,33 @@ def test_page_draws_labels_outside_the_grid_and_a_source_badge():
     assert "SimController.prototype.demandOverlay = function()" in HTML
     assert "this.renderer.overlaySource = this;" in HTML
     assert "if (!names[a] || !edges || edges.length === 0) continue;" in HTML     # 이름 없는 접근로는 이름표 없음
-    assert "var gap = L.r * cam.scale + 10;" in HTML                              # 인도 원 바깥에 둔다
+    assert "var gap = L.r * cam.scale + 6;" in HTML                               # 인도 원 바깥에 둔다
     assert "var hasLabels = !!(ov && ov.labels && ov.labels.length);" in HTML     # 격자를 맞출 때 이름표 자리를 비운다
     assert "'대/시 ' + L.arrow" in HTML and "차로" not in HTML.split("_drawDemandOverlay = function(cam)")[1].split("// ===== SimController")[0]
+    assert "var mx = hasLabels ? 34 : 16;" in HTML                                    # 한 줄 이름표라 여백이 작다
     assert "roadName" in HTML and "row.cells[0].appendChild(small);" in HTML       # 표 둘째 줄
     # 떠 있는 AI 패널의 오른쪽 선(leftBound) 왼쪽에는 격자·이름표·배지를 두지 않는다
     assert "SimController.prototype._panelLeftBound = function()" in HTML
     assert "leftBound: this._panelLeftBound()" in HTML
     assert "var LB = ov.leftBound || 0;" in HTML and "var bx = LB + 10" in HTML
+
+
+def test_fit_uses_the_drawn_extent_and_centres_on_the_whole_canvas():
+    # 맞추는 대상은 그려지는 범위(첫 노드~마지막 노드 + 테두리 여유)이고, 가로는 화면 가운데가 기본, 패널과 겹칠 때만 민다
+    assert "var FIT_PAD = 32;" in HTML
+    assert "var nw = (self.gridSize - 1) * sp + 2 * FIT_PAD, nh = nw;" in HTML
+    assert "var px = (rect.width - nw * s) / 2;" in HTML
+    assert "if (px < left + mx) px = left + mx;" in HTML
+    assert "return { scale: s, x: px - x0 * s, y: py - y0 * s };" in HTML
+    assert "(self.gridSize+1)*100" not in HTML
+
+
+def test_zoom_out_stops_at_the_fitted_scale():
+    # 축소 하한 = 화면 맞춤 배율. 그 아래로는 이름표끼리 겹치므로, 하한에 닿으면 맞춤 위치로 되돌린다.
+    assert "var zoomBy = function(factor, mx, my)" in HTML
+    assert "if (newScale <= fit.scale) {" in HTML
+    assert "self.cam.scale = fit.scale; self.cam.x = fit.x; self.cam.y = fit.y;" in HTML
+    assert "Math.max(0.2, Math.min(self.cam.scale" not in HTML                      # 예전 고정 하한 0.2는 없다
+    for who in ("zoomBy(Math.exp(wheel * 0.1), mx, my);", "zoomBy(Math.exp(0.2), rect.width / 2, rect.height / 2);",
+                "zoomBy(Math.exp(-0.2), rect.width / 2, rect.height / 2);"):
+        assert who in HTML

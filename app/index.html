@@ -118,8 +118,13 @@ input[type="range"]:disabled { opacity: 0.35; }
 .c-bar-fill { height: 100%; width: 0%; background: #22c55e; transition: width 0.3s, background-color 0.3s; }
 .canvas-container { flex: 1; background: #000; border-radius: 8px; border: 1px solid #333; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
 #sim-canvas { background: #222; box-shadow: inset 0 0 50px rgba(0,0,0,0.5); cursor: crosshair; touch-action: none; }
-.legend { margin-top: 1rem; background: var(--panel-bg); padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.85rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-.l-item { display: flex; align-items: center; gap: 0.3rem; }
+/* 범례: 차량·신호·보행자를 각각 테두리 상자로 묶어 구분이 보이게 한다. 상자 안 첫 칸이 구분 이름. */
+.legend { margin-top: 0.75rem; background: var(--panel-bg); padding: 0.45rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.85rem;
+          display: flex; flex-wrap: wrap; gap: 0.4rem 0.7rem; align-items: center; }
+.l-group { display: flex; align-items: center; gap: 0.75rem; padding: 0.22rem 0.6rem; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.03); }
+.l-key { color: var(--text-muted); font-weight: 600; white-space: nowrap; padding-right: 0.6rem; border-right: 1px solid var(--border-color); }
+.l-note { flex: 1 1 320px; color: var(--text-muted); font-size: 0.9em; line-height: 1.35; }
+.l-item { display: flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
 .color-box { width: 12px; height: 12px; border-radius: 2px; }
 .log-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
 .log-overlay.hidden { display: none; }
@@ -246,7 +251,8 @@ input[type="range"]:disabled { opacity: 0.35; }
     .stats-bar { gap: 0.4rem; padding: 0.5rem; margin-bottom: 0.5rem; }
     .stat { font-size: 0.72rem; padding: 0.25rem 0.5rem; }
     .stat.congestion { margin-left: 0; }
-    .legend { font-size: 0.72rem; gap: 0.5rem; margin-top: 0.5rem; }
+    .legend { font-size: 0.72rem; gap: 0.3rem 0.5rem; margin-top: 0.5rem; }
+    .l-group { gap: 0.5rem; padding: 0.2rem 0.45rem; }
 }
 
     </style>
@@ -489,22 +495,28 @@ input[type="range"]:disabled { opacity: 0.35; }
             </div>
 
             <div class="legend">
-                <strong>범례:</strong>
-                <span class="l-item"><span class="color-box" style="background:#22c55e"></span>원활</span>
-                <span class="l-item"><span class="color-box" style="background:#eab308"></span>서행</span>
-                <span class="l-item"><span class="color-box" style="background:#ef4444"></span>정체</span>
-                |
-                <span class="l-item">🟢직진·우회전</span>
-                <span class="l-item"><span style="color:#22c55e;font-weight:700;font-size:1.1em">←</span> 좌회전 신호 (녹색 화살표, 차가 꺾는 방향)</span>
-                <span class="l-item">🟡황색</span>
-                <span class="l-item">🔴적색(우회전가능·보행자양보)</span>
-                |
-                <span class="l-item"><span class="color-box" style="background:#fb923c"></span>지시등(점멸=회전방향)</span>
-                <span class="l-item"><span class="color-box" style="background:#f8fafc;border-radius:50%"></span>일반인</span>
-                <span class="l-item"><span class="color-box" style="background:#f472b6;border-radius:50%"></span>어린이</span>
-                <span class="l-item"><span class="color-box" style="background:#c084fc;border-radius:50%"></span>노약자</span>
-                <span class="l-item"><span class="color-box" style="background:#38bdf8"></span>장애인(휠체어)</span>
-                <span class="l-item" style="flex-basis:100%;color:var(--text-muted);font-size:0.9em">정체 지수 = 멈춘·느린 차 비율. 신호 대기 차도 포함되어 정상 운영 중에도 빨강이 흔하니, 비교는 통과·정지 차량 수로 하세요.</span>
+                <div class="l-group">
+                    <span class="l-key">차량</span>
+                    <span class="l-item"><span class="color-box" style="background:#22c55e"></span>원활</span>
+                    <span class="l-item"><span class="color-box" style="background:#eab308"></span>서행</span>
+                    <span class="l-item"><span class="color-box" style="background:#ef4444"></span>정체</span>
+                    <span class="l-item"><span class="color-box" style="background:#fb923c"></span>지시등 (점멸 = 회전)</span>
+                </div>
+                <div class="l-group">
+                    <span class="l-key">보행자</span>
+                    <span class="l-item"><span class="color-box" style="background:#f8fafc;border-radius:50%"></span>일반인</span>
+                    <span class="l-item"><span class="color-box" style="background:#f472b6;border-radius:50%"></span>어린이</span>
+                    <span class="l-item"><span class="color-box" style="background:#c084fc;border-radius:50%"></span>노약자</span>
+                    <span class="l-item"><span class="color-box" style="background:#38bdf8"></span>장애인 (휠체어)</span>
+                </div>
+                <div class="l-group">
+                    <span class="l-key">신호</span>
+                    <span class="l-item">🟢 직진·우회전</span>
+                    <span class="l-item"><span style="color:#22c55e;font-weight:700;font-size:1.1em">←</span> 좌회전 화살표 (꺾는 방향)</span>
+                    <span class="l-item">🟡 황색</span>
+                    <span class="l-item">🔴 적색 (우회전·보행자 양보)</span>
+                </div>
+                <div class="l-note">정체 지수 = 멈춘·느린 차 비율. 신호 대기 차도 포함되어 정상 운영 중에도 빨강이 흔하니, 비교는 통과·정지 차량 수로 하세요.</div>
             </div>
         </main>
     </div>
@@ -2579,49 +2591,41 @@ Renderer.prototype._drawDemandOverlay = function(cam) {
     ctx.lineWidth = 1;
     var LB = ov.leftBound || 0;                               // 이 선 왼쪽은 AI 패널이 덮고 있다
     var labels = ov.labels || [];
+    // 이름표는 한 줄짜리 알약: [방향 칩] 도로 이름 · 수요 화살표. 남북은 도로 끝 위·아래에 가로로, 동서는 도로 끝 옆에 세로로 세운다.
+    // 한 줄이라 격자 둘레 여백이 34px 이면 되고, 그만큼 격자를 크게 그릴 수 있다.
+    var drawPill = function(L, cx, cy, angle, pw, ph, text, textW) {
+        ctx.save();
+        ctx.translate(cx, cy); ctx.rotate(angle);
+        ctx.fillStyle = bg; ctx.strokeStyle = bd; pill(-pw / 2, -ph / 2, pw, ph, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = chip; pill(-pw / 2 + 4, -8, 16, 16, 3); ctx.fill();
+        ctx.fillStyle = '#eff6ff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(L.side, -pw / 2 + 12, 0.5);
+        ctx.fillStyle = fg; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(text, -pw / 2 + 25, 0.5);
+        ctx.restore();
+    };
     for (var i = 0; i < labels.length; i++) {
         var L = labels[i];
         var sx = cam.x + L.x * cam.scale, sy = cam.y + L.y * cam.scale;
-        var gap = L.r * cam.scale + 10;                       // 인도 원 바깥 + 여백
-        var volTxt = L.volume != null ? L.volume.toLocaleString() + '대/시 ' + L.arrow : '';
+        var gap = L.r * cam.scale + 6;                        // 인도 원 바깥 + 여백
+        var text = L.name + (L.volume != null ? ' · ' + L.volume.toLocaleString() + '대/시 ' + L.arrow : '');
         ctx.font = '11px sans-serif';
-        var nameW = ctx.measureText(L.name).width;
-        ctx.font = '10px sans-serif';
-        var volW = volTxt ? ctx.measureText(volTxt).width : 0;
-        var pw = 8 + 24 + 6 + Math.max(nameW, volW) + 10, ph = volTxt ? 36 : 28;
-        var horizontal = true, cx = sx, cy = sy;
-        if (L.side === 'N') cy = sy - gap - ph / 2;
-        else if (L.side === 'S') cy = sy + gap + ph / 2;
-        else if (L.side === 'E') { horizontal = sx + gap + pw <= W - 4; cx = sx + gap + pw / 2; }
-        else { horizontal = sx - gap - pw >= LB + 4; cx = sx - gap - pw / 2; }
-        if (horizontal) {
-            cx = Math.max(LB + pw / 2 + 4, Math.min(W - pw / 2 - 4, cx));
+        var textW = ctx.measureText(text).width;
+        var pw = 25 + textW + 8, ph = 22;
+        ctx.strokeStyle = bd;
+        if (L.side === 'N' || L.side === 'S') {
+            var cy = L.side === 'N' ? sy - gap - ph / 2 : sy + gap + ph / 2;
+            var cx = Math.max(LB + pw / 2 + 4, Math.min(W - pw / 2 - 4, sx));
             cy = Math.max(ph / 2 + 4, Math.min(H - ph / 2 - 4, cy));
-            ctx.strokeStyle = bd; ctx.beginPath(); ctx.moveTo(sx, sy);
-            if (L.side === 'N') ctx.lineTo(sx, cy + ph / 2);
-            else if (L.side === 'S') ctx.lineTo(sx, cy - ph / 2);
-            else if (L.side === 'E') ctx.lineTo(cx - pw / 2, sy);
-            else ctx.lineTo(cx + pw / 2, sy);
-            ctx.stroke();
-            var x0 = cx - pw / 2, y0 = cy - ph / 2;
-            ctx.fillStyle = bg; ctx.strokeStyle = bd; pill(x0, y0, pw, ph, 6); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = chip; pill(x0 + 6, y0 + ph / 2 - 12, 24, 24, 4); ctx.fill();
-            ctx.fillStyle = '#eff6ff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(L.side, x0 + 18, y0 + ph / 2 + 0.5);
-            ctx.textAlign = 'left'; ctx.fillStyle = fg; ctx.font = '11px sans-serif';
-            ctx.fillText(L.name, x0 + 38, y0 + (volTxt ? 12 : ph / 2 + 0.5));
-            if (volTxt) { ctx.fillStyle = mute; ctx.font = '10px sans-serif'; ctx.fillText(volTxt, x0 + 38, y0 + 25); }
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, L.side === 'N' ? cy + ph / 2 : cy - ph / 2); ctx.stroke();
+            drawPill(L, cx, cy, 0, pw, ph, text, textW);
         } else {
-            var t = L.side + ' ' + L.name + (L.volume != null ? ' · ' + L.volume.toLocaleString() + '대/시' : '');
-            ctx.font = '11px sans-serif';
-            var tw = ctx.measureText(t).width + 16, th = 20;
-            var vx = L.side === 'E' ? Math.min(W - th / 2 - 4, sx + gap + th / 2) : Math.max(LB + th / 2 + 4, sx - gap - th / 2);
-            var vy = Math.max(tw / 2 + 4, Math.min(H - tw / 2 - 4, sy));
-            ctx.save();
-            ctx.translate(vx, vy); ctx.rotate(L.side === 'E' ? Math.PI / 2 : -Math.PI / 2);
-            ctx.fillStyle = bg; ctx.strokeStyle = bd; pill(-tw / 2, -th / 2, tw, th, 6); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.fillText(t, 0, 0.5);
-            ctx.restore();
+            // 동서는 세로로 세운 알약. 글자는 위에서 아래로 읽히도록 동쪽은 시계 방향, 서쪽은 반시계 방향으로 돌린다.
+            var vx = L.side === 'E' ? sx + gap + ph / 2 : sx - gap - ph / 2;
+            vx = Math.max(LB + ph / 2 + 4, Math.min(W - ph / 2 - 4, vx));
+            var vy = Math.max(pw / 2 + 4, Math.min(H - pw / 2 - 4, sy));
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(L.side === 'E' ? vx - ph / 2 : vx + ph / 2, sy); ctx.stroke();
+            drawPill(L, vx, vy, L.side === 'E' ? Math.PI / 2 : -Math.PI / 2, pw, ph, text, textW);
         }
     }
     if (ov.badge) {
@@ -2692,28 +2696,60 @@ SimController.prototype._initDOM = function() {
     this.renderer = new Renderer(this.canvas);
     this.renderer.overlaySource = this;      // 실데이터 모드의 도로 이름표·출처 배지 데이터
 
-    // 격자가 화면보다 크면(휴대폰 등) 화면에 맞게 줄이고, 넉넉하면 1배로 가운데 둔다.
+    // 격자가 화면보다 크면(휴대폰 등) 화면에 맞게 줄이고, 넉넉하면 남는 공간만큼(최대 2.6배) 키워 가운데 둔다.
+    // 맞추는 대상은 실제로 그려지는 범위(첫 노드~마지막 노드 + 테두리 도로·인도 여유)다. 노드 좌표계 전체(0~(N+1)×100)로 맞추면
+    // 그려지지 않는 바깥 여백까지 세어 격자가 작게 남는다.
+    var MAX_FIT_SCALE = 2.6;
+    var FIT_PAD = 32;                               // 경계 노드 중심에서 둥근 테두리 바깥까지 (테두리 도로 반폭 + 인도 + 여유)
     // 실데이터 모드에서는 격자 둘레에 이름표(위·아래·옆)와 출처 배지(아래) 자리를 먼저 비워 둔다.
-    var fitCamera = function(rect) {
-        var nw = (self.gridSize+1)*100, nh = (self.gridSize+1)*100;
+    var computeFit = function(rect) {
+        var sp = (self.network && self.network.spacing) || 100;
+        var x0 = sp - FIT_PAD, y0 = sp - FIT_PAD;                       // 그려지는 범위의 왼쪽 위 (world)
+        var nw = (self.gridSize - 1) * sp + 2 * FIT_PAD, nh = nw;      // 그려지는 범위의 폭·높이 (world)
         var ov = self.demandOverlay ? self.demandOverlay() : null;
         var hasLabels = !!(ov && ov.labels && ov.labels.length);
-        // AI 패널이 도로 화면 왼쪽 위에 떠 있으면(넓은 화면) 그 오른쪽 남은 공간에 격자를 가운데 둔다.
+        // AI 패널이 도로 화면 왼쪽 위에 떠 있으면(넓은 화면) 격자가 패널을 덮지 않게 한다.
         // 남은 공간이 격자 절반도 안 되면 예전처럼 전체 가운데에 둔다 (노트북 폭에서 격자와 이름표가 패널에 가려지지 않게).
         var left = ov ? (ov.leftBound || 0) : self._panelLeftBound();
         if (left) left += 12;
         var availW = rect.width - left;
         if (availW < nw * 0.5 + 80) { left = 0; availW = rect.width; }
-        var mx = hasLabels ? (availW >= 720 ? 190 : 40) : 16;
-        var top = hasLabels ? 80 : 16;
-        var bottom = (hasLabels ? 80 : 16) + (ov ? 32 : 0);
-        var s = Math.min(1, (availW - 2 * mx) / nw, (rect.height - top - bottom) / nh);
+        var mx = hasLabels ? 34 : 16;                // 세로 이름표 폭(22) + 여백
+        var top = hasLabels ? 34 : 16;               // 가로 이름표 높이(22) + 여백
+        var bottom = (hasLabels ? 34 : 16) + (ov ? 28 : 0);
+        // 남은 공간만큼 키운다. 상한 2.6배 (차·신호등이 너무 커지지 않게). 이름표·배지는 화면 좌표로 그려서 글자 크기는 그대로다.
+        var s = Math.min(MAX_FIT_SCALE, (availW - 2 * mx) / nw, (rect.height - top - bottom) / nh);
         if (!(s > 0)) s = 1;
-        self.cam.scale = s;
-        self.cam.x = left + (availW - nw * s) / 2;
-        self.cam.y = top + (rect.height - top - bottom - nh * s) / 2;
+        // 가로는 화면 전체의 가운데가 기본이고, 패널과 겹칠 때만 겹치지 않을 만큼 오른쪽으로 민다 (오른쪽으로 치우쳐 보이지 않게).
+        var px = (rect.width - nw * s) / 2;
+        if (px < left + mx) px = left + mx;
+        var py = top + (rect.height - top - bottom - nh * s) / 2;
+        return { scale: s, x: px - x0 * s, y: py - y0 * s };
+    };
+    var fitCamera = function(rect) {
+        var f = computeFit(rect);
+        self.cam.scale = f.scale; self.cam.x = f.x; self.cam.y = f.y;
     };
     self.fitCamera = fitCamera;
+    // 확대·축소 공통. 축소 하한은 화면 맞춤 배율이다: 그 아래로는 격자만 작아지고 화면 크기가 고정인 이름표끼리 겹친다.
+    // 하한에 닿으면 맞춤 위치로 되돌려 가운데에 둔다. 상한 5배.
+    var MAX_ZOOM = 5.0;
+    var zoomBy = function(factor, mx, my) {
+        var rect = self.canvas.getBoundingClientRect();
+        var fit = computeFit(rect);
+        var newScale = self.cam.scale * factor;
+        if (newScale <= fit.scale) {
+            self.cam.scale = fit.scale; self.cam.x = fit.x; self.cam.y = fit.y;
+        } else {
+            newScale = Math.min(newScale, MAX_ZOOM);
+            var zoom = newScale / self.cam.scale;
+            self.cam.x = mx - (mx - self.cam.x) * zoom;
+            self.cam.y = my - (my - self.cam.y) * zoom;
+            self.cam.scale = newScale;
+        }
+        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+    };
+    self.zoomBy = zoomBy;
     // 좁은 화면에서는 AI 패널이 도로를 가리지 않도록 도로 화면 아래로 옮기고, 넓어지면 원래 자리로 돌린다.
     var aiPanel = document.getElementById('ai-floating-panel');
     var canvasBox = self.canvas.parentElement;
@@ -2864,15 +2900,7 @@ SimController.prototype._initDOM = function() {
         var my = ev.clientY - rect.top;
         
         var wheel = ev.deltaY < 0 ? 1 : -1;
-        var zoom = Math.exp(wheel * 0.1);
-        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
-        zoom = newScale / self.cam.scale;
-        
-        self.cam.x = mx - (mx - self.cam.x) * zoom;
-        self.cam.y = my - (my - self.cam.y) * zoom;
-        self.cam.scale = newScale;
-        
-        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+        zoomBy(Math.exp(wheel * 0.1), mx, my);
     }, {passive: false});
 
     // 캔버스 드래그 패닝 및 클릭 제어
@@ -3743,27 +3771,11 @@ SimController.prototype._initDOM = function() {
     // 확대/축소 버튼 클릭 바인딩
     document.getElementById('btn-zoom-in').onclick = function() {
         var rect = self.canvas.getBoundingClientRect();
-        var mx = rect.width / 2;
-        var my = rect.height / 2;
-        var zoom = Math.exp(0.2);
-        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
-        zoom = newScale / self.cam.scale;
-        self.cam.x = mx - (mx - self.cam.x) * zoom;
-        self.cam.y = my - (my - self.cam.y) * zoom;
-        self.cam.scale = newScale;
-        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+        zoomBy(Math.exp(0.2), rect.width / 2, rect.height / 2);
     };
     document.getElementById('btn-zoom-out').onclick = function() {
         var rect = self.canvas.getBoundingClientRect();
-        var mx = rect.width / 2;
-        var my = rect.height / 2;
-        var zoom = Math.exp(-0.2);
-        var newScale = Math.max(0.2, Math.min(self.cam.scale * zoom, 5.0));
-        zoom = newScale / self.cam.scale;
-        self.cam.x = mx - (mx - self.cam.x) * zoom;
-        self.cam.y = my - (my - self.cam.y) * zoom;
-        self.cam.scale = newScale;
-        if (!self.running) self.renderer.render(self.network, self.jc, self.cam);
+        zoomBy(Math.exp(-0.2), rect.width / 2, rect.height / 2);
     };
     document.getElementById('btn-zoom-reset').onclick = function() {
         fitCamera(self.canvas.getBoundingClientRect());
