@@ -155,7 +155,7 @@ FlowLight는 **교통 데이터 → 시뮬레이터 → FastAPI → Multi-Agent 
 
 # 🤖 AI 의사결정 과정
 
-FlowLight는 **Multi-Agent 기반 AI Workflow**로 교통 상황을 분석하고 신호 계획을 생성한 뒤 스스로 평가합니다. Guardrail은 계획 직후, 평가 이전에 실행됩니다.
+FlowLight는 Agent 세 개가 차례로 교통 상황을 분석하고, 신호 계획을 세우고, 그 계획을 평가합니다. Guardrail은 계획 직후, 평가 이전에 실행됩니다.
 
 <p align="center">
   <img src="docs/ai_decision_process.png" width="100%">
@@ -601,44 +601,20 @@ Agent가 실제로 돌려준 `summary` / `explanation` / `reason`과 Guardrail �
 | **Re-planning** | 시간대 변경 외에 포화도 급변·교통약자 출현 같은 상황 변화에도 재분석 |
 | **Roundabout Scenario** | 회전교차로 차량 흐름과 우선순위 규칙 추가 |
 | **Multi-Intersection Control** | 인접 교차로 간 신호 연동 및 녹색파 제어 확장 |
-| **Reinforcement Learning** | LLM Agent와 강화학습을 결합한 하이브리드 신호 최적화 |
+| **Reinforcement Learning** | LLM 계획과 강화학습을 함께 쓰는 신호 제어 |
 | **Evaluation Automation** | 여러 시드 비교와 신뢰구간 계산을 화면의 A/B 검증에서 바로 실행 |
 
 ---
 
 # 👨‍💻 My Contributions
 
-본 프로젝트에서 저는 **LLM Agent 설계, Backend 연동, Guardrail 검증, Frontend 연결, 실험 및 발표 자료 제작**을 중심으로 수행했습니다.
+이 저장소에서 제가 한 일입니다.
 
-### AI / LLM
-- Traffic Analysis Agent, Signal Planning Agent, Plan Evaluation Agent 구조 설계
-- Upstage Solar API 기반 LLM 호출 흐름 구현
-- 교통 상태 데이터를 LLM 입력에 적합한 Prompt 형식으로 변환
-- JSON 기반 신호 계획 출력 형식 설계
-
-### Backend
-- FastAPI 기반 AI Agent 서버 구현
-- Frontend와 통신하기 위한 API Endpoint 구성
-- SSE(Server-Sent Events)를 활용한 실시간 스트리밍 응답 구현
-- AI 분석 단계, 신호 계획 생성, 평가 결과를 순차적으로 전달하는 흐름 구성
-
-### Reliability
-- Guardrail을 통한 신호 시간 최소/최대 범위 검증
-- JSON 응답 형식 검증
-- 비정상 값 필터링 및 안전한 신호 계획만 적용하도록 처리
-- 오류 발생 시 데모가 중단되지 않도록 예외 처리 보완
-
-### Frontend / Demo
-- HTML / JavaScript 기반 시뮬레이션 화면과 Backend 연동
-- AI 분석 결과 및 신호 계획을 사용자 화면에 표시
-- AI 적용 전 / 후 비교 시나리오 구성
-- 전체 시뮬레이션 데모 영상 제작
-
-### Documentation / Presentation
-- 프로젝트 발표 자료 제작
-- 시스템 아키텍처 및 AI 의사결정 과정 정리
-- 실험 결과 분석 및 발표
-- 최종 발표 진행
+- Agent 세 개(분석·계획·평가)의 역할과 프롬프트, 출력 JSON Schema를 정했습니다. 교차로 상태를 Agent가 읽을 입력 JSON으로 바꾸는 부분도 여기에 들어갑니다.
+- FastAPI 서버, SSE 스트리밍, 교통량 프로파일 API를 만들었습니다.
+- Guardrail(최소 녹색 시간과 주기 합계)과 최종 판단 보정을 코드로 넣었고, Solar 응답이 잘리거나 실패해도 데모가 멈추지 않게 했습니다.
+- 브라우저 시뮬레이터를 백엔드와 연결하고, 분석 결과와 적용 효과를 화면에 표시했습니다.
+- 적용 전후 비교와 시드 10개 비교를 설계해 돌렸고, 영상과 발표 자료를 만들어 발표했습니다.
 
 ---
 
