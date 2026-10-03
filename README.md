@@ -22,6 +22,8 @@
 
 **설치 없이 바로 체험: [https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/](https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/)**
 
+Upstage Education 블로그에 소개된 글: [FlowLight: 교통량에 따른 실시간 AI 신호체계 설계 Agent](https://edu.upstage.ai/blog/daegu-bootcamp-flowlight) (2026-10-03)
+
 공개 페이지는 서버 없이 동작합니다. 실데이터 프로파일은 내장 데이터로 열리고, AI 분석은 기록해 둔 실제 Solar Pro 4 응답을 재생합니다. 실제 호출은 아래 실행 방법대로 저장소를 내려받아 API 키를 넣으면 볼 수 있습니다.
 
 아래는 사용법 안내 → 실데이터 프로파일 → AI 분석 → 신호 적용까지의 실행 화면입니다.
