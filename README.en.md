@@ -22,6 +22,8 @@
 
 **Try it without installing anything: [https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/](https://jihooni217.github.io/FlowLight-AI-Traffic-Signal/)**
 
+Featured on the Upstage Education blog (in Korean): [FlowLight: 교통량에 따른 실시간 AI 신호체계 설계 Agent](https://edu.upstage.ai/blog/daegu-bootcamp-flowlight) (2026-10-03)
+
 The public page runs without a server. The real-data profile opens from bundled data, and AI analysis replays a recorded real Solar Pro 4 response. To see live calls, clone the repository and add your API key as described under Getting started. The UI text is Korean.
 
 Below: from the first-run guide to the real-data profile, the AI analysis and the applied signal plan.
